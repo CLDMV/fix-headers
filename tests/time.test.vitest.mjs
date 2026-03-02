@@ -8,6 +8,39 @@ describe("utils/time", () => {
 		expect(formatted).toMatch(/^2026-03-01\s\d{2}:\d{2}:\d{2}\s[+-]\d{2}:\d{2}$/);
 	});
 
+	it("formats timezone with explicit plus and minus signs", () => {
+		const makeDate = (timezoneOffsetMinutes) =>
+			/** @type {Date} */ ({
+				getTimezoneOffset() {
+					return timezoneOffsetMinutes;
+				},
+				getFullYear() {
+					return 2026;
+				},
+				getMonth() {
+					return 0;
+				},
+				getDate() {
+					return 1;
+				},
+				getHours() {
+					return 2;
+				},
+				getMinutes() {
+					return 3;
+				},
+				getSeconds() {
+					return 4;
+				}
+			});
+
+		const plus = formatDateWithTimezone(makeDate(-120));
+		const minus = formatDateWithTimezone(makeDate(120));
+
+		expect(plus).toContain("+02:00");
+		expect(minus).toContain("-02:00");
+	});
+
 	it("returns date payload with unix timestamp", () => {
 		const date = new Date("2026-01-01T00:00:05.000Z");
 		const payload = toDatePayload(date);
