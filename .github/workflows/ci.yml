@@ -1,0 +1,97 @@
+#
+# @Project: @cldmv/fix-headers
+# @Filename: /.github/workflows/ci.yml
+# @Date: 2026-03-01 17:28:28 -08:00 (1772414908)
+# @Author: Nate Hyson <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-03-01 17:36:19 -08:00 (1772415379)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: CI
+
+on:
+    push:
+        branches: ["**"]
+    pull_request:
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                node: [20]
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node }}
+                  cache: npm
+
+            - name: Install
+              run: npm ci
+
+            - name: Type check
+              run: npm run types:check
+
+            - name: Tests + coverage
+              run: npm run ci:coverage
+
+            - name: Compute coverage badge JSON
+              run: |
+                  node -e "
+                    const s = JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json','utf8')).total;
+                    const avg = ((s.statements.pct + s.branches.pct + s.functions.pct + s.lines.pct) / 4).toFixed(1);
+                    const color = avg >= 90 ? 'brightgreen' : avg >= 75 ? 'green' : avg >= 60 ? 'yellow' : 'red';
+                    require('fs').writeFileSync('badge.json', JSON.stringify({schemaVersion:1,label:'coverage',message:avg+'%',color}));
+                    console.log('Coverage avg:', avg+'%');
+                  "
+
+            - name: Generate bot token
+              id: bot-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Import bot GPG key
+              uses: crazy-max/ghaction-import-gpg@v6
+              with:
+                  gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+
+            - name: Push coverage badge to badges branch
+              env:
+                  BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
+              run: |
+                  git config user.name "${{ secrets.CLDMV_BOT_NAME }}"
+                  git config user.email "${{ secrets.CLDMV_BOT_EMAIL }}"
+                  cp badge.json /tmp/coverage.json
+                  if git fetch origin badges; then
+                    git checkout badges
+                  else
+                    git checkout --orphan badges
+                    git rm -rf . --quiet 2>/dev/null || true
+                  fi
+                  cp /tmp/coverage.json coverage.json
+                  git add coverage.json
+                  git diff --cached --quiet && echo "Badge unchanged" && exit 0
+                  git commit -S -m "ci: update coverage badge"
+                  git push "https://x-access-token:${BOT_TOKEN}@github.com/${{ github.repository }}.git" badges
+                  git checkout master
+
+            - name: Upload coverage artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage
+                  path: coverage/
