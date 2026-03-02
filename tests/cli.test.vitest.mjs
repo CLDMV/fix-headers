@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/cli.test.vitest.mjs
+ *	@Date: 2026-03-01 15:14:34 -08:00 (1772406874)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -56,6 +69,42 @@ describe("cli", () => {
 	it("parses marker null sentinel", () => {
 		const parsed = parseCliArgs(["--marker", "null"]);
 		expect(parsed.options.marker).toBeNull();
+	});
+
+	it("parses sample-output flag", () => {
+		const parsed = parseCliArgs(["--sample-output"]);
+		expect(parsed.options.sampleOutput).toBe(true);
+	});
+
+	it("parses force-author-update flag", () => {
+		const parsed = parseCliArgs(["--force-author-update"]);
+		expect(parsed.options.forceAuthorUpdate).toBe(true);
+	});
+
+	it("parses use-gpg-signer-author flag", () => {
+		const parsed = parseCliArgs(["--use-gpg-signer-author"]);
+		expect(parsed.options.useGpgSignerAuthor).toBe(true);
+	});
+
+	it("parses verbose flag", () => {
+		const parsed = parseCliArgs(["--verbose"]);
+		expect(parsed.options.verbose).toBe(true);
+	});
+
+	it("removes duplicates for repeatable list flags", () => {
+		const parsed = parseCliArgs([
+			"--include-folder",
+			"src",
+			"--include-folder",
+			"src",
+			"--enable-detector",
+			"node",
+			"--enable-detector",
+			"node"
+		]);
+
+		expect(parsed.options.includeFolders).toEqual(["src"]);
+		expect(parsed.options.enabledDetectors).toEqual(["node"]);
 	});
 
 	it("throws unknown malformed flag when next token is another flag", () => {
@@ -128,6 +177,175 @@ describe("cli", () => {
 
 		expect(code).toBe(0);
 		expect(stdout.join("\n")).toContain("scanned=5");
+	});
+
+	it("prints updated file paths in verbose mode", async () => {
+		const stdout = [];
+		const code = await runCli(["--verbose"], {
+			runner: async () => ({
+				filesScanned: 3,
+				filesUpdated: 2,
+				dryRun: true,
+				changes: [
+					{ file: "src/a.mjs", changed: true },
+					{ file: "src/b.mjs", changed: false },
+					{ file: "src/c.mjs", changed: true }
+				]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("updated: src/a.mjs");
+		expect(stdout.join("\n")).toContain("updated: src/c.mjs");
+		expect(stdout.join("\n")).not.toContain("updated: src/b.mjs");
+	});
+
+	it("handles verbose mode when runner returns non-object result", async () => {
+		const stdout = [];
+		const code = await runCli(["--verbose"], {
+			runner: async () => "ok",
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout).toEqual(["fix-headers complete"]);
+	});
+
+	it("handles verbose mode when changes is not an array", async () => {
+		const stdout = [];
+		const code = await runCli(["--verbose"], {
+			runner: async () => ({ filesScanned: 1, filesUpdated: 0, dryRun: true, changes: "invalid" }),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("fix-headers complete: scanned=1, updated=0, dryRun=true");
+		expect(stdout.join("\n")).not.toContain("updated:");
+	});
+
+	it("prints unknown-file fallback in verbose mode", async () => {
+		const stdout = [];
+		const code = await runCli(["--verbose"], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 1,
+				dryRun: true,
+				changes: [{ changed: true }]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("updated: <unknown-file>");
+	});
+
+	it("prints sample output blocks for changed files when enabled", async () => {
+		const stdout = [];
+		const code = await runCli(["--sample-output"], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 1,
+				dryRun: true,
+				changes: [
+					{
+						file: "src/demo.mjs",
+						changed: true,
+						sample: {
+							previousValue: null,
+							newValue: "/**\\n *\\t@Project: demo\\n */",
+							detectedValues: {
+								projectName: "demo",
+								language: "node"
+							}
+						}
+					}
+				]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("sample: src/demo.mjs");
+		expect(stdout.join("\n")).toContain("previous:\n(none)");
+		expect(stdout.join("\n")).toContain("new:");
+		expect(stdout.join("\n")).toContain("detected-values:");
+		expect(stdout.join("\n")).toContain('"projectName": "demo"');
+	});
+
+	it("skips malformed sample changes while still printing summary", async () => {
+		const stdout = [];
+		const code = await runCli(["--sample-output"], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 1,
+				dryRun: true,
+				changes: [
+					null,
+					{ changed: false, sample: { newValue: "ignored" } },
+					{ changed: true, sample: {} },
+					{ changed: true, sample: { newValue: 123 } }
+				]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("fix-headers complete: scanned=1, updated=1, dryRun=true");
+		expect(stdout.join("\n")).not.toContain("sample:");
+	});
+
+	it("handles sample-output mode when changes is not an array", async () => {
+		const stdout = [];
+		const code = await runCli(["--sample-output"], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 1,
+				dryRun: true,
+				changes: "invalid"
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("fix-headers complete: scanned=1, updated=1, dryRun=true");
+		expect(stdout.join("\n")).not.toContain("sample:");
+	});
+
+	it("prints unknown-file fallback and non-null previous sample value", async () => {
+		const stdout = [];
+		const code = await runCli(["--sample-output"], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 1,
+				dryRun: true,
+				changes: [
+					{
+						changed: true,
+						sample: {
+							previousValue: "/**\\n * old header\\n */",
+							newValue: "/**\\n * new header\\n */"
+						}
+					}
+				]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout.join("\n")).toContain("sample: <unknown-file>");
+		expect(stdout.join("\n")).toContain("previous:\n/**\\n * old header\\n */");
+	});
+
+	it("handles sample-output mode when runner returns non-object result", async () => {
+		const stdout = [];
+		const code = await runCli(["--sample-output"], {
+			runner: async () => "ok",
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout).toEqual(["fix-headers complete"]);
 	});
 
 	it("prints summary defaults for null counts and dryRun true", async () => {

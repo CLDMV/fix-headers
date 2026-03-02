@@ -26,8 +26,8 @@ export function getDetectorById(id: string): (typeof DETECTOR_PROFILES)[number] 
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options.
- * @returns {{kind: "block" | "line" | "html", linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options.
+ * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
 export function getCommentSyntaxForFile(filePath: string, options?: {
     language?: string;
@@ -35,6 +35,7 @@ export function getCommentSyntaxForFile(filePath: string, options?: {
     disabledDetectors?: string[];
     detectorSyntaxOverrides?: Record<string, {
         linePrefix?: string;
+        lineSeparator?: string;
         blockStart?: string;
         blockLinePrefix?: string;
         blockEnd?: string;
@@ -42,11 +43,25 @@ export function getCommentSyntaxForFile(filePath: string, options?: {
 }): {
     kind: "block" | "line" | "html";
     linePrefix?: string;
+    lineSeparator?: string;
     blockStart?: string;
     blockLinePrefix?: string;
     blockEnd?: string;
 };
-export const DETECTOR_PROFILES: {
+/**
+ * Resolves detector-specific leading content that must be preserved above inserted headers.
+ * @param {string} filePath - File path.
+ * @param {string} content - Full file content.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
+ * @returns {string} Preserved prefix (possibly empty).
+ */
+export function getPreservedPrefixForFile(filePath: string, content: string, options?: {
+    language?: string;
+    enabledDetectors?: string[];
+    disabledDetectors?: string[];
+}): string;
+export const DETECTOR_PROFILES: DetectorProfile[];
+export type DetectorProfile = {
     id: string;
     markers: string[];
     extensions: string[];
@@ -56,11 +71,14 @@ export const DETECTOR_PROFILES: {
         marker: string;
     } | null>;
     parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string;
-    resolveCommentSyntax: (filePath: string) => {
+    resolveCommentSyntax: (filePath: string) => ({
         kind: "block" | "line" | "html";
         linePrefix?: string;
+        lineSeparator?: string;
         blockStart?: string;
         blockLinePrefix?: string;
         blockEnd?: string;
-    } | null;
-}[];
+    } | null);
+    resolvePreservedPrefix?: (filePath: string, content: string) => string;
+    priority?: number;
+};

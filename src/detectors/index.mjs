@@ -2,13 +2,13 @@
  *	@Project: @cldmv/fix-headers
  *	@Filename: /src/detectors/index.mjs
  *	@Date: 2026-03-01 16:34:41 -08:00 (1772411681)
- *	@Author: Nate Hyson <CLDMV>
+ *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
- *	@Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01 17:57:59 -08:00 (1772416679)
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
  *	-----
- *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { readdir } from "node:fs/promises";
@@ -29,7 +29,8 @@ import { dirname, join } from "node:path";
  *  enabledByDefault: boolean,
  *  findNearestConfig: (startPath: string) => Promise<{root: string, marker: string} | null>,
  *  parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string,
- *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
+ *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
+ *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
  *  priority?: number
  * }} DetectorProfile
  */
@@ -63,9 +64,9 @@ const detectorMap = new Map(DETECTOR_PROFILES.map((detector) => [detector.id, de
 
 /**
  * Applies runtime syntax overrides to a detector-provided syntax descriptor.
- * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Base syntax descriptor.
- * @param {{ linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string } | undefined} override - Override descriptor.
- * @returns {{kind: "block" | "line" | "html", linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Effective descriptor.
+ * @param {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Base syntax descriptor.
+ * @param {{ linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string } | undefined} override - Override descriptor.
+ * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Effective descriptor.
  */
 function applySyntaxOverride(syntax, override) {
 	if (!override || typeof override !== "object") {
@@ -75,7 +76,8 @@ function applySyntaxOverride(syntax, override) {
 	if (syntax.kind === "line") {
 		return {
 			...syntax,
-			linePrefix: typeof override.linePrefix === "string" && override.linePrefix.length > 0 ? override.linePrefix : syntax.linePrefix
+			linePrefix: typeof override.linePrefix === "string" && override.linePrefix.length > 0 ? override.linePrefix : syntax.linePrefix,
+			lineSeparator: typeof override.lineSeparator === "string" ? override.lineSeparator : syntax.lineSeparator
 		};
 	}
 
@@ -138,8 +140,8 @@ export function getDetectorById(id) {
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options.
- * @returns {{kind: "block" | "line" | "html", linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options.
+ * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
 export function getCommentSyntaxForFile(filePath, options = {}) {
 	const extension = extname(filePath).toLowerCase();
@@ -157,4 +159,29 @@ export function getCommentSyntaxForFile(filePath, options = {}) {
 	}
 
 	return { kind: "block", blockStart: "/**", blockLinePrefix: " *\t", blockEnd: " */" };
+}
+
+/**
+ * Resolves detector-specific leading content that must be preserved above inserted headers.
+ * @param {string} filePath - File path.
+ * @param {string} content - Full file content.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
+ * @returns {string} Preserved prefix (possibly empty).
+ */
+export function getPreservedPrefixForFile(filePath, content, options = {}) {
+	const extension = extname(filePath).toLowerCase();
+	const detectors = getEnabledDetectors(options);
+	for (const detector of detectors) {
+		if (!detector.extensions.includes(extension)) {
+			continue;
+		}
+
+		if (typeof detector.resolvePreservedPrefix === "function") {
+			return detector.resolvePreservedPrefix(filePath, content);
+		}
+
+		return "";
+	}
+
+	return "";
 }

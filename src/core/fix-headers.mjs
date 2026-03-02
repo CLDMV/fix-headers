@@ -1,9 +1,22 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/core/fix-headers.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import { buildHeader } from "../header/template.mjs";
-import { replaceOrInsertHeader } from "../header/parser.mjs";
+import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
 import { readFileDates } from "../utils/fs.mjs";
 import { getGitCreationDate, getGitLastModifiedDate } from "../utils/git.mjs";
 import { toDatePayload } from "../utils/time.mjs";
@@ -14,9 +27,12 @@ import { toDatePayload } from "../utils/time.mjs";
  *  input?: string,
  *  dryRun?: boolean,
  *  configFile?: string,
+ *  sampleOutput?: boolean,
+ *  forceAuthorUpdate?: boolean,
+ *  useGpgSignerAuthor?: boolean,
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
- *  detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>,
+ *  detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>,
  *  includeFolders?: string[],
  *  excludeFolders?: string[],
  *  includeExtensions?: string[],
@@ -47,7 +63,20 @@ import { toDatePayload } from "../utils/time.mjs";
  *  filesScanned: number,
  *  filesUpdated: number,
  *  dryRun: boolean,
- *  changes: Array<{file: string, changed: boolean}>
+ *  changes: Array<{file: string, changed: boolean, sample?: { previousValue: string | null, newValue: string, detectedValues?: {
+ *   projectName: string,
+ *   language: string,
+ *   projectRoot: string,
+ *   marker: string | null,
+ *   authorName: string,
+ *   authorEmail: string,
+ *   companyName: string,
+ *   copyrightStartYear: number,
+ *   createdAtSource: string,
+ *   lastModifiedAtSource: string,
+ *   createdAt: {date: string, timestamp: number},
+ *   lastModifiedAt: {date: string, timestamp: number}
+ *  } }}>
  * }} FixHeadersResult
  */
 
@@ -81,6 +110,65 @@ async function resolveRuntimeOptions(options) {
 	/** @type {FixHeadersOptions} */
 	const output = merged;
 	return output;
+}
+
+/**
+ * Extracts original author identity from an existing header block.
+ * @param {string} headerText - Existing header content.
+ * @returns {{ authorName?: string, authorEmail?: string }} Parsed identity values.
+ */
+function extractHeaderAuthorIdentity(headerText) {
+	const authorMatch = headerText.match(/@Author:\s*(.+)$/m);
+	const emailMatch = headerText.match(/@Email:\s*<([^>\n]+)>/m);
+
+	return {
+		authorName: authorMatch?.[1]?.trim(),
+		authorEmail: emailMatch?.[1]?.trim()
+	};
+}
+
+/**
+ * Extracts original created-at payload from an existing header block.
+ * @param {string} headerText - Existing header content.
+ * @returns {{date: string, timestamp: number} | null} Parsed created-at value.
+ */
+function extractHeaderCreatedAt(headerText) {
+	const dateMatch = headerText.match(/@Date:\s*(.+?)\s*\((\d+)\)$/m);
+	if (!dateMatch || !dateMatch[1] || !dateMatch[2]) {
+		return null;
+	}
+
+	const timestamp = Number.parseInt(dateMatch[2], 10);
+	if (Number.isNaN(timestamp)) {
+		return null;
+	}
+
+	return {
+		date: dateMatch[1].trim(),
+		timestamp
+	};
+}
+
+/**
+ * Extracts original last-modified payload from an existing header block.
+ * @param {string} headerText - Existing header content.
+ * @returns {{date: string, timestamp: number} | null} Parsed last-modified value.
+ */
+function extractHeaderLastModifiedAt(headerText) {
+	const modifiedMatch = headerText.match(/@Last modified time:\s*(.+?)\s*\((\d+)\)$/m);
+	if (!modifiedMatch || !modifiedMatch[1] || !modifiedMatch[2]) {
+		return null;
+	}
+
+	const timestamp = Number.parseInt(modifiedMatch[2], 10);
+	if (Number.isNaN(timestamp)) {
+		return null;
+	}
+
+	return {
+		date: modifiedMatch[1].trim(),
+		timestamp
+	};
 }
 
 /**
@@ -138,6 +226,7 @@ export async function fixHeaders(options = {}) {
 	}
 
 	const currentYear = new Date().getFullYear();
+	/** @type {FixHeadersResult["changes"]} */
 	const changes = [];
 	const detectedProjects = new Set();
 	let filesUpdated = 0;
@@ -152,16 +241,33 @@ export async function fixHeaders(options = {}) {
 		detectedProjects.add(`${fileMetadata.language}:${fileMetadata.projectRoot}`);
 		const relativePath = relative(scanRoot, filePath);
 		const original = await readFile(filePath, "utf8");
+		const existingHeader = findProjectHeader(original, filePath, {
+			language: fileMetadata.language,
+			enabledDetectors: effectiveOptions.enabledDetectors,
+			disabledDetectors: effectiveOptions.disabledDetectors,
+			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+		});
+		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
+		const existingIdentity = existingHeaderText.length > 0 ? extractHeaderAuthorIdentity(existingHeaderText) : {};
+		const existingCreatedAt = existingHeaderText.length > 0 ? extractHeaderCreatedAt(existingHeaderText) : null;
+		const existingLastModifiedAt = existingHeaderText.length > 0 ? extractHeaderLastModifiedAt(existingHeaderText) : null;
 		const filesystemDates = await readFileDates(filePath);
 
 		const metadataRelativePath = relative(fileMetadata.projectRoot, filePath);
 		const gitCreated = await getGitCreationDate(fileMetadata.projectRoot, metadataRelativePath);
 		const gitLastUpdated = await getGitLastModifiedDate(fileMetadata.projectRoot, metadataRelativePath);
 
-		const createdAt = gitCreated || toDatePayload(filesystemDates.createdAt);
-		const lastModifiedAt = gitLastUpdated || toDatePayload(filesystemDates.updatedAt);
+		const createdAtSource = existingCreatedAt ? "existing-header" : gitCreated ? "git-created" : "filesystem-created";
+		const comparisonLastModifiedAtSource = existingLastModifiedAt
+			? "existing-header"
+			: gitLastUpdated
+				? "git-last-modified"
+				: "filesystem-updated";
+		const createdAt = existingCreatedAt || gitCreated || toDatePayload(filesystemDates.createdAt);
+		const comparisonLastModifiedAt = existingLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt);
+		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
 
-		const header = buildHeader({
+		const comparisonHeader = buildHeader({
 			absoluteFilePath: filePath,
 			language: fileMetadata.language,
 			syntaxOptions: {
@@ -172,22 +278,90 @@ export async function fixHeaders(options = {}) {
 			},
 			projectRoot: fileMetadata.projectRoot,
 			projectName: fileMetadata.projectName,
+			createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
+			createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
+			lastModifiedByName: fileMetadata.authorName,
+			lastModifiedByEmail: fileMetadata.authorEmail,
 			authorName: fileMetadata.authorName,
 			authorEmail: fileMetadata.authorEmail,
 			createdAt,
-			lastModifiedAt,
+			lastModifiedAt: comparisonLastModifiedAt,
 			copyrightStartYear: fileMetadata.copyrightStartYear,
 			companyName: fileMetadata.companyName,
 			currentYear
 		});
 
-		const replacement = replaceOrInsertHeader(original, header, filePath, {
+		const comparisonReplacement = replaceOrInsertHeader(original, comparisonHeader, filePath, {
 			language: fileMetadata.language,
 			enabledDetectors: effectiveOptions.enabledDetectors,
 			disabledDetectors: effectiveOptions.disabledDetectors,
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		});
-		changes.push({ file: relativePath, changed: replacement.changed });
+		const needsUpdate = comparisonReplacement.changed;
+		const finalLastModifiedAt = needsUpdate ? toDatePayload(new Date()) : comparisonLastModifiedAt;
+		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
+
+		const header = needsUpdate
+			? buildHeader({
+					absoluteFilePath: filePath,
+					language: fileMetadata.language,
+					syntaxOptions: {
+						language: fileMetadata.language,
+						enabledDetectors: effectiveOptions.enabledDetectors,
+						disabledDetectors: effectiveOptions.disabledDetectors,
+						detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+					},
+					projectRoot: fileMetadata.projectRoot,
+					projectName: fileMetadata.projectName,
+					createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
+					createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
+					lastModifiedByName: fileMetadata.authorName,
+					lastModifiedByEmail: fileMetadata.authorEmail,
+					authorName: fileMetadata.authorName,
+					authorEmail: fileMetadata.authorEmail,
+					createdAt,
+					lastModifiedAt: finalLastModifiedAt,
+					copyrightStartYear: fileMetadata.copyrightStartYear,
+					companyName: fileMetadata.companyName,
+					currentYear
+				})
+			: comparisonHeader;
+
+		const replacement = needsUpdate
+			? replaceOrInsertHeader(original, header, filePath, {
+					language: fileMetadata.language,
+					enabledDetectors: effectiveOptions.enabledDetectors,
+					disabledDetectors: effectiveOptions.disabledDetectors,
+					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+				})
+			: comparisonReplacement;
+		const changeEntry = {
+			file: relativePath,
+			changed: replacement.changed
+		};
+
+		if (effectiveOptions.sampleOutput === true && replacement.changed) {
+			changeEntry.sample = {
+				previousValue: existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null,
+				newValue: header,
+				detectedValues: {
+					projectName: fileMetadata.projectName,
+					language: fileMetadata.language,
+					projectRoot: fileMetadata.projectRoot,
+					marker: fileMetadata.marker,
+					authorName: fileMetadata.authorName,
+					authorEmail: fileMetadata.authorEmail,
+					companyName: fileMetadata.companyName,
+					copyrightStartYear: fileMetadata.copyrightStartYear,
+					createdAtSource,
+					lastModifiedAtSource,
+					createdAt,
+					lastModifiedAt: finalLastModifiedAt
+				}
+			};
+		}
+
+		changes.push(changeEntry);
 
 		if (!replacement.changed) {
 			continue;

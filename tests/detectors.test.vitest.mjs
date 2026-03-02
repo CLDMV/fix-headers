@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/detectors.test.vitest.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { detector as cssDetector } from "../src/detectors/css.mjs";
@@ -7,7 +20,8 @@ import { detector as nodeDetector } from "../src/detectors/node.mjs";
 import { detector as phpDetector } from "../src/detectors/php.mjs";
 import { detector as pythonDetector } from "../src/detectors/python.mjs";
 import { detector as rustDetector } from "../src/detectors/rust.mjs";
-import { getCommentSyntaxForFile, getDetectorById } from "../src/detectors/index.mjs";
+import { detector as yamlDetector } from "../src/detectors/yaml.mjs";
+import { getCommentSyntaxForFile, getDetectorById, getPreservedPrefixForFile } from "../src/detectors/index.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 describe("detector implementations", () => {
@@ -46,6 +60,15 @@ describe("detector implementations", () => {
 		expect(htmlDetector.parseProjectName("index.html", "", "fallback")).toBe("fallback");
 		expect(htmlDetector.resolveCommentSyntax("/repo/index.html")?.kind).toBe("html");
 		expect(htmlDetector.resolveCommentSyntax("/repo/index.md")).toBeNull();
+
+		expect(yamlDetector.parseProjectName("package.json", JSON.stringify({ name: "yaml-project" }), "fallback")).toBe("yaml-project");
+		expect(yamlDetector.parseProjectName("package.json", JSON.stringify({}), "fallback")).toBe("fallback");
+		expect(yamlDetector.parseProjectName("package.json", "{", "fallback")).toBe("fallback");
+		expect(yamlDetector.parseProjectName(".git", "", "fallback")).toBe("fallback");
+		expect(yamlDetector.resolveCommentSyntax("/repo/config/app.yaml")?.kind).toBe("line");
+		expect(yamlDetector.resolveCommentSyntax("/repo/config/app.yaml")?.linePrefix).toBe("#");
+		expect(yamlDetector.resolveCommentSyntax("/repo/config/app.yml")?.kind).toBe("line");
+		expect(yamlDetector.resolveCommentSyntax("/repo/config/app.toml")).toBeNull();
 	});
 
 	it("covers detector findNearestConfig methods and registry helpers", async () => {
@@ -67,8 +90,10 @@ describe("detector implementations", () => {
 			expect(await rustDetector.findNearestConfig(workspace)).not.toBeNull();
 			expect(await pythonDetector.findNearestConfig(workspace)).not.toBeNull();
 			expect(await htmlDetector.findNearestConfig(workspace)).not.toBeNull();
+			expect(await yamlDetector.findNearestConfig(workspace)).not.toBeNull();
 
 			expect(getDetectorById("node")?.id).toBe("node");
+			expect(getDetectorById("yaml")?.id).toBe("yaml");
 			expect(getDetectorById("unknown-detector")).toBeUndefined();
 
 			const blockSyntax = getCommentSyntaxForFile("/repo/src/file.mjs", {
@@ -85,11 +110,13 @@ describe("detector implementations", () => {
 			const lineSyntax = getCommentSyntaxForFile("/repo/src/file.py", {
 				detectorSyntaxOverrides: {
 					python: {
-						linePrefix: ";;"
+						linePrefix: ";;",
+						lineSeparator: " "
 					}
 				}
 			});
 			expect(lineSyntax.linePrefix).toBe(";;");
+			expect(lineSyntax.lineSeparator).toBe(" ");
 
 			const lineFallbackSyntax = getCommentSyntaxForFile("/repo/src/file.py", {
 				detectorSyntaxOverrides: {
@@ -120,6 +147,14 @@ describe("detector implementations", () => {
 
 			const fallbackSyntax = getCommentSyntaxForFile("/repo/src/file.unknown");
 			expect(fallbackSyntax.kind).toBe("block");
+
+			expect(getPreservedPrefixForFile("/repo/src/cli.mjs", "#!/usr/bin/env node\nconsole.log('x')\n")).toBe(
+				"#!/usr/bin/env node\n"
+			);
+			expect(getPreservedPrefixForFile("/repo/src/app.py", "#!/usr/bin/env python3\nprint('x')\n")).toBe(
+				"#!/usr/bin/env python3\n"
+			);
+			expect(getPreservedPrefixForFile("/repo/src/file.unknown", "#!/usr/bin/env custom\nvalue\n")).toBe("");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}

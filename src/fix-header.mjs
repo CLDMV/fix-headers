@@ -2,13 +2,13 @@
  *	@Project: @cldmv/fix-headers
  *	@Filename: /src/fix-header.mjs
  *	@Date: 2026-03-01 13:34:00 -08:00 (1772400840)
- *	@Author: Nate Hyson <CLDMV>
+ *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
- *	@Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01 14:39:14 -08:00 (1772404754)
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
  *	-----
- *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { fixHeaders as fixHeadersCore } from "./core/fix-headers.mjs";

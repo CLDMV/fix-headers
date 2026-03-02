@@ -6,6 +6,7 @@
  * @typedef {{
  *  kind: "block" | "line" | "html",
  *  linePrefix?: string,
+ *  lineSeparator?: string,
  *  blockStart?: string,
  *  blockLinePrefix?: string,
  *  blockEnd?: string
@@ -14,7 +15,7 @@
 /**
  * Resolves comment syntax for a file path based on extension.
  * @param {string} filePath - Absolute or relative file path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Syntax resolution options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Syntax resolution options.
  * @returns {HeaderSyntax} Header syntax descriptor.
  */
 export function getHeaderSyntaxForFile(filePath: string, options?: {
@@ -23,6 +24,7 @@ export function getHeaderSyntaxForFile(filePath: string, options?: {
     disabledDetectors?: string[];
     detectorSyntaxOverrides?: Record<string, {
         linePrefix?: string;
+        lineSeparator?: string;
         blockStart?: string;
         blockLinePrefix?: string;
         blockEnd?: string;
@@ -38,6 +40,7 @@ export function renderHeaderLines(syntax: HeaderSyntax, lines: string[]): string
 export type HeaderSyntax = {
     kind: "block" | "line" | "html";
     linePrefix?: string;
+    lineSeparator?: string;
     blockStart?: string;
     blockLinePrefix?: string;
     blockEnd?: string;

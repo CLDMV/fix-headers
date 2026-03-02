@@ -40,6 +40,7 @@ export function detectProjectFromMarkers(cwd: string, options?: {
  *  language?: string,
  *  projectRoot?: string,
  *  marker?: string | null,
+ *  useGpgSignerAuthor?: boolean,
  *  authorName?: string,
  *  authorEmail?: string,
  *  companyName?: string,
@@ -65,6 +66,7 @@ export function resolveProjectMetadata(options?: {
     language?: string;
     projectRoot?: string;
     marker?: string | null;
+    useGpgSignerAuthor?: boolean;
     authorName?: string;
     authorEmail?: string;
     companyName?: string;

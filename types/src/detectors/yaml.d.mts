@@ -8,18 +8,15 @@ export namespace detector {
         root: string;
         marker: string;
     }>;
-    export function parseProjectName(_marker: any, markerContent: any, rootDirName: any): string;
-    export function resolvePreservedPrefix(filePath: any, content: any): string;
+    export function parseProjectName(marker: any, markerContent: any, rootDirName: any): string;
     export function resolveCommentSyntax(filePath: any): {
-        kind: "block";
-        blockStart: string;
-        blockLinePrefix: string;
-        blockEnd: string;
+        kind: "line";
+        linePrefix: string;
     };
 }
 /**
- * @fileoverview Node.js detector implementation.
- * @module fix-headers/detectors/node
+ * @fileoverview YAML detector implementation.
+ * @module fix-headers/detectors/yaml
  */
 declare const markers: string[];
 declare const extensions: string[];

@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/detectors/node.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { extname } from "node:path";
 import { findNearestMarker } from "./shared.mjs";
 
@@ -45,6 +58,17 @@ function resolveNodeCommentSyntax(filePath) {
 	return null;
 }
 
+/**
+ * Resolves preserved leading prefix for Node files (for example: shebang line).
+ * @param {string} _filePath - File path.
+ * @param {string} content - File content.
+ * @returns {string} Preserved prefix.
+ */
+function resolveNodePreservedPrefix(_filePath, content) {
+	const shebangMatch = content.match(/^#!.*\b(node|bun|deno|tsx|ts-node)\b.*(?:\r?\n|$)/);
+	return shebangMatch ? shebangMatch[0] : "";
+}
+
 export const detector = {
 	id: "node",
 	priority: 100,
@@ -56,6 +80,9 @@ export const detector = {
 	},
 	parseProjectName(_marker, markerContent, rootDirName) {
 		return parseNodeProjectName(markerContent, rootDirName);
+	},
+	resolvePreservedPrefix(filePath, content) {
+		return resolveNodePreservedPrefix(filePath, content);
 	},
 	resolveCommentSyntax(filePath) {
 		return resolveNodeCommentSyntax(filePath);

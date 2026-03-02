@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/fs-dates-mock.test.vitest.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs/promises", async () => {

@@ -7,8 +7,12 @@
  * @param {{
  *  absoluteFilePath: string,
  *  language?: string,
- *  syntaxOptions?: { language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> },
+ *  syntaxOptions?: { language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> },
  *  projectRoot: string,
+ *  createdByName?: string,
+ *  createdByEmail?: string,
+ *  lastModifiedByName?: string,
+ *  lastModifiedByEmail?: string,
  *  projectName: string,
  *  authorName: string,
  *  authorEmail: string,
@@ -29,12 +33,17 @@ export function buildHeader(data: {
         disabledDetectors?: string[];
         detectorSyntaxOverrides?: Record<string, {
             linePrefix?: string;
+            lineSeparator?: string;
             blockStart?: string;
             blockLinePrefix?: string;
             blockEnd?: string;
         }>;
     };
     projectRoot: string;
+    createdByName?: string;
+    createdByEmail?: string;
+    lastModifiedByName?: string;
+    lastModifiedByEmail?: string;
     projectName: string;
     authorName: string;
     authorEmail: string;

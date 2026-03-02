@@ -10,7 +10,7 @@ Multi-language source header normalizer for Node.js projects.
 
 ## Features
 
-- Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`)
+- Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`) and YAML files (`.yaml`, `.yml`)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration
@@ -52,6 +52,9 @@ Common CLI options:
 
 - `--dry-run`
 - `--json`
+- `--sample-output`
+- `--force-author-update`
+- `--use-gpg-signer-author`
 - `--cwd <path>`
 - `--input <path>`
 - `--include-folder <path>` (repeatable)
@@ -83,11 +86,12 @@ Important options:
 - `cwd?: string` - start directory for project detection
 - `input?: string` - explicit single file or folder path to process
 - `dryRun?: boolean` - compute changes without writing files
+- `sampleOutput?: boolean` - include previous/new header sample text for changed files
 - `configFile?: string` - load JSON options from file (resolved from `cwd`)
 - `includeExtensions?: string[]` - file extensions to process
 - `enabledDetectors?: string[]` - detector ids to enable (defaults to all)
 - `disabledDetectors?: string[]` - detector ids to disable
-- `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
+- `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: string[]` - project-relative folders to scan
 - `excludeFolders?: string[]` - folder names or relative paths to exclude
 - `projectName?: string`
@@ -96,6 +100,8 @@ Important options:
 - `marker?: string | null`
 - `authorName?: string`
 - `authorEmail?: string`
+- `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
+- `useGpgSignerAuthor?: boolean` - use signed-commit UID (`%GS`) for detected `@Author` (includes signer comment when present)
 - `companyName?: string` (default: `Catalyzed Motivation Inc.`)
 - `copyrightStartYear?: number` (default: current year)
 
@@ -115,7 +121,8 @@ const result = await fixHeaders({
 			blockEnd: " */"
 		},
 		python: {
-			linePrefix: ";;"
+			linePrefix: ";;",
+			lineSeparator: " "
 		}
 	},
 	projectName: "@scope/my-package",
@@ -128,6 +135,7 @@ const result = await fixHeaders({
 
 - `excludeFolders` supports both folder-name and nested path matching.
 - For monorepos, each file resolves metadata from the closest detector config in its parent tree.
+- With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, and `detectedValues` in results.
 
 ## License
 

@@ -9,6 +9,7 @@ export namespace detector {
         marker: string;
     }>;
     export function parseProjectName(_marker: any, markerContent: any, rootDirName: any): string;
+    export function resolvePreservedPrefix(filePath: any, content: any): string;
     export function resolveCommentSyntax(filePath: any): {
         kind: string;
         linePrefix: string;

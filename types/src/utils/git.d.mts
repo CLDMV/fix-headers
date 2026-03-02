@@ -12,9 +12,12 @@ export function runGit(cwd: string, args: string[]): Promise<string | null>;
 /**
  * Detects git author name and email from config or commit history.
  * @param {string} cwd - Project directory.
+ * @param {{useGpgSignerAuthor?: boolean}} [options={}] - Detection options.
  * @returns {Promise<{authorName: string | null, authorEmail: string | null}>} Author information.
  */
-export function detectGitAuthor(cwd: string): Promise<{
+export function detectGitAuthor(cwd: string, options?: {
+    useGpgSignerAuthor?: boolean;
+}): Promise<{
     authorName: string | null;
     authorEmail: string | null;
 }>;

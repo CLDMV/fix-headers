@@ -2,26 +2,13 @@
  *	@Project: @cldmv/fix-headers
  *	@Filename: /src/detect/project.mjs
  *	@Date: 2026-03-01 13:32:57 -08:00 (1772400777)
- *	@Author: Nate Hyson <CLDMV>
+ *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
- *	@Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01 16:29:34 -08:00 (1772411374)
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
  *	-----
- *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-
-/**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/detect/project.mjs
- *	@Date: 2026-03-01 13:32:57 -08:00 (1772400777)
- *	@Author: Nate Hyson <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01 16:27:47 -08:00 (1772411267)
- *	-----
- *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { dirname, extname, join, resolve } from "node:path";
@@ -136,6 +123,7 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
  *  language?: string,
  *  projectRoot?: string,
  *  marker?: string | null,
+ *  useGpgSignerAuthor?: boolean,
  *  authorName?: string,
  *  authorEmail?: string,
  *  companyName?: string,
@@ -159,7 +147,9 @@ export async function resolveProjectMetadata(options = {}) {
 	const detectFrom = options.targetFilePath ? dirname(cwd) : cwd;
 	const preferredExtension = options.targetFilePath ? extname(cwd).toLowerCase() : "";
 	const detected = await detectProjectFromMarkers(detectFrom, { detectors, preferredExtension });
-	const gitAuthor = await detectGitAuthor(detected.rootDir);
+	const gitAuthor = await detectGitAuthor(detected.rootDir, {
+		useGpgSignerAuthor: options.useGpgSignerAuthor === true
+	});
 	const currentYear = new Date().getFullYear();
 
 	return {

@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/project-metadata-edge.test.vitest.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
@@ -173,5 +186,39 @@ describe("project metadata edge branches", () => {
 
 		expect(typeof metadata.projectRoot).toBe("string");
 		expect(metadata.projectRoot.length).toBeGreaterThan(0);
+	});
+
+	it("uses gpg signer UID for resolved author when enabled", async () => {
+		const workspace = await createWorkspace("project-gpg-signer-author");
+		const previousPath = process.env.PATH;
+
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "project-gpg-signer-author" }, null, 2));
+			await writeWorkspaceFile(join(workspace, "src", "main.mjs"), "export const x = true;\n");
+			await execFileAsync("git", ["init"], { cwd: workspace });
+			await execFileAsync("git", ["config", "user.name", "Configured Name"], { cwd: workspace });
+			await execFileAsync("git", ["config", "user.email", "configured@example.com"], { cwd: workspace });
+			await execFileAsync("git", ["add", "."], { cwd: workspace });
+			await execFileAsync("git", ["commit", "-m", "init"], { cwd: workspace });
+
+			const shimPath = join(workspace, "git");
+			await writeWorkspaceFile(
+				shimPath,
+				'#!/usr/bin/env bash\nset -e\nif [[ "$*" == *"log -1 --format=%GS"* ]]; then\n  echo "Signer Name (2026 Laptop) <signer@example.com>"\n  exit 0\nfi\nexec /usr/bin/git "$@"\n'
+			);
+			await execFileAsync("chmod", ["755", shimPath], { cwd: workspace });
+			process.env.PATH = `${workspace}:${previousPath}`;
+
+			const metadata = await resolveProjectMetadata({
+				cwd: workspace,
+				useGpgSignerAuthor: true
+			});
+
+			expect(metadata.authorName).toBe("Signer Name (2026 Laptop)");
+			expect(metadata.authorEmail).toBe("configured@example.com");
+		} finally {
+			process.env.PATH = previousPath;
+			await cleanupWorkspace(workspace);
+		}
 	});
 });

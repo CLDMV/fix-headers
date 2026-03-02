@@ -1,3 +1,16 @@
+/**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/utils/git.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -25,13 +38,38 @@ export async function runGit(cwd, args) {
 }
 
 /**
+ * Parses a signer UID string into author name and optional email.
+ * @param {string} signerUid - Raw signer UID (for example: "Name (Comment) <email@example.com>").
+ * @returns {{authorName: string | null, authorEmail: string | null}} Parsed signer identity.
+ */
+function parseSignerUid(signerUid) {
+	const trimmed = signerUid.trim();
+	if (trimmed.length === 0) {
+		return { authorName: null, authorEmail: null };
+	}
+
+	const emailMatch = trimmed.match(/<([^>\n]+)>\s*$/);
+	const authorEmail = emailMatch?.[1]?.trim() || null;
+	const authorName = (emailMatch ? trimmed.slice(0, emailMatch.index) : trimmed).trim() || null;
+
+	return { authorName, authorEmail };
+}
+
+/**
  * Detects git author name and email from config or commit history.
  * @param {string} cwd - Project directory.
+ * @param {{useGpgSignerAuthor?: boolean}} [options={}] - Detection options.
  * @returns {Promise<{authorName: string | null, authorEmail: string | null}>} Author information.
  */
-export async function detectGitAuthor(cwd) {
+export async function detectGitAuthor(cwd, options = {}) {
 	let authorName = await runGit(cwd, ["config", "--get", "user.name"]);
 	let authorEmail = await runGit(cwd, ["config", "--get", "user.email"]);
+	if (options.useGpgSignerAuthor === true) {
+		const signerUid = await runGit(cwd, ["log", "-1", "--format=%GS"]);
+		const signerIdentity = parseSignerUid(signerUid || "");
+		authorName = signerIdentity.authorName || authorName;
+		authorEmail = authorEmail || signerIdentity.authorEmail;
+	}
 
 	if (!authorName || !authorEmail) {
 		const fallback = await runGit(cwd, ["log", "-1", "--format=%an|%ae"]);
