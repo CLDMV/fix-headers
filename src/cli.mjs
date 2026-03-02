@@ -13,8 +13,9 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import fixHeaders from "./fix-header.mjs";
 
 /**
@@ -293,7 +294,16 @@ export async function runCli(argv, deps = {}) {
  * @returns {boolean} Whether the entrypoint branch was executed.
  */
 export function runCliAsMain(argv = process.argv, moduleUrl = import.meta.url, executor = runCli) {
-	const isMain = argv[1] && moduleUrl === pathToFileURL(argv[1]).href;
+	let isMain = false;
+	if (argv[1]) {
+		try {
+			const argvRealPath = realpathSync(argv[1]);
+			const moduleRealPath = realpathSync(fileURLToPath(moduleUrl));
+			isMain = argvRealPath === moduleRealPath;
+		} catch {
+			isMain = moduleUrl === pathToFileURL(argv[1]).href;
+		}
+	}
 	if (!isMain) {
 		return false;
 	}

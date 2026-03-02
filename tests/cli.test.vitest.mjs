@@ -11,7 +11,7 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -437,6 +437,26 @@ describe("cli", () => {
 			expect(process.exitCode).toBe(0);
 		} finally {
 			process.exitCode = originalExitCode;
+		}
+	});
+
+	it("treats symlinked cli path as main entry", async () => {
+		const workspace = await createWorkspace("cli-main-symlink");
+		const originalExitCode = process.exitCode;
+		const targetPath = join(process.cwd(), "src", "cli.mjs");
+		const symlinkPath = join(workspace, "fix-headers-bin");
+		const fakeModuleUrl = new URL(`file://${targetPath}`).href;
+
+		try {
+			await symlink(targetPath, symlinkPath);
+			process.exitCode = undefined;
+			const didRun = runCliAsMain(["node", symlinkPath, "--help"], fakeModuleUrl, async () => 0);
+			expect(didRun).toBe(true);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(process.exitCode).toBe(0);
+		} finally {
+			process.exitCode = originalExitCode;
+			await cleanupWorkspace(workspace);
 		}
 	});
 });
