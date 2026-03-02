@@ -188,6 +188,38 @@ describe("project metadata edge branches", () => {
 		expect(metadata.projectRoot.length).toBeGreaterThan(0);
 	});
 
+	it("formats resolved author name with company suffix when provided", async () => {
+		const workspace = await createWorkspace("project-author-company");
+		try {
+			await writeWorkspaceFile(join(workspace, "placeholder.txt"), "x\n");
+			const metadata = await resolveProjectMetadata({
+				cwd: workspace,
+				enabledDetectors: [],
+				authorName: "Nate Corcoran",
+				company: "CLDMV"
+			});
+			expect(metadata.authorName).toBe("Nate Corcoran <CLDMV>");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("does not append company suffix when author name already includes angle brackets", async () => {
+		const workspace = await createWorkspace("project-author-company-existing");
+		try {
+			await writeWorkspaceFile(join(workspace, "placeholder.txt"), "x\n");
+			const metadata = await resolveProjectMetadata({
+				cwd: workspace,
+				enabledDetectors: [],
+				authorName: "Nate Corcoran <CLDMV>",
+				company: "CLDMV"
+			});
+			expect(metadata.authorName).toBe("Nate Corcoran <CLDMV>");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
 	it("uses gpg signer UID for resolved author when enabled", async () => {
 		const workspace = await createWorkspace("project-gpg-signer-author");
 		const previousPath = process.env.PATH;

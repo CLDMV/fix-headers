@@ -26,6 +26,8 @@ describe("cli", () => {
 		const parsed = parseCliArgs([
 			"--dry-run",
 			"--json",
+			"--company",
+			"CLDMV",
 			"--input",
 			"src/main.mjs",
 			"--include-folder",
@@ -45,6 +47,7 @@ describe("cli", () => {
 		expect(parsed.help).toBe(false);
 		expect(parsed.json).toBe(true);
 		expect(parsed.options.dryRun).toBe(true);
+		expect(parsed.options.company).toBe("CLDMV");
 		expect(parsed.options.input).toBe("src/main.mjs");
 		expect(parsed.options.includeFolders).toEqual(["src", "scripts"]);
 		expect(parsed.options.excludeFolders).toEqual(["dist"]);
@@ -64,6 +67,11 @@ describe("cli", () => {
 		const parsed = parseCliArgs(["--marker", "package.json", "--custom-flag", "value"]);
 		expect(parsed.options.marker).toBe("package.json");
 		expect(parsed.options.customFlag).toBe("value");
+	});
+
+	it("parses company scalar flag", () => {
+		const parsed = parseCliArgs(["--company", "CLDMV"]);
+		expect(parsed.options.company).toBe("CLDMV");
 	});
 
 	it("parses marker null sentinel", () => {

@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { detector as cssDetector } from "../src/detectors/css.mjs";
 import { detector as goDetector } from "../src/detectors/go.mjs";
 import { detector as htmlDetector } from "../src/detectors/html.mjs";
+import { detector as jsonDetector } from "../src/detectors/json.mjs";
 import { detector as nodeDetector } from "../src/detectors/node.mjs";
 import { detector as phpDetector } from "../src/detectors/php.mjs";
 import { detector as pythonDetector } from "../src/detectors/python.mjs";
@@ -30,7 +31,14 @@ describe("detector implementations", () => {
 		expect(nodeDetector.parseProjectName("package.json", JSON.stringify({ name: "   " }), "fallback")).toBe("fallback");
 		expect(nodeDetector.parseProjectName("package.json", "{", "fallback")).toBe("fallback");
 		expect(nodeDetector.resolveCommentSyntax("/repo/src/file.mjs")?.kind).toBe("block");
+		expect(nodeDetector.resolveCommentSyntax("/repo/src/file.jsonc")).toBeNull();
 		expect(nodeDetector.resolveCommentSyntax("/repo/src/file.css")).toBeNull();
+
+		expect(jsonDetector.parseProjectName("package.json", JSON.stringify({ name: "det-json" }), "fallback")).toBe("det-json");
+		expect(jsonDetector.parseProjectName("package.json", JSON.stringify({ name: "   " }), "fallback")).toBe("fallback");
+		expect(jsonDetector.parseProjectName("package.json", "{", "fallback")).toBe("fallback");
+		expect(jsonDetector.resolveCommentSyntax("/repo/src/file.jsonc")?.kind).toBe("block");
+		expect(jsonDetector.resolveCommentSyntax("/repo/src/file.mjs")).toBeNull();
 
 		expect(goDetector.parseProjectName("go.mod", "module github.com/demo/pkg", "fallback")).toBe("github.com/demo/pkg");
 		expect(goDetector.parseProjectName("go.mod", "module    ", "fallback")).toBe("fallback");
@@ -90,9 +98,11 @@ describe("detector implementations", () => {
 			expect(await rustDetector.findNearestConfig(workspace)).not.toBeNull();
 			expect(await pythonDetector.findNearestConfig(workspace)).not.toBeNull();
 			expect(await htmlDetector.findNearestConfig(workspace)).not.toBeNull();
+			expect(await jsonDetector.findNearestConfig(workspace)).not.toBeNull();
 			expect(await yamlDetector.findNearestConfig(workspace)).not.toBeNull();
 
 			expect(getDetectorById("node")?.id).toBe("node");
+			expect(getDetectorById("json")?.id).toBe("json");
 			expect(getDetectorById("yaml")?.id).toBe("yaml");
 			expect(getDetectorById("unknown-detector")).toBeUndefined();
 

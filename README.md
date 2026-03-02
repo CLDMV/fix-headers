@@ -100,6 +100,7 @@ Important options:
 - `marker?: string | null`
 - `authorName?: string`
 - `authorEmail?: string`
+- `company?: string` - appends to `@Author` as `Name <Company>`
 - `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
 - `useGpgSignerAuthor?: boolean` - use signed-commit UID (`%GS`) for detected `@Author` (includes signer comment when present)
 - `companyName?: string` (default: `Catalyzed Motivation Inc.`)

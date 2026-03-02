@@ -20,5 +20,6 @@ describe("constants", () => {
 		expect(DEFAULT_MAX_HEADER_SCAN_LINES).toBe(40);
 		expect(DEFAULT_IGNORE_FOLDERS.has("node_modules")).toBe(true);
 		expect(DETECTOR_PROFILES.some((profile) => profile.id === "node")).toBe(true);
+		expect(DETECTOR_PROFILES.some((profile) => profile.id === "json")).toBe(true);
 	});
 });

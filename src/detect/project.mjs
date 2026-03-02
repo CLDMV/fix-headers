@@ -74,6 +74,29 @@ async function findClosestDetectorMatch(startPath, detectors, preferredExtension
 }
 
 /**
+ * Appends company suffix to author display name when requested.
+ * @param {string} authorName - Base author name.
+ * @param {string | undefined} company - Optional company suffix value.
+ * @returns {string} Formatted author name.
+ */
+function formatAuthorNameWithCompany(authorName, company) {
+	if (typeof company !== "string") {
+		return authorName;
+	}
+
+	const trimmedCompany = company.trim();
+	if (trimmedCompany.length === 0) {
+		return authorName;
+	}
+
+	if (/<[^>]+>/.test(authorName)) {
+		return authorName;
+	}
+
+	return `${authorName} <${trimmedCompany}>`;
+}
+
+/**
  * Detects project root and language by scanning known marker files.
  * @param {string} cwd - Starting working directory.
  * @param {{ detectors?: { id: string, extensions: string[], priority?: number, findNearestConfig: (path: string) => Promise<{ root: string, marker: string } | null>, parseProjectName: (marker: string, content: string, rootDirName: string) => string }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string }} [options={}] - Detection options.
@@ -126,6 +149,7 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
  *  useGpgSignerAuthor?: boolean,
  *  authorName?: string,
  *  authorEmail?: string,
+ *  company?: string,
  *  companyName?: string,
  *  copyrightStartYear?: number
  * }} [options={}] - Detection options and overrides.
@@ -151,13 +175,14 @@ export async function resolveProjectMetadata(options = {}) {
 		useGpgSignerAuthor: options.useGpgSignerAuthor === true
 	});
 	const currentYear = new Date().getFullYear();
+	const baseAuthorName = options.authorName || gitAuthor.authorName || "Unknown Author";
 
 	return {
 		projectName: options.projectName || detected.projectName,
 		language: options.language || detected.language,
 		projectRoot: options.projectRoot || detected.rootDir,
 		marker: options.marker === undefined ? detected.marker : options.marker,
-		authorName: options.authorName || gitAuthor.authorName || "Unknown Author",
+		authorName: formatAuthorNameWithCompany(baseAuthorName, options.company),
 		authorEmail: options.authorEmail || gitAuthor.authorEmail || "unknown@example.com",
 		companyName: options.companyName || DEFAULT_COMPANY_NAME,
 		copyrightStartYear: Number.isInteger(options.copyrightStartYear) ? Number(options.copyrightStartYear) : currentYear

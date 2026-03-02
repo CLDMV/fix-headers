@@ -259,6 +259,30 @@ describe("core edge coverage", () => {
 		}
 	});
 
+	it("applies company suffix to generated author line", async () => {
+		const workspace = await createWorkspace("core-edge-author-company");
+
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-author-company" }, null, 2));
+			await writeWorkspaceFile(join(workspace, "src", "one.mjs"), "export const one = true;\n");
+
+			const result = await coreFixHeaders({
+				cwd: workspace,
+				input: "src/one.mjs",
+				authorName: "Nate Corcoran",
+				authorEmail: "nate@example.com",
+				company: "CLDMV",
+				sampleOutput: true,
+				dryRun: true
+			});
+
+			expect(result.filesScanned).toBe(1);
+			expect(result.changes[0]?.sample?.newValue).toContain("@Author: Nate Corcoran <CLDMV>");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
 	it("does not churn on subsequent run when no other changes are needed", async () => {
 		const workspace = await createWorkspace("core-edge-no-last-modified-churn");
 

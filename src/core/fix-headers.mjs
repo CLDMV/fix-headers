@@ -42,6 +42,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  marker?: string | null,
  *  authorName?: string,
  *  authorEmail?: string,
+ *  company?: string,
  *  companyName?: string,
  *  copyrightStartYear?: number
  * }} FixHeadersOptions
