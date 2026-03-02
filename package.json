@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./index.cjs",

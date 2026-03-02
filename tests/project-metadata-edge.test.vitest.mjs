@@ -220,6 +220,22 @@ describe("project metadata edge branches", () => {
 		}
 	});
 
+	it("does not append company suffix when company value is blank", async () => {
+		const workspace = await createWorkspace("project-author-company-blank");
+		try {
+			await writeWorkspaceFile(join(workspace, "placeholder.txt"), "x\n");
+			const metadata = await resolveProjectMetadata({
+				cwd: workspace,
+				enabledDetectors: [],
+				authorName: "Nate Corcoran",
+				company: "   "
+			});
+			expect(metadata.authorName).toBe("Nate Corcoran");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
 	it("uses gpg signer UID for resolved author when enabled", async () => {
 		const workspace = await createWorkspace("project-gpg-signer-author");
 		const previousPath = process.env.PATH;
