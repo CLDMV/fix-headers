@@ -1,8 +1,8 @@
-# fix-headers
+# @cldmv/fix-headers
 
 Multi-language source header normalizer for Node.js projects.
 
-`fix-headers` scans project files, auto-detects project metadata (language, root, project name, git author/email), and inserts or updates standard file headers.
+`@cldmv/fix-headers` scans project files, auto-detects project metadata (language, root, project name, git author/email), and inserts or updates standard file headers.
 
 [![npm version]][npm_version_url] [![npm downloads]][npm_downloads_url] <!-- [![GitHub release]][github_release_url] -->[![GitHub downloads]][github_downloads_url] [![Last commit]][last_commit_url] <!-- [![Release date]][release_date_url] -->[![npm last update]][npm_last_update_url] [![Coverage]][coverage_url]
 
@@ -21,7 +21,7 @@ Multi-language source header normalizer for Node.js projects.
 ## Install
 
 ```bash
-npm i fix-headers
+npm i @cldmv/fix-headers
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ npm i fix-headers
 ### ESM
 
 ```js
-import fixHeaders from "fix-headers";
+import fixHeaders from "@cldmv/fix-headers";
 
 const result = await fixHeaders({ dryRun: true });
 ```
@@ -70,7 +70,7 @@ Common CLI options:
 ### CommonJS
 
 ```js
-const fixHeaders = require("fix-headers");
+const fixHeaders = require("@cldmv/fix-headers");
 
 const result = await fixHeaders({ dryRun: true });
 ```
