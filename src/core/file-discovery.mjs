@@ -6,12 +6,13 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Last modified time: 2026-03-04 20:59:30 -08:00 (1772686770)
  *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { join, relative, resolve } from "node:path";
+import { stat } from "node:fs/promises";
 import { DEFAULT_IGNORE_FOLDERS } from "../constants.mjs";
 import { getAllowedExtensions } from "../detectors/index.mjs";
 import { walkFiles } from "../utils/fs.mjs";
@@ -56,6 +57,17 @@ function resolveIncludeFolders(includeFolders) {
 	}
 
 	return [];
+}
+
+/**
+ * Warns when an include folder cannot be scanned and is skipped.
+ * @param {string} includeFolder - Project-relative include folder.
+ * @param {unknown} error - Original filesystem error.
+ * @returns {void}
+ */
+function reportSkippedIncludeFolder(includeFolder, error) {
+	const message = error instanceof Error ? error.message : String(error);
+	console.warn(`fix-headers: skipped include folder \"${includeFolder}\" (${message})`);
 }
 
 /**
@@ -128,13 +140,29 @@ export async function discoverFiles(options) {
 	const includeFolders = resolveIncludeFolders(options.includeFolders);
 	const excludeFolders = Array.isArray(options.excludeFolders) ? options.excludeFolders : [];
 	const exclusionMatcher = buildExclusionMatcher(options.projectRoot, excludeFolders);
-
 	const roots =
-		includeFolders.length > 0 ? includeFolders.map((relativePath) => join(options.projectRoot, relativePath)) : [options.projectRoot];
+		includeFolders.length > 0
+			? includeFolders.map((includeFolder) => ({ includeFolder, rootPath: join(options.projectRoot, includeFolder) }))
+			: [{ includeFolder: ".", rootPath: options.projectRoot }];
 
 	const files = [];
-	for (const rootPath of roots) {
-		const discovered = await walkFiles(rootPath, {
+	for (const root of roots) {
+		const rootStats = await stat(root.rootPath).catch((error) => error);
+		if (rootStats instanceof Error) {
+			if (/** @type {{ code?: string }} */ (rootStats).code === "ENOENT") {
+				reportSkippedIncludeFolder(root.includeFolder, rootStats);
+				continue;
+			}
+
+			throw rootStats;
+		}
+
+		if (!rootStats.isDirectory()) {
+			reportSkippedIncludeFolder(root.includeFolder, `path is not a directory: ${root.rootPath}`);
+			continue;
+		}
+
+		const discovered = await walkFiles(root.rootPath, {
 			allowedExtensions,
 			ignoreFolders: DEFAULT_IGNORED_FOLDERS,
 			shouldSkipDirectory: exclusionMatcher

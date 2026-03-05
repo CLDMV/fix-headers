@@ -13,7 +13,7 @@
 
 import { mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DETECTOR_PROFILES, getAllowedExtensions, getEnabledDetectors } from "../src/constants.mjs";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { detectProjectFromMarkers } from "../src/detect/project.mjs";
@@ -74,6 +74,26 @@ describe("branch coverage helpers", () => {
 			});
 			expect(fileNameExclusion.some((filePath) => filePath.endsWith("drop-me.mjs"))).toBe(false);
 		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("warns and skips missing include folders", async () => {
+		const workspace = await createWorkspace("branches-discovery-missing-include");
+		const warningSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "branches" }));
+			await writeWorkspaceFile(join(workspace, "src", "file.mjs"), "export const x = true;\n");
+
+			const files = await discoverFiles({
+				projectRoot: workspace,
+				includeFolders: ["src", ".github"]
+			});
+
+			expect(files.some((filePath) => filePath.endsWith("file.mjs"))).toBe(true);
+			expect(warningSpy).toHaveBeenCalledWith(expect.stringContaining('skipped include folder ".github"'));
+		} finally {
+			warningSpy.mockRestore();
 			await cleanupWorkspace(workspace);
 		}
 	});

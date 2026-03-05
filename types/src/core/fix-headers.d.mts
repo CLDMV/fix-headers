@@ -34,6 +34,7 @@ export type FixHeadersOptions = {
     marker?: string | null;
     authorName?: string;
     authorEmail?: string;
+    company?: string;
     companyName?: string;
     copyrightStartYear?: number;
 };

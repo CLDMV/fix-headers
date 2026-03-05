@@ -43,6 +43,7 @@ export function detectProjectFromMarkers(cwd: string, options?: {
  *  useGpgSignerAuthor?: boolean,
  *  authorName?: string,
  *  authorEmail?: string,
+ *  company?: string,
  *  companyName?: string,
  *  copyrightStartYear?: number
  * }} [options={}] - Detection options and overrides.
@@ -69,6 +70,7 @@ export function resolveProjectMetadata(options?: {
     useGpgSignerAuthor?: boolean;
     authorName?: string;
     authorEmail?: string;
+    company?: string;
     companyName?: string;
     copyrightStartYear?: number;
 }): Promise<{

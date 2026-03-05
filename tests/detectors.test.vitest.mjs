@@ -6,9 +6,9 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Last modified time: 2026-03-04 21:00:18 -08:00 (1772686818)
  *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { join } from "node:path";
@@ -158,12 +158,8 @@ describe("detector implementations", () => {
 			const fallbackSyntax = getCommentSyntaxForFile("/repo/src/file.unknown");
 			expect(fallbackSyntax.kind).toBe("block");
 
-			expect(getPreservedPrefixForFile("/repo/src/cli.mjs", "#!/usr/bin/env node\nconsole.log('x')\n")).toBe(
-				"#!/usr/bin/env node\n"
-			);
-			expect(getPreservedPrefixForFile("/repo/src/app.py", "#!/usr/bin/env python3\nprint('x')\n")).toBe(
-				"#!/usr/bin/env python3\n"
-			);
+			expect(getPreservedPrefixForFile("/repo/src/cli.mjs", "#!/usr/bin/env node\nconsole.log('x')\n")).toBe("#!/usr/bin/env node\n");
+			expect(getPreservedPrefixForFile("/repo/src/app.py", "#!/usr/bin/env python3\nprint('x')\n")).toBe("#!/usr/bin/env python3\n");
 			expect(getPreservedPrefixForFile("/repo/src/file.unknown", "#!/usr/bin/env custom\nvalue\n")).toBe("");
 		} finally {
 			await cleanupWorkspace(workspace);
