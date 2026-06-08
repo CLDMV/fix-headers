@@ -90,6 +90,57 @@ describe("header/template + parser", () => {
 		expect(replacement.nextContent).not.toContain("@Project: second");
 	});
 
+	describe("block-comment header matching (regression: styled-token over-match data loss)", () => {
+		const NEW = "/**\n *\t@Project: new\n */";
+
+		it("preserves the body when an existing `**/` header precedes a `*/` inside a // comment", () => {
+			const content = ["/**", " *\t@Project: old", " **/", "", "{", '\t"compilerOptions": { "x": true } // see /** @internal */ note', "}", ""].join("\n");
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/tsconfig.jsonc");
+			expect(nextContent).toContain("@Project: new");
+			expect(nextContent).not.toContain("@Project: old");
+			expect(nextContent).toContain('"compilerOptions"');
+			expect(nextContent).toContain("see /** @internal */ note");
+		});
+
+		it("recognizes and replaces a `/*` single-asterisk opener without duplicating", () => {
+			const content = ["/*", " *\t@Project: old", " */", "", "export const value = 1;"].join("\n");
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/src/a.js");
+			expect(nextContent).toContain("@Project: new");
+			expect(nextContent).not.toContain("@Project: old");
+			expect(nextContent).toContain("export const value = 1;");
+		});
+
+		it("recognizes a tab-indented `\\t*/` closer as the header end", () => {
+			const content = ["/**", " *\t@Project: old", "\t*/", "", "export const value = 1; // later */ token"].join("\n");
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/src/a.js");
+			expect(nextContent).toContain("@Project: new");
+			expect(nextContent).not.toContain("@Project: old");
+			expect(nextContent).toContain("export const value = 1; // later */ token");
+		});
+
+		it("recognizes a `*/` closer at column 0", () => {
+			const content = ["/**", " *\t@Project: old", "*/", "", "export const value = 1;"].join("\n");
+			expect(findProjectHeader(content, "/repo/src/a.js")).not.toBeNull();
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/src/a.js");
+			expect(nextContent).not.toContain("@Project: old");
+			expect(nextContent).toContain("export const value = 1;");
+		});
+
+		it("leaves a // line comment containing /** */ intact below the header", () => {
+			const content = ["/**", " *\t@Project: old", " */", "", "// foo /** bar */ baz", "code();"].join("\n");
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/src/a.js");
+			expect(nextContent).toContain("// foo /** bar */ baz");
+			expect(nextContent).toContain("code();");
+		});
+
+		it("does not corrupt a string literal containing */ below a `**/` header", () => {
+			const content = ["/**", " *\t@Project: old", " **/", "", 'const s = "a*/b";'].join("\n");
+			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/src/a.js");
+			expect(nextContent).not.toContain("@Project: old");
+			expect(nextContent).toContain('const s = "a*/b";');
+		});
+	});
+
 	it("inserts header after python shebang via detector", () => {
 		const content = "#!/usr/bin/env python3\n\nprint('x')\n";
 		const replacement = replaceOrInsertHeader(content, "#\t@Project: x", "/repo/src/app.py");

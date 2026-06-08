@@ -66,9 +66,19 @@ function matchHeaderSegment(content, syntax) {
 		return content.match(new RegExp(`^(?:${linePrefix}.*\\n)+\\n*`));
 	}
 
-	const blockStart = escapeRegex(syntax.blockStart || "/**");
-	const blockEnd = escapeRegex(syntax.blockEnd || " */");
-	return content.match(new RegExp(`^${blockStart}[\\s\\S]*?${blockEnd}\\n*`));
+	// Block comments (/* … */ family). A block comment opens with `/*` and is
+	// terminated by the FIRST `*/` after the opener (block comments do not nest in
+	// JS/JSONC/CSS/PHP). Match that real grammar rather than the detector's *styled*
+	// tokens: `blockStart` may be `/*` or `/**` (so anchor on `/*`, which prefixes
+	// both), and `blockEnd` carries a leading space (" */") that exists for GENERATION
+	// only. Using the styled " */" to bound an EXISTING header is the data-loss bug —
+	// any real closer that isn't byte-for-byte " */" (e.g. `**/`, a tab-indented `*/`,
+	// or `*/` at column 0) is skipped, so the lazy match runs on to the next `*/`
+	// downstream (inside a `//` line comment, a string literal, or another block) and
+	// everything in between is deleted on replace. Trim the styled space off so we stop
+	// at the header's own terminator.
+	const blockEnd = escapeRegex((syntax.blockEnd || " */").trim());
+	return content.match(new RegExp(`^/\\*[\\s\\S]*?${blockEnd}\\n*`));
 }
 
 /**
