@@ -12,8 +12,9 @@
  */
 
 import { join, relative, resolve } from "node:path";
-import { stat } from "node:fs/promises";
-import { DEFAULT_IGNORE_FOLDERS } from "../constants.mjs";
+import { readFile, stat } from "node:fs/promises";
+import ignore from "ignore";
+import { ALWAYS_IGNORE_FOLDERS, ROOT_IGNORE_FOLDERS } from "../constants.mjs";
 import { getAllowedExtensions } from "../detectors/index.mjs";
 import { walkFiles } from "../utils/fs.mjs";
 
@@ -35,7 +36,7 @@ function resolveExtensions(options) {
 	return getAllowedExtensions(options);
 }
 
-const DEFAULT_IGNORED_FOLDERS = new Set(DEFAULT_IGNORE_FOLDERS);
+const ALWAYS_IGNORED_FOLDERS = new Set(ALWAYS_IGNORE_FOLDERS);
 
 /**
  * Normalizes a user-provided folder path to a project-relative value.
@@ -131,8 +132,10 @@ function buildExclusionMatcher(projectRoot, excludeFolders) {
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
  *  includeFolders?: string[],
- *  excludeFolders?: string[]
- * }} options - File discovery options.
+ *  excludeFolders?: string[],
+ *  gitignore?: boolean | string | string[]
+ * }} options - File discovery options. `gitignore`: `false` disables; a path or array of
+ *  paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`.
  * @returns {Promise<string[]>} Absolute file paths.
  */
 export async function discoverFiles(options) {
@@ -140,6 +143,42 @@ export async function discoverFiles(options) {
 	const includeFolders = resolveIncludeFolders(options.includeFolders);
 	const excludeFolders = Array.isArray(options.excludeFolders) ? options.excludeFolders : [];
 	const exclusionMatcher = buildExclusionMatcher(options.projectRoot, excludeFolders);
+	// Build/cache dirs (ROOT_IGNORE_FOLDERS) are ignored only at the PROJECT ROOT, so a nested
+	// source directory with the same name (e.g. tools/build) is still processed. node_modules /
+	// .git stay any-depth via walkFiles' `ignoreFolders` below.
+	const absoluteRoot = resolve(options.projectRoot);
+	const rootIgnorePaths = new Set(Array.from(ROOT_IGNORE_FOLDERS, (name) => resolve(absoluteRoot, name)));
+	// Optional .gitignore support: skip anything the project's .gitignore matches, so generated /
+	// output paths are excluded by the project's own rules without hard-coding names. `options.gitignore`
+	// may be `false` (disabled), a file path or array of paths, or anything else / undefined
+	// (auto-detect `<projectRoot>/.gitignore`).
+	let gitignoreMatcher = null;
+	if (options.gitignore !== false) {
+		const gitignoreFiles =
+			typeof options.gitignore === "string"
+				? [options.gitignore]
+				: Array.isArray(options.gitignore)
+					? options.gitignore.filter((entry) => typeof entry === "string")
+					: [".gitignore"];
+		const ig = ignore();
+		let loaded = false;
+		for (const rel of gitignoreFiles) {
+			try {
+				ig.add(await readFile(resolve(absoluteRoot, rel), "utf8"));
+				loaded = true;
+			} catch {
+				/* missing .gitignore — nothing to add */
+			}
+		}
+		gitignoreMatcher = loaded ? ig : null;
+	}
+	const isGitignored = (targetPath) => {
+		if (!gitignoreMatcher) return false;
+		const rel = relative(absoluteRoot, resolve(targetPath)).replace(/\\/g, "/");
+		return rel.length > 0 && !rel.startsWith("..") && gitignoreMatcher.ignores(rel);
+	};
+	const shouldSkipDirectory = (targetPath, targetName) =>
+		rootIgnorePaths.has(resolve(targetPath)) || exclusionMatcher(targetPath, targetName) || isGitignored(targetPath);
 	const roots =
 		includeFolders.length > 0
 			? includeFolders.map((includeFolder) => ({ includeFolder, rootPath: join(options.projectRoot, includeFolder) }))
@@ -164,11 +203,11 @@ export async function discoverFiles(options) {
 
 		const discovered = await walkFiles(root.rootPath, {
 			allowedExtensions,
-			ignoreFolders: DEFAULT_IGNORED_FOLDERS,
-			shouldSkipDirectory: exclusionMatcher
+			ignoreFolders: ALWAYS_IGNORED_FOLDERS,
+			shouldSkipDirectory
 		});
 		files.push(...discovered);
 	}
 
-	return files.filter((filePath) => !exclusionMatcher(filePath, filePath.split("/").at(-1) || ""));
+	return files.filter((filePath) => !exclusionMatcher(filePath, filePath.split("/").at(-1) || "") && !isGitignored(filePath));
 }

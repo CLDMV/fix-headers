@@ -13,7 +13,7 @@ Multi-language source header normalizer for Node.js projects.
 - Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`) and YAML files (`.yaml`, `.yml`)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
-- Supports folder inclusion and exclusion configuration
+- Supports folder inclusion and exclusion configuration, with project-root-scoped build/cache ignores and optional `.gitignore` respect
 - Supports detector-based monorepo scanning with nearest config resolution per file
 - Supports per-detector syntax overrides for line and block comment tokens
 - Supports both ESM and CJS consumers
@@ -94,6 +94,7 @@ Important options:
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: string[]` - project-relative folders to scan
 - `excludeFolders?: string[]` - folder names or relative paths to exclude
+- `gitignore?: boolean | string | string[]` - respect `.gitignore` during discovery. `false` disables; a path or array of paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`. Matched files and directories are skipped.
 - `projectName?: string`
 - `language?: string`
 - `projectRoot?: string`
@@ -135,6 +136,8 @@ const result = await fixHeaders({
 ## Notes
 
 - `excludeFolders` supports both folder-name and nested path matching.
+- Built-in ignores are scoped: `.git` and `node_modules` are skipped at **any depth**, while build/cache directories (`dist`, `build`, `coverage`, `tmp`, `.next`, `.turbo`) are skipped **only at the project root** — so a source directory that happens to share a name (for example `tools/build`) is still processed.
+- With `gitignore` enabled (the default, auto-detecting the project's `.gitignore`), anything the project ignores is skipped during discovery — generated paths are excluded by the project's own rules without hard-coding names. Pass `gitignore: false` to disable, or a path/array to use specific ignore files.
 - For monorepos, each file resolves metadata from the closest detector config in its parent tree.
 - With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, and `detectedValues` in results.
 

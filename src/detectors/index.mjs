@@ -140,12 +140,12 @@ export function getDetectorById(id) {
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectors?: object[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
  * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
 export function getCommentSyntaxForFile(filePath, options = {}) {
 	const extension = extname(filePath).toLowerCase();
-	const detectors = getEnabledDetectors(options);
+	const detectors = Array.isArray(options.detectors) ? options.detectors : getEnabledDetectors(options);
 	for (const detector of detectors) {
 		if (!detector.extensions.includes(extension)) {
 			continue;

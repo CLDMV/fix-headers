@@ -36,6 +36,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  includeFolders?: string[],
  *  excludeFolders?: string[],
  *  includeExtensions?: string[],
+ *  gitignore?: boolean | string | string[],
  *  projectName?: string,
  *  language?: string,
  *  projectRoot?: string,
@@ -209,7 +210,8 @@ export async function fixHeaders(options = {}) {
 				disabledDetectors: effectiveOptions.disabledDetectors,
 				includeFolders: effectiveOptions.includeFolders,
 				excludeFolders: effectiveOptions.excludeFolders,
-				includeExtensions: effectiveOptions.includeExtensions
+				includeExtensions: effectiveOptions.includeExtensions,
+				gitignore: effectiveOptions.gitignore
 			});
 		} else {
 			throw new Error(`Input path must be a file or directory: ${effectiveOptions.input}`);
@@ -222,7 +224,8 @@ export async function fixHeaders(options = {}) {
 			disabledDetectors: effectiveOptions.disabledDetectors,
 			includeFolders: effectiveOptions.includeFolders,
 			excludeFolders: effectiveOptions.excludeFolders,
-			includeExtensions: effectiveOptions.includeExtensions
+			includeExtensions: effectiveOptions.includeExtensions,
+			gitignore: effectiveOptions.gitignore
 		});
 	}
 
