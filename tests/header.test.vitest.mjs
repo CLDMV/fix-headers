@@ -141,6 +141,17 @@ describe("header/template + parser", () => {
 		});
 	});
 
+	it("replaces a header block longer than the old 40-line scan cap without duplicating it", () => {
+		const oldFields = Array.from({ length: 45 }, (_, i) => ` *\t@Field${i}: value${i}`).join("\n");
+		const content = `/**\n *\t@Project: old\n${oldFields}\n */\n\nexport const value = 1;\n`;
+		const { nextContent } = replaceOrInsertHeader(content, "/**\\n *\\t@Project: new\\n */", "/repo/src/a.mjs");
+
+		expect(nextContent.match(/@Project:/g)).toHaveLength(1);
+		expect(nextContent).toContain("@Project: new");
+		expect(nextContent).not.toContain("@Project: old");
+		expect(nextContent).toContain("export const value = 1;");
+	});
+
 	it("inserts header after python shebang via detector", () => {
 		const content = "#!/usr/bin/env python3\n\nprint('x')\n";
 		const replacement = replaceOrInsertHeader(content, "#\t@Project: x", "/repo/src/app.py");
