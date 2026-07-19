@@ -53,10 +53,27 @@
 	"engines": {
 		"node": ">=20.19.0"
 	},
+	"author": {
+		"name": "Shinrai",
+		"company": "CLDMV",
+		"email": "git+npm@cldmv.net",
+		"url": "https://cldmv.net"
+	},
+	"contributors": [
+		{
+			"name": "CLDMV",
+			"url": "https://github.com/CLDMV"
+		}
+	],
+	"funding": {
+		"type": "github",
+		"url": "https://github.com/sponsors/shinrai"
+	},
 	"publishConfig": {
 		"access": "public"
 	},
 	"license": "Apache-2.0",
+	"sideEffects": false,
 	"devDependencies": {
 		"@types/node": "^25.3.0",
 		"@vitest/coverage-v8": "^4.1.8",
