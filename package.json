@@ -39,6 +39,14 @@
 		"automation",
 		"node-module"
 	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/CLDMV/fix-headers.git"
+	},
+	"bugs": {
+		"url": "https://github.com/CLDMV/fix-headers/issues"
+	},
+	"homepage": "https://github.com/CLDMV/fix-headers#readme",
 	"peerDependencies": {
 		"vitest": ">=1.0.0"
 	},
