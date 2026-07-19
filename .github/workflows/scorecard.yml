@@ -1,0 +1,41 @@
+#	@Project: @cldmv/fix-headers
+#	@Filename: /.github/workflows/scorecard.yml
+#	@Date: 2026-05-31 00:00:00 -07:00 (1780210800)
+#	@Author: Nate Corcoran <CLDMV>
+#	@Email: <Shinrai@users.noreply.github.com>
+#	-----
+#	@Last modified by: Shinrai (Shinrai@users.noreply.github.com)
+#	@Last modified time: 2026-07-18 18:06:49 -07:00 (1784423209)
+#	-----
+#	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+
+# Individual repo: .github/workflows/scorecard.yml
+#
+# OpenSSF Scorecard — scans the repo against ~18 security best-practice checks
+# and produces a 0-10 score. Thin caller: the steps and the SHA-pinned
+# scorecard-action version live in reusable-scorecard.yml@v4, so the action
+# version can't drift in this copy (it just calls the org reusable). Triggers
+# stay here, per OpenSSF's recommended setup.
+name: 🔬 OpenSSF Scorecard
+
+on:
+    branch_protection_rule:
+    schedule:
+        - cron: "32 7 * * 1" # weekly Monday 07:32 UTC
+    push:
+        branches: [master, main]
+    workflow_dispatch:
+
+# Caller must grant what the reusable needs — notably id-token: write for the
+# OpenSSF transparency-log publish.
+permissions:
+    security-events: write
+    id-token: write
+    contents: read
+    actions: read
+
+jobs:
+    analyze:
+        uses: CLDMV/.github/.github/workflows/reusable-scorecard.yml@v4
+        with:
+            publish_results: true # set false for private repos / to skip the public badge

@@ -24,6 +24,7 @@
 		"fix-headers": "./src/cli.mjs"
 	},
 	"scripts": {
+		"build:ci": "echo 'no build step: fix-headers ships source directly, see package.json files[]'",
 		"test": "vitest run --config .configs/vitest.config.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"ci:coverage": "vitest run --coverage --reporter=dot --maxWorkers=1 --config .configs/vitest.ci.config.mjs",
@@ -42,7 +43,7 @@
 		"vitest": ">=1.0.0"
 	},
 	"engines": {
-		"node": ">=18.0.0"
+		"node": ">=20.19.0"
 	},
 	"publishConfig": {
 		"access": "public"
