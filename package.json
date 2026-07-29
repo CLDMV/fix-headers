@@ -31,7 +31,8 @@
 		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"test:coverage": "vitest run --config .configs/vitest.config.mjs --coverage",
-		"cli": "node ./src/cli.mjs"
+		"cli": "node ./src/cli.mjs",
+		"build": "echo 'no build step - stopgap for CI coverage-badge; see tracking issue'"
 	},
 	"keywords": [
 		"headers",
