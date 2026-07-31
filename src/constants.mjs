@@ -21,8 +21,10 @@ export { DETECTOR_PROFILES, getAllowedExtensions, getEnabledDetectors } from "./
 /** @type {string} */
 export const DEFAULT_COMPANY_NAME = "Catalyzed Motivation Inc.";
 
-/** @type {number} */
-export const DEFAULT_MAX_HEADER_SCAN_LINES = 40;
+/** Header must sit near the top of the file, but a metadata block can legitimately
+ *	run long; cap the scan generously so a long block's closing `*​/` is still seen.
+ * @type {number} */
+export const DEFAULT_MAX_HEADER_SCAN_LINES = 200;
 
 /**
  * Folders skipped at ANY depth — vendored / VCS directories that are never source and can
