@@ -7,8 +7,10 @@
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
  *  includeFolders?: string[],
- *  excludeFolders?: string[]
- * }} options - File discovery options.
+ *  excludeFolders?: string[],
+ *  gitignore?: boolean | string | string[]
+ * }} options - File discovery options. `gitignore`: `false` disables; a path or array of
+ *  paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`.
  * @returns {Promise<string[]>} Absolute file paths.
  */
 export function discoverFiles(options: {
@@ -19,4 +21,5 @@ export function discoverFiles(options: {
     disabledDetectors?: string[];
     includeFolders?: string[];
     excludeFolders?: string[];
+    gitignore?: boolean | string | string[];
 }): Promise<string[]>;
