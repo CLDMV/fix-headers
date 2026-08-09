@@ -29,6 +29,7 @@ export type FixHeadersOptions = {
     includeFolders?: string[];
     excludeFolders?: string[];
     includeExtensions?: string[];
+    gitignore?: boolean | string | string[];
     projectName?: string;
     language?: string;
     projectRoot?: string;
