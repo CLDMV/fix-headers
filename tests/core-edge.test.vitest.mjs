@@ -236,6 +236,7 @@ describe("core edge coverage", () => {
 
 	it("forces last-modified identity update when enabled without forcing created-by", async () => {
 		const workspace = await createWorkspace("core-edge-force-last-modified-author-update");
+		const currentYear = new Date().getFullYear();
 
 		try {
 			await writeWorkspaceFile(
@@ -244,7 +245,7 @@ describe("core edge coverage", () => {
 			);
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) ${currentYear}-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({
