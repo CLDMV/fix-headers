@@ -15,6 +15,7 @@ export type FixHeadersOptions = {
     configFile?: string;
     sampleOutput?: boolean;
     forceAuthorUpdate?: boolean;
+    forceLastModifiedAuthorUpdate?: boolean;
     useGpgSignerAuthor?: boolean;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
@@ -28,6 +29,7 @@ export type FixHeadersOptions = {
     includeFolders?: string[];
     excludeFolders?: string[];
     includeExtensions?: string[];
+    gitignore?: boolean | string | string[];
     projectName?: string;
     language?: string;
     projectRoot?: string;

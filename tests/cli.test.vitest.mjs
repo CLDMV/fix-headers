@@ -89,6 +89,11 @@ describe("cli", () => {
 		expect(parsed.options.forceAuthorUpdate).toBe(true);
 	});
 
+	it("parses force-last-modified-author-update flag", () => {
+		const parsed = parseCliArgs(["--force-last-modified-author-update"]);
+		expect(parsed.options.forceLastModifiedAuthorUpdate).toBe(true);
+	});
+
 	it("parses use-gpg-signer-author flag", () => {
 		const parsed = parseCliArgs(["--use-gpg-signer-author"]);
 		expect(parsed.options.useGpgSignerAuthor).toBe(true);
