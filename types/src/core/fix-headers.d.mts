@@ -15,6 +15,7 @@ export type FixHeadersOptions = {
     configFile?: string;
     sampleOutput?: boolean;
     forceAuthorUpdate?: boolean;
+    forceLastModifiedAuthorUpdate?: boolean;
     useGpgSignerAuthor?: boolean;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
