@@ -296,6 +296,34 @@ describe("core edge coverage", () => {
 		}
 	});
 
+	it("does not cascade a forced author update into the last-modified identity of an unrelated rewrite", async () => {
+		const workspace = await createWorkspace("core-edge-force-author-no-cascade");
+
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-force-author-no-cascade" }, null, 2));
+			await writeWorkspaceFile(
+				join(workspace, "src", "one.mjs"),
+				`/**\n *\t@Project: core-edge-force-author-no-cascade\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+			);
+
+			await coreFixHeaders({
+				cwd: workspace,
+				input: "src/one.mjs",
+				authorName: "Forced Author",
+				authorEmail: "forced@example.com",
+				forceAuthorUpdate: true,
+				dryRun: false
+			});
+
+			const updated = await readFile(join(workspace, "src", "one.mjs"), "utf8");
+			expect(updated).toContain("@Author: Forced Author");
+			expect(updated).toContain("@Last modified by: Old Updater (old@example.com)");
+			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
 	it("applies company suffix to generated author line", async () => {
 		const workspace = await createWorkspace("core-edge-author-company");
 

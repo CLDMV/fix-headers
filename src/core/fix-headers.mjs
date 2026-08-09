@@ -340,8 +340,12 @@ export async function fixHeaders(options = {}) {
 					projectName: fileMetadata.projectName,
 					createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
 					createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
-					lastModifiedByName: fileMetadata.authorName,
-					lastModifiedByEmail: fileMetadata.authorEmail,
+					lastModifiedByName: shouldForceLastModifiedAuthorUpdate
+						? fileMetadata.authorName
+						: existingLastModifiedIdentity.authorName || fileMetadata.authorName,
+					lastModifiedByEmail: shouldForceLastModifiedAuthorUpdate
+						? fileMetadata.authorEmail
+						: existingLastModifiedIdentity.authorEmail || fileMetadata.authorEmail,
 					authorName: fileMetadata.authorName,
 					authorEmail: fileMetadata.authorEmail,
 					createdAt,
