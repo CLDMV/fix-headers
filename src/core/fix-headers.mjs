@@ -29,6 +29,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  configFile?: string,
  *  sampleOutput?: boolean,
  *  forceAuthorUpdate?: boolean,
+ *  forceLastModifiedAuthorUpdate?: boolean,
  *  useGpgSignerAuthor?: boolean,
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
@@ -126,6 +127,20 @@ function extractHeaderAuthorIdentity(headerText) {
 	return {
 		authorName: authorMatch?.[1]?.trim(),
 		authorEmail: emailMatch?.[1]?.trim()
+	};
+}
+
+/**
+ * Extracts original last-modified-by identity from an existing header block.
+ * @param {string} headerText - Existing header content.
+ * @returns {{ authorName?: string, authorEmail?: string }} Parsed identity values.
+ */
+function extractHeaderLastModifiedIdentity(headerText) {
+	const match = headerText.match(/@Last modified by:\s*(.+?)\s*\(([^)\n]+)\)\s*$/m);
+
+	return {
+		authorName: match?.[1]?.trim(),
+		authorEmail: match?.[2]?.trim()
 	};
 }
 
@@ -253,6 +268,7 @@ export async function fixHeaders(options = {}) {
 		});
 		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
 		const existingIdentity = existingHeaderText.length > 0 ? extractHeaderAuthorIdentity(existingHeaderText) : {};
+		const existingLastModifiedIdentity = existingHeaderText.length > 0 ? extractHeaderLastModifiedIdentity(existingHeaderText) : {};
 		const existingCreatedAt = existingHeaderText.length > 0 ? extractHeaderCreatedAt(existingHeaderText) : null;
 		const existingLastModifiedAt = existingHeaderText.length > 0 ? extractHeaderLastModifiedAt(existingHeaderText) : null;
 		const filesystemDates = await readFileDates(filePath);
@@ -270,6 +286,7 @@ export async function fixHeaders(options = {}) {
 		const createdAt = existingCreatedAt || gitCreated || toDatePayload(filesystemDates.createdAt);
 		const comparisonLastModifiedAt = existingLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt);
 		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
+		const shouldForceLastModifiedAuthorUpdate = effectiveOptions.forceLastModifiedAuthorUpdate === true;
 
 		const comparisonHeader = buildHeader({
 			absoluteFilePath: filePath,
@@ -284,8 +301,12 @@ export async function fixHeaders(options = {}) {
 			projectName: fileMetadata.projectName,
 			createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
 			createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
-			lastModifiedByName: fileMetadata.authorName,
-			lastModifiedByEmail: fileMetadata.authorEmail,
+			lastModifiedByName: shouldForceLastModifiedAuthorUpdate
+				? fileMetadata.authorName
+				: existingLastModifiedIdentity.authorName || fileMetadata.authorName,
+			lastModifiedByEmail: shouldForceLastModifiedAuthorUpdate
+				? fileMetadata.authorEmail
+				: existingLastModifiedIdentity.authorEmail || fileMetadata.authorEmail,
 			authorName: fileMetadata.authorName,
 			authorEmail: fileMetadata.authorEmail,
 			createdAt,

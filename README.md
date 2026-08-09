@@ -54,6 +54,7 @@ Common CLI options:
 - `--json`
 - `--sample-output`
 - `--force-author-update`
+- `--force-last-modified-author-update`
 - `--use-gpg-signer-author`
 - `--cwd <path>`
 - `--input <path>`
@@ -103,6 +104,7 @@ Important options:
 - `authorEmail?: string`
 - `company?: string` - appends to `@Author` as `Name <Company>`
 - `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
+- `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
 - `useGpgSignerAuthor?: boolean` - use signed-commit UID (`%GS`) for detected `@Author` (includes signer comment when present)
 - `companyName?: string` (default: `Catalyzed Motivation Inc.`)
 - `copyrightStartYear?: number` (default: current year)
