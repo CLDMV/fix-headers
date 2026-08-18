@@ -113,14 +113,16 @@ export async function reapStaleWorkspaces(maxAgeMs = 60 * 60 * 1000) {
 	}
 	const cutoff = Date.now() - maxAgeMs;
 	await Promise.all(
-		entries.map(async (entry) => {
-			const full = join(FIXTURE_ROOT, entry.name);
-			try {
-				const info = await stat(full);
-				if (info.mtimeMs < cutoff) await rm(full, { recursive: true, force: true });
-			} catch {
-				/* vanished mid-sweep (a concurrent run cleaned it) — fine */
-			}
-		})
+		entries
+			.filter((entry) => entry.isDirectory())
+			.map(async (entry) => {
+				const full = join(FIXTURE_ROOT, entry.name);
+				try {
+					const info = await stat(full);
+					if (info.mtimeMs < cutoff) await rm(full, { recursive: true, force: true });
+				} catch {
+					/* vanished mid-sweep (a concurrent run cleaned it) — fine */
+				}
+			})
 	);
 }

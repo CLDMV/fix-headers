@@ -23,8 +23,9 @@ export default defineConfig({
 	test: {
 		environment: "node",
 		include: ["tests/**/*.test.vitest.mjs"],
-		// Wipe the fixture root before/after the run so orphaned fixtures from a
-		// crashed/interrupted run self-heal (see tests/helpers/workspace.mjs).
+		// Reap only STALE fixture directories (age-guarded) before/after the run so
+		// orphaned fixtures from a crashed/interrupted run self-heal, without touching
+		// a concurrent run's fresh fixtures (see tests/helpers/workspace.mjs).
 		// Absolute path so it resolves regardless of vitest's root.
 		globalSetup: [fileURLToPath(new URL("./vitest.globalSetup.mjs", import.meta.url))],
 		// "dot" keeps CI logs to one character per test file instead of a full
