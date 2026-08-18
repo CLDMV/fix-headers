@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { detector as nodeDetector } from "../src/detectors/node.mjs";
 import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/project.mjs";
-import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
+import { cleanupWorkspace, createIsolatedWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -150,7 +150,7 @@ describe("project metadata edge branches", () => {
 	});
 
 	it("uses unknown author/email fallback when git identity is unavailable", async () => {
-		const workspace = await createWorkspace("project-unknown-author");
+		const workspace = await createIsolatedWorkspace("project-unknown-author");
 		const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
 		const previousHome = process.env.HOME;
 		try {
