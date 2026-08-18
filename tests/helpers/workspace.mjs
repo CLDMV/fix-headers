@@ -11,7 +11,8 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 /**
@@ -43,6 +44,26 @@ export async function createWorkspace(name) {
 	const workspacePath = join(FIXTURE_ROOT, directoryName);
 	await mkdir(workspacePath, { recursive: true });
 	return workspacePath;
+}
+
+/**
+ * Creates a workspace with NO ancestor `package.json` and NO ancestor `.git` —
+ * for tests that assert the "nothing detected" fallback path (unknown project
+ * language, unknown git author). {@link createWorkspace}'s fixture root now lives
+ * under this repo's own `tmp/` specifically so leaked fixtures don't sprawl into
+ * the shared repos root — but that means every fixture it creates sits under this
+ * repo's own `package.json` and `.git`, which upward marker/config search will
+ * always find. A fallback-path test needs a workspace with genuinely zero project
+ * ancestry, which no location under this repo can provide by definition. The OS
+ * temp directory is the right tool for that: it's outside any project tree, so it
+ * doesn't reintroduce the original clutter problem (a human-browsed shared repos
+ * root), and each call still cleans up via {@link cleanupWorkspace} same as any
+ * other workspace.
+ * @param {string} name - Workspace name prefix.
+ * @returns {Promise<string>} Absolute workspace path.
+ */
+export async function createIsolatedWorkspace(name) {
+	return mkdtemp(join(tmpdir(), `${name}-`));
 }
 
 /**

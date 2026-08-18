@@ -24,7 +24,7 @@ import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/
 import { readFileDates, findProjectRoot, pathExists, readTextIfExists, walkFiles } from "../src/utils/fs.mjs";
 import { detectGitAuthor, getGitCreationDate, getGitLastModifiedDate, runGit } from "../src/utils/git.mjs";
 
-import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
+import { cleanupWorkspace, createIsolatedWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -155,7 +155,7 @@ describe("module integration and coverage", () => {
 		expect(markerDetection.marker).toBe("package.json");
 		expect(markerDetection.projectName).toBe("fixture-node-project");
 
-		const unknownWorkspace = await createWorkspace("detection-unknown");
+		const unknownWorkspace = await createIsolatedWorkspace("detection-unknown");
 		workspaces.push(unknownWorkspace);
 		await writeWorkspaceFile(join(unknownWorkspace, "file.txt"), "hello\n");
 		const unknownDetection = await detectProjectFromMarkers(unknownWorkspace);
