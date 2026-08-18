@@ -11,6 +11,7 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
@@ -22,6 +23,11 @@ export default defineConfig({
 	test: {
 		environment: "node",
 		include: ["tests/**/*.test.vitest.mjs"],
+		// Reap only STALE fixture directories (age-guarded) before/after the run so
+		// orphaned fixtures from a crashed/interrupted run self-heal, without touching
+		// a concurrent run's fresh fixtures (see tests/helpers/workspace.mjs).
+		// Absolute path so it resolves regardless of vitest's root.
+		globalSetup: [fileURLToPath(new URL("./vitest.globalSetup.mjs", import.meta.url))],
 		// "dot" keeps CI logs to one character per test file instead of a full
 		// "RUN vX.Y.Z" + per-file pass/fail block for every file — vitest's
 		// non-interactive fallback (no TTY to redraw) otherwise reprints that
