@@ -77,9 +77,9 @@
 	"sideEffects": false,
 	"devDependencies": {
 		"@types/node": "^26.1.1",
-		"@vitest/coverage-v8": "^4.1.8",
+		"@vitest/coverage-v8": "^5.0.0",
 		"typescript": "^7.0.2",
-		"vitest": "^4.1.8"
+		"vitest": "^5.0.0"
 	},
 	"dependencies": {
 		"ignore": "^7.0.5"
