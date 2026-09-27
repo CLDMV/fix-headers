@@ -11,10 +11,16 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { readdir } from "node:fs/promises";
 import { extname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join } from "node:path";
+import { detector as cssDetector } from "./css.mjs";
+import { detector as goDetector } from "./go.mjs";
+import { detector as htmlDetector } from "./html.mjs";
+import { detector as jsonDetector } from "./json.mjs";
+import { detector as nodeDetector } from "./node.mjs";
+import { detector as phpDetector } from "./php.mjs";
+import { detector as pythonDetector } from "./python.mjs";
+import { detector as rustDetector } from "./rust.mjs";
+import { detector as yamlDetector } from "./yaml.mjs";
 
 /**
  * @fileoverview Detector registry and shared selector helpers.
@@ -36,28 +42,23 @@ import { dirname, join } from "node:path";
  */
 
 /**
- * Loads detector modules from the current directory.
- * @returns {Promise<DetectorProfile[]>} Loaded detectors.
+ * Registered detector profiles, in alphabetical order by module name. Imported
+ * statically (not discovered from the directory at runtime) so the registry
+ * survives bundling into dist/. Add a new detector module here. The cast keeps the
+ * public type `DetectorProfile[]`: the detector modules' object literals widen their
+ * `kind` strings, which the typedef narrows to its literal union.
  */
-async function loadDetectorsFromDirectory() {
-	const directoryPath = dirname(fileURLToPath(import.meta.url));
-	const files = await readdir(directoryPath);
-	const detectorFiles = files
-		.filter((fileName) => fileName.endsWith(".mjs"))
-		.filter((fileName) => fileName !== "index.mjs" && fileName !== "shared.mjs")
-		.sort((left, right) => left.localeCompare(right));
-
-	const modules = await Promise.all(
-		detectorFiles.map((fileName) => {
-			const fileUrl = pathToFileURL(join(directoryPath, fileName)).href;
-			return import(fileUrl);
-		})
-	);
-
-	return modules.map((moduleExports) => moduleExports.detector).filter((entry) => entry && typeof entry.id === "string");
-}
-
-export const DETECTOR_PROFILES = await loadDetectorsFromDirectory();
+export const DETECTOR_PROFILES = /** @type {DetectorProfile[]} */ ([
+	cssDetector,
+	goDetector,
+	htmlDetector,
+	jsonDetector,
+	nodeDetector,
+	phpDetector,
+	pythonDetector,
+	rustDetector,
+	yamlDetector
+]);
 
 /** @type {Map<string, typeof DETECTOR_PROFILES[number]>} */
 const detectorMap = new Map(DETECTOR_PROFILES.map((detector) => [detector.id, detector]));
