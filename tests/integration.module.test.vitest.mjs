@@ -16,8 +16,12 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import fixHeadersDefault, { fixHeaders } from "../index.mjs";
+import { build } from "tsup";
+import tsupConfigs from "../tsup.config.mjs";
+import fixHeadersDefault, { fixHeaders } from "../src/fix-header.mjs";
+import cjsEntryDefault from "../src/index.cjs.mjs";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
 import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/project.mjs";
@@ -72,6 +76,7 @@ describe("module integration and coverage", () => {
 		await initializeGitWorkspace(workspace);
 
 		expect(fixHeadersDefault).toBe(fixHeaders);
+		expect(cjsEntryDefault).toBe(fixHeaders);
 
 		const result = await fixHeaders({
 			cwd: workspace,
@@ -86,24 +91,44 @@ describe("module integration and coverage", () => {
 		expect(result.changes.some((change) => change.file.startsWith("src/generated/"))).toBe(false);
 	});
 
-	it("runs through top-level ESM and CJS shims", async () => {
-		const workspace = await createWorkspace("shim-api");
+	it("builds dist/ and bin/ with tsup and exposes the same API from the built output", async () => {
+		const workspace = await createWorkspace("built-api");
 		workspaces.push(workspace);
 		await createNodeFixture(workspace);
 		await initializeGitWorkspace(workspace);
 
-		const projectRoot = process.cwd();
-		const esmModule = await import(pathToFileURL(join(projectRoot, "index.mjs")).href);
-		expect(typeof esmModule.default).toBe("function");
-		expect(typeof esmModule.fixHeaders).toBe("function");
+		// Build with the repo's own tsup config, redirected into this test's workspace so
+		// the run never touches the repo's dist/ or bin/ (the API calls below only scan src/).
+		const outRoot = join(workspace, "build-output");
+		for (const config of tsupConfigs) {
+			await build({ ...config, outDir: join(outRoot, config.outDir), silent: true, config: false });
+		}
 
-		const cjsModule = await import(pathToFileURL(join(projectRoot, "index.cjs")).href);
+		const esmModule = await import(pathToFileURL(join(outRoot, "dist", "index.mjs")).href);
+		expect(typeof esmModule.default).toBe("function");
+		expect(esmModule.fixHeaders).toBe(esmModule.default);
+
+		// `require()` must return the function itself (historical CJS shape), and an ESM
+		// `import()` of the CJS build sees a function as its default export. (Not asserted
+		// identical: vitest loads CJS through its own module runner, a separate instance.)
+		const required = createRequire(import.meta.url)(join(outRoot, "dist", "index.cjs"));
+		expect(typeof required).toBe("function");
+		const cjsModule = await import(pathToFileURL(join(outRoot, "dist", "index.cjs")).href);
 		expect(typeof cjsModule.default).toBe("function");
 
 		const esmResult = await esmModule.default({ cwd: workspace, dryRun: true, includeFolders: ["src"] });
-		const cjsResult = await cjsModule.default({ cwd: workspace, dryRun: true, includeFolders: ["src"] });
+		const cjsResult = await required({ cwd: workspace, dryRun: true, includeFolders: ["src"] });
 		expect(esmResult.filesScanned).toBeGreaterThan(0);
-		expect(cjsResult.filesScanned).toBeGreaterThan(0);
+		expect(cjsResult.filesScanned).toBe(esmResult.filesScanned);
+
+		const { stdout } = await execFileAsync(
+			process.execPath,
+			[join(outRoot, "bin", "fix-headers.mjs"), "--dry-run", "--json", "--include-folder", "src"],
+			{ cwd: workspace }
+		);
+		const cliResult = JSON.parse(stdout);
+		expect(cliResult.filesScanned).toBe(esmResult.filesScanned);
+		expect(cliResult.metadata.projectName).toBe("fixture-node-project");
 	});
 
 	it("covers file discovery branches with include folders and exclusions", async () => {

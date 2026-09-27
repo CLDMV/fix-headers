@@ -5,6 +5,8 @@ trash/
 other_drivers/
 dist
 dist/
+# tsup CLI output (package.json "bin"); a build artifact like dist/
+/bin/
 types/dist
 types/dist/
 build/

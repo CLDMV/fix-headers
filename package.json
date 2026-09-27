@@ -3,28 +3,33 @@
 	"version": "1.3.13",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
-	"main": "./index.cjs",
+	"main": "./dist/index.cjs",
 	"module": "./index.mjs",
 	"types": "./types/index.d.mts",
 	"files": [
-		"index.mjs",
-		"index.cjs",
-		"src/",
-		"types/"
+		"dist/",
+		"!dist/**/*.map",
+		"types/",
+		"bin/",
+		"!bin/**/*.map"
 	],
 	"exports": {
 		".": {
+			"fix-headers-dev": {
+				"types": "./types/index.d.mts",
+				"import": "./src/fix-header.mjs"
+			},
 			"types": "./types/index.d.mts",
-			"import": "./index.mjs",
-			"require": "./index.cjs"
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.cjs"
 		},
 		"./package.json": "./package.json"
 	},
 	"bin": {
-		"fix-headers": "./src/cli.mjs"
+		"fix-headers": "./bin/fix-headers.mjs"
 	},
 	"scripts": {
-		"build:ci": "echo 'no build step: fix-headers ships source directly, see package.json files[]'",
+		"build:ci": "npm run lint --if-present && npm run format:check --if-present && npm run types:build && npm run build",
 		"test": "vitest run --config .configs/vitest.config.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"ci:coverage": "vitest run --coverage --reporter=dot --maxWorkers=1 --config .configs/vitest.ci.config.mjs",
@@ -32,7 +37,8 @@
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"test:coverage": "vitest run --config .configs/vitest.config.mjs --coverage",
 		"cli": "node ./src/cli.mjs",
-		"build": "echo 'no build step - stopgap for CI coverage-badge; see tracking issue'"
+		"build": "node -e \"for (const d of ['dist', 'bin']) require('node:fs').rmSync(d, { recursive: true, force: true })\" && tsup",
+		"prepack": "node -e \"const fs=require('node:fs');const hasTsup=fs.existsSync('node_modules/.bin/tsup')||fs.existsSync('node_modules/.bin/tsup.cmd');if(hasTsup){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and tsup is unavailable to build it (expected in a bare package-contents publish dir with a prebuilt dist/; unexpected anywhere else)')}\""
 	},
 	"keywords": [
 		"headers",
@@ -75,6 +81,7 @@
 	"devDependencies": {
 		"@types/node": "^26.1.1",
 		"@vitest/coverage-v8": "^5.0.0",
+		"tsup": "^8.5.1",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.0"
 	},
