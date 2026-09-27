@@ -68,7 +68,7 @@ function resolveIncludeFolders(includeFolders) {
  */
 function reportSkippedIncludeFolder(includeFolder, error) {
 	const message = error instanceof Error ? error.message : String(error);
-	console.warn(`fix-headers: skipped include folder \"${includeFolder}\" (${message})`);
+	console.warn(`fix-headers: skipped include folder "${includeFolder}" (${message})`);
 }
 
 /**
