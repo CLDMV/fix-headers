@@ -38,7 +38,12 @@
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"cli": "node ./src/cli.mjs",
 		"build": "node -e \"for (const d of ['dist', 'bin']) require('node:fs').rmSync(d, { recursive: true, force: true })\" && tsup",
-		"prepack": "node -e \"const fs=require('node:fs');const hasTsup=fs.existsSync('node_modules/.bin/tsup')||fs.existsSync('node_modules/.bin/tsup.cmd');if(hasTsup){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and tsup is unavailable to build it (expected in a bare package-contents publish dir with a prebuilt dist/; unexpected anywhere else)')}\""
+		"prepack": "node -e \"const fs=require('node:fs');const hasTsup=fs.existsSync('node_modules/.bin/tsup')||fs.existsSync('node_modules/.bin/tsup.cmd');if(hasTsup){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and tsup is unavailable to build it (expected in a bare package-contents publish dir with a prebuilt dist/; unexpected anywhere else)')}\"",
+		"lint": "eslint --config .configs/eslint.config.mjs .",
+		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
+		"format": "prettier --config .configs/.prettierrc --write .",
+		"format:check": "prettier --config .configs/.prettierrc --check .",
+		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\""
 	},
 	"keywords": [
 		"headers",
@@ -79,9 +84,19 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
+		"@cldmv/eslint-plugin-jsonv": "^1.0.10",
+		"@cldmv/jsonv": "^1.0.9",
+		"@cldmv/prettier-plugin-jsonv": "^1.0.6",
 		"@cldmv/vitest-runner": "^1.4.2",
+		"@eslint/css": "^2.0.0",
+		"@eslint/js": "^10.0.1",
+		"@eslint/json": "^2.1.0",
+		"@eslint/markdown": "^8.0.3",
 		"@types/node": "^26.1.1",
 		"@vitest/coverage-v8": "^5.0.0",
+		"eslint": "^10.11.0",
+		"globals": "^17.12.0",
+		"prettier": "^3.9.9",
 		"tsup": "^8.5.1",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.0"
