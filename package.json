@@ -48,9 +48,6 @@
 		"url": "https://github.com/CLDMV/fix-headers/issues"
 	},
 	"homepage": "https://github.com/CLDMV/fix-headers#readme",
-	"peerDependencies": {
-		"vitest": ">=1.0.0"
-	},
 	"engines": {
 		"node": ">=22.12.0"
 	},
