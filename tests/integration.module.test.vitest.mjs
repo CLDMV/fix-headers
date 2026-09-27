@@ -91,7 +91,9 @@ describe("module integration and coverage", () => {
 		expect(result.changes.some((change) => change.file.startsWith("src/generated/"))).toBe(false);
 	});
 
-	it("builds dist/ and bin/ with tsup and exposes the same API from the built output", async () => {
+	// Three tsup builds, a git init and a CLI spawn: several seconds on its own, well past
+	// vitest's 5s default once coverage instrumentation and parallel workers are involved.
+	it("builds dist/ and bin/ with tsup and exposes the same API from the built output", { timeout: 30_000 }, async () => {
 		const workspace = await createWorkspace("built-api");
 		workspaces.push(workspace);
 		await createNodeFixture(workspace);
