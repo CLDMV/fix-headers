@@ -1,4 +1,16 @@
 /**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/detect/project.mjs
+ *	@Date: 2026-03-01 13:32:57 -08:00 (1772400777)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+/**
  * Detects project root and language by scanning known marker files.
  * @param {string} cwd - Starting working directory.
  * @param {{ detectors?: { id: string, extensions: string[], priority?: number, findNearestConfig: (path: string) => Promise<{ root: string, marker: string } | null>, parseProjectName: (marker: string, content: string, rootDirName: string) => string }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string }} [options={}] - Detection options.
@@ -9,7 +21,7 @@
  *  projectName: string
  * }>} Detection result.
  */
-export function detectProjectFromMarkers(cwd: string, options?: {
+export declare function detectProjectFromMarkers(cwd: string, options?: {
     detectors?: {
         id: string;
         extensions: string[];
@@ -58,7 +70,7 @@ export function detectProjectFromMarkers(cwd: string, options?: {
  *  copyrightStartYear: number
  * }>} Final metadata.
  */
-export function resolveProjectMetadata(options?: {
+export declare function resolveProjectMetadata(options?: {
     cwd?: string;
     targetFilePath?: string;
     enabledDetectors?: string[];

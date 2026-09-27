@@ -1,9 +1,67 @@
 /**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/detectors/index.mjs
+ *	@Date: 2026-03-01 16:34:41 -08:00 (1772411681)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+export type DetectorProfile = {
+    id: string;
+    markers: string[];
+    extensions: string[];
+    enabledByDefault: boolean;
+    findNearestConfig: (startPath: string) => Promise<{
+        root: string;
+        marker: string;
+    } | null>;
+    parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string;
+    resolveCommentSyntax: (filePath: string) => ({
+        kind: "block" | "line" | "html";
+        linePrefix?: string;
+        lineSeparator?: string;
+        blockStart?: string;
+        blockLinePrefix?: string;
+        blockEnd?: string;
+    } | null);
+    resolvePreservedPrefix?: (filePath: string, content: string) => string;
+    priority?: number;
+};
+/**
+ * @fileoverview Detector registry and shared selector helpers.
+ * @module fix-headers/detectors
+ */
+/**
+ * @typedef {{
+ *  id: string,
+ *  markers: string[],
+ *  extensions: string[],
+ *  enabledByDefault: boolean,
+ *  findNearestConfig: (startPath: string) => Promise<{root: string, marker: string} | null>,
+ *  parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string,
+ *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
+ *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
+ *  priority?: number
+ * }} DetectorProfile
+ */
+/**
+ * Registered detector profiles, in alphabetical order by module name. Imported
+ * statically (not discovered from the directory at runtime) so the registry
+ * survives bundling into dist/. Add a new detector module here. The cast keeps the
+ * public type `DetectorProfile[]`: the detector modules' object literals widen their
+ * `kind` strings, which the typedef narrows to its literal union.
+ */
+export declare const DETECTOR_PROFILES: DetectorProfile[];
+/**
  * Gets enabled detector profiles based on include/exclude options.
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
  * @returns {typeof DETECTOR_PROFILES} Enabled detector list.
  */
-export function getEnabledDetectors(options?: {
+export declare function getEnabledDetectors(options?: {
     enabledDetectors?: string[];
     disabledDetectors?: string[];
 }): typeof DETECTOR_PROFILES;
@@ -12,7 +70,7 @@ export function getEnabledDetectors(options?: {
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], includeExtensions?: string[] }} [options={}] - Runtime options.
  * @returns {Set<string>} Allowed extensions.
  */
-export function getAllowedExtensions(options?: {
+export declare function getAllowedExtensions(options?: {
     enabledDetectors?: string[];
     disabledDetectors?: string[];
     includeExtensions?: string[];
@@ -22,14 +80,14 @@ export function getAllowedExtensions(options?: {
  * @param {string} id - Detector id.
  * @returns {typeof DETECTOR_PROFILES[number] | undefined} Detector.
  */
-export function getDetectorById(id: string): (typeof DETECTOR_PROFILES)[number] | undefined;
+export declare function getDetectorById(id: string): typeof DETECTOR_PROFILES[number] | undefined;
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectors?: DetectorProfile[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
  * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
-export function getCommentSyntaxForFile(filePath: string, options?: {
+export declare function getCommentSyntaxForFile(filePath: string, options?: {
     language?: string;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
@@ -56,30 +114,8 @@ export function getCommentSyntaxForFile(filePath: string, options?: {
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
  * @returns {string} Preserved prefix (possibly empty).
  */
-export function getPreservedPrefixForFile(filePath: string, content: string, options?: {
+export declare function getPreservedPrefixForFile(filePath: string, content: string, options?: {
     language?: string;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
 }): string;
-export const DETECTOR_PROFILES: DetectorProfile[];
-export type DetectorProfile = {
-    id: string;
-    markers: string[];
-    extensions: string[];
-    enabledByDefault: boolean;
-    findNearestConfig: (startPath: string) => Promise<{
-        root: string;
-        marker: string;
-    } | null>;
-    parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string;
-    resolveCommentSyntax: (filePath: string) => ({
-        kind: "block" | "line" | "html";
-        linePrefix?: string;
-        lineSeparator?: string;
-        blockStart?: string;
-        blockLinePrefix?: string;
-        blockEnd?: string;
-    } | null);
-    resolvePreservedPrefix?: (filePath: string, content: string) => string;
-    priority?: number;
-};

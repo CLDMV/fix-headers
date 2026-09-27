@@ -1,13 +1,15 @@
 /**
- * @fileoverview Main header-fixing engine with auto-detection and override support.
- * @module fix-headers/core/fix-headers
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/core/fix-headers.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
-/**
- * Fixes headers in a project using auto-detected metadata unless overridden.
- * @param {FixHeadersOptions} [options={}] - Runtime options.
- * @returns {Promise<FixHeadersResult>} Process report.
- */
-export function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;
 export type FixHeadersOptions = {
     cwd?: string;
     input?: string;
@@ -84,3 +86,13 @@ export type FixHeadersResult = {
         };
     }>;
 };
+/**
+ * @fileoverview Main header-fixing engine with auto-detection and override support.
+ * @module fix-headers/core/fix-headers
+ */
+/**
+ * Fixes headers in a project using auto-detected metadata unless overridden.
+ * @param {FixHeadersOptions} [options={}] - Runtime options.
+ * @returns {Promise<FixHeadersResult>} Process report.
+ */
+export declare function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;

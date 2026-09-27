@@ -1,5 +1,17 @@
 #!/usr/bin/env node
 /**
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /src/cli.mjs
+ *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	-----
+ *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ */
+/**
  * Parses CLI arguments into fixHeaders options and control flags.
  * @param {string[]} argv - Process argument vector without node/script items.
  * @returns {{
@@ -8,7 +20,7 @@
  *  json: boolean
  * }} Parsed CLI payload.
  */
-export function parseCliArgs(argv: string[]): {
+export declare function parseCliArgs(argv: string[]): {
     options: Record<string, unknown>;
     help: boolean;
     json: boolean;
@@ -18,7 +30,7 @@ export function parseCliArgs(argv: string[]): {
  * @param {Record<string, unknown>} options - Current options object.
  * @returns {Promise<Record<string, unknown>>} Merged options object.
  */
-export function applyConfigFile(options: Record<string, unknown>): Promise<Record<string, unknown>>;
+export declare function applyConfigFile(options: Record<string, unknown>): Promise<Record<string, unknown>>;
 /**
  * Executes CLI flow and returns process-like exit code.
  * @param {string[]} argv - CLI arguments.
@@ -29,7 +41,7 @@ export function applyConfigFile(options: Record<string, unknown>): Promise<Recor
  * }} [deps={}] - Dependency overrides for tests.
  * @returns {Promise<number>} Exit code.
  */
-export function runCli(argv: string[], deps?: {
+export declare function runCli(argv: string[], deps?: {
     runner?: (options: Record<string, unknown>) => Promise<unknown>;
     stdout?: (message: string) => void;
     stderr?: (message: string) => void;
@@ -41,4 +53,4 @@ export function runCli(argv: string[], deps?: {
  * @param {(args: string[]) => Promise<number>} [executor=runCli] - CLI executor.
  * @returns {boolean} Whether the entrypoint branch was executed.
  */
-export function runCliAsMain(argv?: string[], moduleUrl?: string, executor?: (args: string[]) => Promise<number>): boolean;
+export declare function runCliAsMain(argv?: string[], moduleUrl?: string, executor?: (args: string[]) => Promise<number>): boolean;

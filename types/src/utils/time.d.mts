@@ -19,13 +19,13 @@
  * @param {Date} date - Input date.
  * @returns {string} Formatted date string.
  */
-export function formatDateWithTimezone(date: Date): string;
+export declare function formatDateWithTimezone(date: Date): string;
 /**
  * Returns a formatted date and unix timestamp.
  * @param {Date} [date=new Date()] - Date value to format.
  * @returns {{ date: string, timestamp: number }} Formatted datetime payload.
  */
-export function toDatePayload(date?: Date): {
+export declare function toDatePayload(date?: Date): {
     date: string;
     timestamp: number;
 };
