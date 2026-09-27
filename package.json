@@ -30,12 +30,12 @@
 	},
 	"scripts": {
 		"build:ci": "npm run lint --if-present && npm run format:check --if-present && npm run types:build && npm run build",
-		"test": "vitest run --config .configs/vitest.config.mjs",
+		"test": "node tests/run-vitest.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
-		"ci:coverage": "vitest run --coverage --reporter=dot --maxWorkers=1 --config .configs/vitest.ci.config.mjs",
+		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
+		"ci:coverage": "npm run coverage",
 		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
-		"test:coverage": "vitest run --config .configs/vitest.config.mjs --coverage",
 		"cli": "node ./src/cli.mjs",
 		"build": "node -e \"for (const d of ['dist', 'bin']) require('node:fs').rmSync(d, { recursive: true, force: true })\" && tsup",
 		"prepack": "node -e \"const fs=require('node:fs');const hasTsup=fs.existsSync('node_modules/.bin/tsup')||fs.existsSync('node_modules/.bin/tsup.cmd');if(hasTsup){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and tsup is unavailable to build it (expected in a bare package-contents publish dir with a prebuilt dist/; unexpected anywhere else)')}\""
@@ -79,6 +79,7 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
+		"@cldmv/vitest-runner": "^1.4.2",
 		"@types/node": "^26.1.1",
 		"@vitest/coverage-v8": "^5.0.0",
 		"tsup": "^8.5.1",
