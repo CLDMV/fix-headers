@@ -25,11 +25,40 @@ vi.mock("node:fs/promises", async () => {
 	};
 });
 
-describe("fs readFileDates fallback branch", () => {
+describe("fs readFileDates creation time", () => {
 	it("uses mtime when birthtime is unavailable", async () => {
 		const { readFileDates } = await import("../src/utils/fs.mjs?fs-date-fallback");
 		const result = await readFileDates("/tmp/does-not-matter");
 		expect(result.createdAt.toISOString()).toBe("2021-01-01T00:00:00.000Z");
 		expect(result.updatedAt.toISOString()).toBe("2021-01-01T00:00:00.000Z");
+	});
+
+	it("uses birthtime when it is earlier than mtime", async () => {
+		const { stat } = await import("node:fs/promises");
+		vi.mocked(stat).mockResolvedValueOnce(
+			/** @type {any} */ ({
+				birthtimeMs: Date.parse("2020-01-01T00:00:00Z"),
+				birthtime: new Date("2020-01-01T00:00:00Z"),
+				mtime: new Date("2021-01-01T00:00:00Z")
+			})
+		);
+		const { readFileDates } = await import("../src/utils/fs.mjs?fs-date-fallback");
+		const result = await readFileDates("/tmp/does-not-matter");
+		expect(result.createdAt.toISOString()).toBe("2020-01-01T00:00:00.000Z");
+		expect(result.updatedAt.toISOString()).toBe("2021-01-01T00:00:00.000Z");
+	});
+
+	it("uses mtime when birthtime is later (archive extraction or cp -p keep the source mtime)", async () => {
+		const { stat } = await import("node:fs/promises");
+		vi.mocked(stat).mockResolvedValueOnce(
+			/** @type {any} */ ({
+				birthtimeMs: Date.parse("2022-01-01T00:00:00Z"),
+				birthtime: new Date("2022-01-01T00:00:00Z"),
+				mtime: new Date("2021-01-01T00:00:00Z")
+			})
+		);
+		const { readFileDates } = await import("../src/utils/fs.mjs?fs-date-fallback");
+		const result = await readFileDates("/tmp/does-not-matter");
+		expect(result.createdAt.toISOString()).toBe("2021-01-01T00:00:00.000Z");
 	});
 });

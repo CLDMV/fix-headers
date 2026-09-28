@@ -53,6 +53,7 @@ Common CLI options:
 - `--dry-run`
 - `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#date-checks))
 - `--fix-created-date`
+- `--strict-created-date`
 - `--normalize-date-format`
 - `--json`
 - `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
@@ -94,7 +95,8 @@ Important options:
 - `input?: string` - explicit single file or folder path to process
 - `dryRun?: boolean` - compute changes without writing files
 - `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#date-checks)
-- `fixCreatedDate?: boolean` - replace an existing `@Date` that is not the file's git first-commit instant with the git date. Off by default: an existing `@Date` is kept, because a file's first commit is not always its real creation (moved or copied in from another repository). Files without git history keep their `@Date`
+- `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
+- `strictCreatedDate?: boolean` - with `check`, count a `@Date` later than the file's git first commit or filesystem creation time as drift (fails the run). Off by default, where it is an advisory
 - `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
 - `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
 - `configFile?: string` - load JSON options from file (resolved from `cwd`)
@@ -144,30 +146,48 @@ const result = await fixHeaders({
 });
 ```
 
+## Creation date
+
+`@Date` is "oldest wins": a file cannot have been created later than its first commit or than the time the filesystem first saw it, and an `@Date` older than both (a file brought in from elsewhere, or dated before it was committed) is kept.
+
+- **New header** (no `@Date`, or one without a `(epoch)`): the older of the git first-commit date and the filesystem creation time. Git wins a tie.
+- **Existing `@Date`**: kept exactly as written. Only its epoch is repaired when it disagrees with the datetime text.
+- **Existing `@Date` with `fixCreatedDate`**: the oldest of the existing `@Date`, the git first commit, and the filesystem creation time. The existing value wins a tie, so the correction only ever moves `@Date` earlier. An existing value whose datetime is not recognised is replaced.
+
+The filesystem creation time is the earlier of the file's birth time and its modification time. Content last written at the modification time existed by then, so it bounds creation even when the birth time is later (an extracted archive or a `cp -p` copy keeps the source's modification time). Where the platform reports no birth time, the modification time is used. A fresh clone or CI checkout gives every file a current filesystem time, so there the git first commit decides.
+
 ## Date checks
 
-`check: true` / `--check` validates the `@Date` and `@Last modified time` values of every existing header and writes nothing. It compares instants, not strings, so the same moment written with another offset or in the space/`T` form is not drift. It is independent of the rendered-header diff: an author, identity, copyright, or other content difference never fails the check.
+`check: true` / `--check` validates the `@Date` and `@Last modified time` values of every existing header and writes nothing. It compares instants, not strings, so the same moment written with another offset or in the space/`T` form is not drift. It is independent of the rendered-header diff: an author, identity, copyright, or other content difference never fails the check. Files without a header are skipped.
 
-| Check                                | Fails the run | Meaning                                                                                                                       |
-| ------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `created-format` / `modified-format` | yes           | the value is not a `<datetime> (<epoch>)` pair with a recognised datetime (a datetime without a UTC offset is not recognised) |
-| `created-epoch` / `modified-epoch`   | yes           | the parenthesised epoch is not the instant the datetime text describes                                                        |
-| `created-git`                        | yes           | `@Date` is not the file's git first-commit date. Skipped for files with no git history                                        |
-| `modified-git`                       | no (advisory) | `@Last modified time` is not the file's git last-commit date                                                                  |
+| Check                                | Fails the run                           | Meaning                                                                                                                                                  |
+| ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `created-format` / `modified-format` | yes                                     | the value is not a `<datetime> (<epoch>)` pair with a recognised datetime (a datetime without a UTC offset is not recognised)                            |
+| `created-epoch` / `modified-epoch`   | yes                                     | the parenthesised epoch is not the instant the datetime text describes                                                                                   |
+| `created-newer-than-source`          | with `strictCreatedDate`, else advisory | `@Date` is later than the older of the git first commit and the filesystem creation time; the message names the older source. An earlier `@Date` is fine |
+| `modified-git`                       | no (advisory)                           | `@Last modified time` is not the file's git last-commit date                                                                                             |
 
 ```bash
 $ fix-headers --check --verbose
-fix-headers check: scanned=5, drift=2, advisories=1
+fix-headers check: scanned=3, drift=1, advisories=2
 drift: src/epoch.mjs: @Date epoch 1758382412 does not match 2026-09-20T15:33:32+00:00 (expected 1789918412)
-drift: src/invented.mjs: @Date 2026-09-20 00:00:00 -07:00 does not match the git first commit 2026-09-20T15:33:32+00:00 (1789918412)
-advisory: src/invented.mjs: @Last modified time 2026-09-21 09:00:00 -07:00 does not match the git last commit 2026-09-20T15:33:32+00:00 (1789918412)
+advisory: src/later.mjs: @Date 2026-09-21 09:00:00 -07:00 is later than the git first commit 2026-09-20T15:33:32+00:00 (1789918412)
+advisory: src/later.mjs: @Last modified time 2026-09-21 09:00:00 -07:00 does not match the git last commit 2026-09-20T15:33:32+00:00 (1789918412)
 $ echo $?
 1
+$ fix-headers --check --strict-created-date
+fix-headers check: scanned=3, drift=2, advisories=1
+drift: src/epoch.mjs: @Date epoch 1758382412 does not match 2026-09-20T15:33:32+00:00 (expected 1789918412)
+drift: src/later.mjs: @Date 2026-09-21 09:00:00 -07:00 is later than the git first commit 2026-09-20T15:33:32+00:00 (1789918412)
 ```
+
+A third file, `src/early.mjs`, has `@Date: 2026-09-20 08:28:32 -07:00`: five minutes before its first commit, as stamped from the file's creation time before it was committed. That is not drift, strict or not.
+
+To make the created-date check fail CI, set `"strictCreatedDate": true` in the config file or pass `--strict-created-date`.
 
 Advisories are counted in the summary and listed with `--verbose`; `--json` prints the full result and uses the same exit code. `--dry-run` still always exits `0`.
 
-In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-git` drift is corrected only with `fixCreatedDate` / `--fix-created-date`.
+In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-newer-than-source` is corrected only with `fixCreatedDate` / `--fix-created-date`.
 
 ## Notes
 

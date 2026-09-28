@@ -16,6 +16,7 @@ export type FixHeadersOptions = {
     dryRun?: boolean;
     check?: boolean;
     fixCreatedDate?: boolean;
+    strictCreatedDate?: boolean;
     normalizeDateFormat?: boolean;
     configFile?: string;
     sampleOutput?: boolean;
