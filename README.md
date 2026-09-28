@@ -52,7 +52,9 @@ Common CLI options:
 
 - `--dry-run`
 - `--json`
-- `--sample-output`
+- `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
+- `--sample-output` - print the previous/new header and detected values for each changed file
+- `--diff` - print a unified diff of each changed file's header (implies sample output)
 - `--force-author-update`
 - `--force-last-modified-author-update`
 - `--use-gpg-signer-author` (signer UID name, with the OpenPGP UID comment dropped)
@@ -88,7 +90,7 @@ Important options:
 - `cwd?: string` - start directory for project detection
 - `input?: string` - explicit single file or folder path to process
 - `dryRun?: boolean` - compute changes without writing files
-- `sampleOutput?: boolean` - include previous/new header sample text for changed files
+- `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
 - `configFile?: string` - load JSON options from file (resolved from `cwd`)
 - `includeExtensions?: string[]` - file extensions to process
 - `enabledDetectors?: string[]` - detector ids to enable (defaults to all)
@@ -143,7 +145,50 @@ const result = await fixHeaders({
 - Built-in ignores are scoped: `.git` and `node_modules` are skipped at **any depth**, while build/cache directories (`dist`, `build`, `coverage`, `tmp`, `.next`, `.turbo`) are skipped **only at the project root** — so a source directory that happens to share a name (for example `tools/build`) is still processed.
 - With `gitignore` enabled (the default, auto-detecting the project's `.gitignore`), anything the project ignores is skipped during discovery — generated paths are excluded by the project's own rules without hard-coding names. Pass `gitignore: false` to disable, or a path/array to use specific ignore files.
 - For monorepos, each file resolves metadata from the closest detector config in its parent tree.
-- With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, and `detectedValues` in results.
+- With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, `diff`, `issues`, and `detectedValues` in results.
+
+## Sample output
+
+With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed entry in `result.changes` carries a `sample` object. It costs nothing when the option is off.
+
+- `previousValue` - the existing header block, or `null` when the file had none.
+- `newValue` - the header block this run writes.
+- `diff` - a ready-to-print unified diff of the header block. The `---`/`+++` lines name the file (`a/<file>` / `b/<file>`, or `/dev/null` when there was no previous header, in which case the whole new header shows as added), and hunk line numbers are file line numbers.
+- `issues` - one `{ field, previous, detected }` entry per header field whose written value differs from the existing header, in header order. Fields: `projectName`, `filename`, `createdAt`, `authorName`, `authorEmail`, `lastModifiedByName`, `lastModifiedByEmail`, `lastModifiedAt`, `copyrightStartYear`, `copyrightEndYear`, `companyName`. Values are the field text as written in the header (dates keep their `date (timestamp)` form); `previous` is `null` when the field was missing.
+- `detectedValues` - the metadata resolved for the file.
+
+`issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` and `@Last modified by` identity unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set, so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
+
+```js
+const { changes } = await fixHeaders({ dryRun: true, sampleOutput: true });
+for (const { file, sample } of changes.filter((change) => change.sample)) {
+	for (const issue of sample.issues) {
+		console.log(`${file}: ${issue.field}: found ${issue.previous}, expected ${issue.detected}`);
+	}
+	console.log(sample.diff);
+}
+```
+
+```text
+$ fix-headers --dry-run --diff --verbose --input src/cli.mjs --company-name "CLDMV Inc."
+fix-headers complete: scanned=1, updated=1, dryRun=true
+updated: src/cli.mjs
+issues: src/cli.mjs
+  lastModifiedAt: found "2026-03-01T17:59:32-08:00 (1772416772)", expected "2026-09-28 09:20:28 -07:00 (1790612428)"
+  companyName: found "Catalyzed Motivation Inc.", expected "CLDMV Inc."
+--- a/src/cli.mjs
++++ b/src/cli.mjs
+@@ -7,7 +7,7 @@
+  *	@Email: <Shinrai@users.noreply.github.com>
+  *	-----
+  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
++ *	@Last modified time: 2026-09-28 09:20:28 -07:00 (1790612428)
+  *	-----
+- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
++ *	@Copyright: Copyright (c) 2026-2026 CLDMV Inc. All rights reserved.
+  */
+```
 
 ## License
 

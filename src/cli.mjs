@@ -23,7 +23,7 @@ import fixHeaders from "./fix-header.mjs";
  * @module fix-headers/cli
  */
 
-const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode\n      --sample-output                Show previous/new header sample for changed files\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --include-folder-non-recursive <path>  Include only a folder's own files, not its subfolders (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          Override company name\n      --copyright-start-year <year>  Override copyright start year\n      --config <path>                Load JSON options file\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
+const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode; with --sample-output or --diff, also print each file's field differences\n      --sample-output                Show previous/new header sample for changed files\n      --diff                         Print a unified diff of each changed file's header (implies sample output)\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --include-folder-non-recursive <path>  Include only a folder's own files, not its subfolders (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          Override company name\n      --copyright-start-year <year>  Override copyright start year\n      --config <path>                Load JSON options file\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --dry-run --diff --verbose\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
 
 /**
  * Converts CLI flag token to camelCase key.
@@ -40,13 +40,14 @@ function toCamelCase(token) {
  * @returns {{
  *  options: Record<string, unknown>,
  *  help: boolean,
- *  json: boolean
+ *  json: boolean,
+ *  diff: boolean
  * }} Parsed CLI payload.
  */
 export function parseCliArgs(argv) {
 	/** @type {Record<string, unknown>} */
 	const options = {};
-	const control = { help: false, json: false };
+	const control = { help: false, json: false, diff: false };
 	const multiMap = {
 		"include-folder": "includeFolders",
 		"exclude-folder": "excludeFolders",
@@ -77,6 +78,10 @@ export function parseCliArgs(argv) {
 		}
 		if (arg === "--json") {
 			control.json = true;
+			continue;
+		}
+		if (arg === "--diff") {
+			control.diff = true;
 			continue;
 		}
 		if (arg === "--verbose") {
@@ -163,7 +168,8 @@ export function parseCliArgs(argv) {
 	return {
 		options,
 		help: control.help,
-		json: control.json
+		json: control.json,
+		diff: control.diff
 	};
 }
 
@@ -193,26 +199,87 @@ export async function applyConfigFile(options) {
 }
 
 /**
+ * @typedef {{
+ *  file?: string,
+ *  changed?: boolean,
+ *  sample?: {
+ *   previousValue?: string | null,
+ *   newValue?: string,
+ *   diff?: string,
+ *   issues?: Array<{ field?: string, previous?: string | null, detected?: string | null }>,
+ *   detectedValues?: Record<string, unknown>
+ *  }
+ * }} CliChangeEntry
+ */
+
+/**
+ * Returns the changed entries that carry a usable sample payload.
+ * @param {unknown} result - Runner result object.
+ * @returns {CliChangeEntry[]} Changed entries with a sample.
+ */
+function getSampledChanges(result) {
+	if (!result || typeof result !== "object") {
+		return [];
+	}
+
+	const report = /** @type {{changes?: CliChangeEntry[]}} */ (result);
+	const changes = Array.isArray(report.changes) ? report.changes : [];
+	return changes.filter((change) => change && change.changed === true && change.sample && typeof change.sample.newValue === "string");
+}
+
+/**
+ * Formats a header field value for issue output.
+ * @param {unknown} value - Field value.
+ * @returns {string} Printable value.
+ */
+function formatIssueValue(value) {
+	return typeof value === "string" ? `"${value}"` : "(missing)";
+}
+
+/**
+ * Prints each changed file's per-field differences.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @returns {void}
+ */
+function printIssues(stdout, result) {
+	for (const change of getSampledChanges(result)) {
+		const issues = Array.isArray(change.sample.issues) ? change.sample.issues : [];
+		stdout(`issues: ${change.file || "<unknown-file>"}`);
+		if (issues.length === 0) {
+			stdout("  (no field differences; header formatting only)");
+			continue;
+		}
+		for (const issue of issues) {
+			stdout(
+				`  ${issue?.field || "<unknown-field>"}: found ${formatIssueValue(issue?.previous)}, expected ${formatIssueValue(issue?.detected)}`
+			);
+		}
+	}
+}
+
+/**
+ * Prints each changed file's unified header diff.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @returns {void}
+ */
+function printDiffs(stdout, result) {
+	for (const change of getSampledChanges(result)) {
+		if (typeof change.sample.diff === "string" && change.sample.diff.length > 0) {
+			stdout(change.sample.diff);
+		}
+	}
+}
+
+/**
  * Prints per-file previous/new header samples when available.
  * @param {(message: string) => void} stdout - Standard output writer.
  * @param {unknown} result - Runner result object.
  * @returns {void}
  */
 function printSampleOutput(stdout, result) {
-	if (!result || typeof result !== "object") {
-		return;
-	}
-
-	const report =
-		/** @type {{changes?: Array<{file?: string, changed?: boolean, sample?: { previousValue?: string | null, newValue?: string, detectedValues?: Record<string, unknown> }}>}} */ (
-			result
-		);
-	const changes = Array.isArray(report.changes) ? report.changes : [];
-	for (const change of changes) {
-		if (!change || change.changed !== true || !change.sample || typeof change.sample.newValue !== "string") {
-			continue;
-		}
-
+	for (const change of getSampledChanges(result)) {
 		stdout(`sample: ${change.file || "<unknown-file>"}`);
 		stdout("previous:");
 		stdout(change.sample.previousValue === null ? "(none)" : String(change.sample.previousValue));
@@ -245,6 +312,30 @@ function printChangedFiles(stdout, result) {
 }
 
 /**
+ * Prints the optional per-file detail sections selected by the CLI flags.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @param {Record<string, unknown>} options - Effective runner options.
+ * @param {boolean} diff - Whether `--diff` was passed.
+ * @returns {void}
+ */
+function printDetails(stdout, result, options, diff) {
+	const sampled = options.sampleOutput === true || diff;
+	if (options.verbose === true) {
+		printChangedFiles(stdout, result);
+		if (sampled) {
+			printIssues(stdout, result);
+		}
+	}
+	if (options.sampleOutput === true) {
+		printSampleOutput(stdout, result);
+	}
+	if (diff) {
+		printDiffs(stdout, result);
+	}
+}
+
+/**
  * Executes CLI flow and returns process-like exit code.
  * @param {string[]} argv - CLI arguments.
  * @param {{
@@ -267,7 +358,7 @@ export async function runCli(argv, deps = {}) {
 		}
 
 		const finalOptions = await applyConfigFile(parsed.options);
-		const result = await runner(finalOptions);
+		const result = await runner(parsed.diff ? { ...finalOptions, sampleOutput: true } : finalOptions);
 
 		if (parsed.json) {
 			stdout(JSON.stringify(result, null, 2));
@@ -279,19 +370,9 @@ export async function runCli(argv, deps = {}) {
 			stdout(
 				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}, dryRun=${report.dryRun === true}`
 			);
-			if (finalOptions.verbose === true) {
-				printChangedFiles(stdout, result);
-			}
-			if (finalOptions.sampleOutput === true) {
-				printSampleOutput(stdout, result);
-			}
+			printDetails(stdout, result, finalOptions, parsed.diff);
 		} else {
-			if (finalOptions.verbose === true) {
-				printChangedFiles(stdout, result);
-			}
-			if (finalOptions.sampleOutput === true) {
-				printSampleOutput(stdout, result);
-			}
+			printDetails(stdout, result, finalOptions, parsed.diff);
 			stdout("fix-headers complete");
 		}
 		return 0;
