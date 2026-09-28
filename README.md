@@ -51,6 +51,9 @@ npm run cli -- --dry-run --json
 Common CLI options:
 
 - `--dry-run`
+- `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#date-checks))
+- `--fix-created-date`
+- `--normalize-date-format`
 - `--json`
 - `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
 - `--sample-output` - print the previous/new header and detected values for each changed file
@@ -90,6 +93,9 @@ Important options:
 - `cwd?: string` - start directory for project detection
 - `input?: string` - explicit single file or folder path to process
 - `dryRun?: boolean` - compute changes without writing files
+- `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#date-checks)
+- `fixCreatedDate?: boolean` - replace an existing `@Date` that is not the file's git first-commit instant with the git date. Off by default: an existing `@Date` is kept, because a file's first commit is not always its real creation (moved or copied in from another repository). Files without git history keep their `@Date`
+- `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
 - `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
 - `configFile?: string` - load JSON options from file (resolved from `cwd`)
 - `includeExtensions?: string[]` - file extensions to process
@@ -137,6 +143,31 @@ const result = await fixHeaders({
 	copyrightStartYear: 2013
 });
 ```
+
+## Date checks
+
+`check: true` / `--check` validates the `@Date` and `@Last modified time` values of every existing header and writes nothing. It compares instants, not strings, so the same moment written with another offset or in the space/`T` form is not drift. It is independent of the rendered-header diff: an author, identity, copyright, or other content difference never fails the check.
+
+| Check                                | Fails the run | Meaning                                                                                                                       |
+| ------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `created-format` / `modified-format` | yes           | the value is not a `<datetime> (<epoch>)` pair with a recognised datetime (a datetime without a UTC offset is not recognised) |
+| `created-epoch` / `modified-epoch`   | yes           | the parenthesised epoch is not the instant the datetime text describes                                                        |
+| `created-git`                        | yes           | `@Date` is not the file's git first-commit date. Skipped for files with no git history                                        |
+| `modified-git`                       | no (advisory) | `@Last modified time` is not the file's git last-commit date                                                                  |
+
+```bash
+$ fix-headers --check --verbose
+fix-headers check: scanned=5, drift=2, advisories=1
+drift: src/epoch.mjs: @Date epoch 1758382412 does not match 2026-09-20T15:33:32+00:00 (expected 1789918412)
+drift: src/invented.mjs: @Date 2026-09-20 00:00:00 -07:00 does not match the git first commit 2026-09-20T15:33:32+00:00 (1789918412)
+advisory: src/invented.mjs: @Last modified time 2026-09-21 09:00:00 -07:00 does not match the git last commit 2026-09-20T15:33:32+00:00 (1789918412)
+$ echo $?
+1
+```
+
+Advisories are counted in the summary and listed with `--verbose`; `--json` prints the full result and uses the same exit code. `--dry-run` still always exits `0`.
+
+In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-git` drift is corrected only with `fixCreatedDate` / `--fix-created-date`.
 
 ## Notes
 

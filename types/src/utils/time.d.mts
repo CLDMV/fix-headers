@@ -29,3 +29,33 @@ export declare function toDatePayload(date?: Date): {
     date: string;
     timestamp: number;
 };
+/**
+ * Parses a header datetime string into its wall-clock parts, UTC offset, and unix timestamp.
+ * Calendar-invalid values (month 13, February 30, hour 24, ...) are rejected rather than rolled over.
+ * @param {string} text - Datetime text as written in a header.
+ * @returns {{ year: number, month: number, day: number, hour: number, minute: number, second: number, offsetMinutes: number, timestamp: number } | null} Parsed datetime, or null when unrecognised.
+ */
+export declare function parseHeaderDate(text: string): {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+    offsetMinutes: number;
+    timestamp: number;
+} | null;
+/**
+ * Renders parsed datetime parts in the git `%aI` form (`YYYY-MM-DDTHH:mm:ss±HH:MM`), keeping the original offset.
+ * @param {{ year: number, month: number, day: number, hour: number, minute: number, second: number, offsetMinutes: number }} parts - Parsed datetime parts.
+ * @returns {string} ISO 8601 datetime text.
+ */
+export declare function formatIsoDate(parts: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+    offsetMinutes: number;
+}): string;
