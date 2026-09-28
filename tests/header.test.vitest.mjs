@@ -94,7 +94,16 @@ describe("header/template + parser", () => {
 		const NEW = "/**\n *\t@Project: new\n */";
 
 		it("preserves the body when an existing `**/` header precedes a `*/` inside a // comment", () => {
-			const content = ["/**", " *\t@Project: old", " **/", "", "{", '\t"compilerOptions": { "x": true } // see /** @internal */ note', "}", ""].join("\n");
+			const content = [
+				"/**",
+				" *\t@Project: old",
+				" **/",
+				"",
+				"{",
+				'\t"compilerOptions": { "x": true } // see /** @internal */ note',
+				"}",
+				""
+			].join("\n");
 			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/tsconfig.jsonc");
 			expect(nextContent).toContain("@Project: new");
 			expect(nextContent).not.toContain("@Project: old");

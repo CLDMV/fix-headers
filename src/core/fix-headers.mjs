@@ -207,7 +207,8 @@ export async function fixHeaders(options = {}) {
 	});
 	const dryRun = effectiveOptions.dryRun === true;
 
-	let files = [];
+	/** @type {string[]} */
+	let files;
 	if (typeof effectiveOptions.input === "string" && effectiveOptions.input.trim().length > 0) {
 		const inputPath = resolve(scanRoot, effectiveOptions.input);
 		const targetStats = await stat(inputPath).catch(() => null);
