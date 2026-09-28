@@ -16,7 +16,9 @@ import { relative, resolve } from "node:path";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import { buildHeader } from "../header/template.mjs";
+import { compareHeaderFields } from "../header/fields.mjs";
 import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
+import { createUnifiedDiff } from "../utils/diff.mjs";
 import { readFileDates } from "../utils/fs.mjs";
 import { getGitCreationDate, getGitLastModifiedDate } from "../utils/git.mjs";
 import { toDatePayload } from "../utils/time.mjs";
@@ -51,6 +53,23 @@ import { toDatePayload } from "../utils/time.mjs";
  */
 
 /**
+ * @typedef {import("../header/fields.mjs").HeaderFieldIssue} HeaderFieldIssue
+ */
+
+/**
+ * Result of a run. With `sampleOutput: true`, each changed entry carries a `sample`:
+ * - `previousValue` / `newValue` - the header block before (null when the file had none) and after.
+ * - `diff` - a unified diff of the header block (`--- a/<file>` / `+++ b/<file>`, `/dev/null`
+ *   when there was no previous header), with hunk line numbers relative to the file.
+ * - `issues` - one `{ field, previous, detected }` entry per header field whose written value
+ *   differs from the existing header. Values are the field text as written in the header
+ *   (dates keep their `date (timestamp)` form; `previous` is null when the field was missing).
+ *   Fields fix-headers preserves - the original `@Author`/`@Email` and `@Last modified by`
+ *   identity, unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set - are compared
+ *   against what is actually written, so they only appear when they really change. Because an
+ *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
+ *   changed file that already had a header.
+ * - `detectedValues` - the metadata resolved for the file.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
@@ -66,7 +85,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  filesScanned: number,
  *  filesUpdated: number,
  *  dryRun: boolean,
- *  changes: Array<{file: string, changed: boolean, sample?: { previousValue: string | null, newValue: string, detectedValues?: {
+ *  changes: Array<{file: string, changed: boolean, sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
  *   projectName: string,
  *   language: string,
  *   projectRoot: string,
@@ -371,9 +390,18 @@ export async function fixHeaders(options = {}) {
 		};
 
 		if (effectiveOptions.sampleOutput === true && replacement.changed) {
+			const previousValue = existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null;
+			const diffPath = relativePath.replace(/\\/g, "/");
+			const headerLineOffset = replacement.nextContent.slice(0, replacement.nextContent.indexOf(header)).split("\n").length - 1;
 			changeEntry.sample = {
-				previousValue: existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null,
+				previousValue,
 				newValue: header,
+				diff: createUnifiedDiff(previousValue, header, {
+					fromFile: `a/${diffPath}`,
+					toFile: `b/${diffPath}`,
+					lineOffset: headerLineOffset
+				}),
+				issues: compareHeaderFields(previousValue, header),
 				detectedValues: {
 					projectName: fileMetadata.projectName,
 					language: fileMetadata.language,

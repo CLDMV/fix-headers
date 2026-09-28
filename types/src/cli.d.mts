@@ -17,13 +17,15 @@
  * @returns {{
  *  options: Record<string, unknown>,
  *  help: boolean,
- *  json: boolean
+ *  json: boolean,
+ *  diff: boolean
  * }} Parsed CLI payload.
  */
 export declare function parseCliArgs(argv: string[]): {
     options: Record<string, unknown>;
     help: boolean;
     json: boolean;
+    diff: boolean;
 };
 /**
  * Loads extra options from a JSON config file.
@@ -31,6 +33,21 @@ export declare function parseCliArgs(argv: string[]): {
  * @returns {Promise<Record<string, unknown>>} Merged options object.
  */
 export declare function applyConfigFile(options: Record<string, unknown>): Promise<Record<string, unknown>>;
+export type CliChangeEntry = {
+    file?: string;
+    changed?: boolean;
+    sample?: {
+        previousValue?: string | null;
+        newValue?: string;
+        diff?: string;
+        issues?: Array<{
+            field?: string;
+            previous?: string | null;
+            detected?: string | null;
+        }>;
+        detectedValues?: Record<string, unknown>;
+    };
+};
 /**
  * Executes CLI flow and returns process-like exit code.
  * @param {string[]} argv - CLI arguments.

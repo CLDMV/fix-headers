@@ -45,6 +45,7 @@ export type FixHeadersOptions = {
     companyName?: string;
     copyrightStartYear?: number;
 };
+export type HeaderFieldIssue = import("../header/fields.mjs").HeaderFieldIssue;
 export type FixHeadersResult = {
     metadata: {
         projectName: string;
@@ -66,6 +67,8 @@ export type FixHeadersResult = {
         sample?: {
             previousValue: string | null;
             newValue: string;
+            diff: string;
+            issues: HeaderFieldIssue[];
             detectedValues?: {
                 projectName: string;
                 language: string;
