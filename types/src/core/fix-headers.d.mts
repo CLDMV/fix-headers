@@ -28,7 +28,10 @@ export type FixHeadersOptions = {
         blockLinePrefix?: string;
         blockEnd?: string;
     }>;
-    includeFolders?: string[];
+    includeFolders?: Array<string | {
+        path: string;
+        recursive?: boolean;
+    }>;
     excludeFolders?: string[];
     includeExtensions?: string[];
     gitignore?: boolean | string | string[];

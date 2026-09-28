@@ -59,6 +59,7 @@ Common CLI options:
 - `--cwd <path>`
 - `--input <path>`
 - `--include-folder <path>` (repeatable)
+- `--include-folder-non-recursive <path>` (repeatable) - include only that folder's own files, not its subfolders
 - `--exclude-folder <path>` (repeatable)
 - `--include-extension <ext>` (repeatable)
 - `--enable-detector <id>` / `--disable-detector <id>` (repeatable)
@@ -93,7 +94,7 @@ Important options:
 - `enabledDetectors?: string[]` - detector ids to enable (defaults to all)
 - `disabledDetectors?: string[]` - detector ids to disable
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
-- `includeFolders?: string[]` - project-relative folders to scan
+- `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
 - `excludeFolders?: string[]` - folder names or relative paths to exclude
 - `gitignore?: boolean | string | string[]` - respect `.gitignore` during discovery. `false` disables; a path or array of paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`. Matched files and directories are skipped.
 - `projectName?: string`
@@ -116,7 +117,7 @@ const result = await fixHeaders({
 	cwd: process.cwd(),
 	dryRun: false,
 	configFile: "fix-headers.config.json",
-	includeFolders: ["src", "scripts"],
+	includeFolders: ["src", "scripts", { path: ".", recursive: false }],
 	excludeFolders: ["src/generated", "dist"],
 	detectorSyntaxOverrides: {
 		node: {
@@ -138,6 +139,7 @@ const result = await fixHeaders({
 ## Notes
 
 - `excludeFolders` supports both folder-name and nested path matching.
+- `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters (for example one under `node_modules` or under a root build folder such as `dist`), which keeps being walked on its own because it was named explicitly.
 - Built-in ignores are scoped: `.git` and `node_modules` are skipped at **any depth**, while build/cache directories (`dist`, `build`, `coverage`, `tmp`, `.next`, `.turbo`) are skipped **only at the project root** — so a source directory that happens to share a name (for example `tools/build`) is still processed.
 - With `gitignore` enabled (the default, auto-detecting the project's `.gitignore`), anything the project ignores is skipped during discovery — generated paths are excluded by the project's own rules without hard-coding names. Pass `gitignore: false` to disable, or a path/array to use specific ignore files.
 - For monorepos, each file resolves metadata from the closest detector config in its parent tree.
