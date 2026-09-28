@@ -262,7 +262,7 @@ describe("project metadata edge branches", () => {
 				useGpgSignerAuthor: true
 			});
 
-			expect(metadata.authorName).toBe("Signer Name (2026 Laptop)");
+			expect(metadata.authorName).toBe("Signer Name");
 			expect(metadata.authorEmail).toBe("configured@example.com");
 		} finally {
 			process.env.PATH = previousPath;

@@ -152,7 +152,7 @@ describe("git edge parsing", () => {
 
 			const { detectGitAuthor } = await import("../src/utils/git.mjs");
 			const author = await detectGitAuthor(workspace, { useGpgSignerAuthor: true });
-			expect(author.authorName).toBe("Signer Name (Laptop)");
+			expect(author.authorName).toBe("Signer Name");
 			expect(author.authorEmail).toBe("configured@example.com");
 		} finally {
 			process.env.PATH = previousPath;
@@ -212,7 +212,7 @@ describe("git edge parsing", () => {
 
 			const { detectGitAuthor } = await import("../src/utils/git.mjs");
 			const author = await detectGitAuthor(workspace, { useGpgSignerAuthor: true });
-			expect(author.authorName).toBe("Signer Name (Desktop)");
+			expect(author.authorName).toBe("Signer Name");
 			expect(author.authorEmail).toBe("configured@example.com");
 		} finally {
 			process.env.PATH = previousPath;

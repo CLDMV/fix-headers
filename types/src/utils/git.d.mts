@@ -22,6 +22,17 @@
  */
 export declare function runGit(cwd: string, args: string[]): Promise<string | null>;
 /**
+ * Parses a signer UID string into author name and optional email.
+ * The OpenPGP UID comment (`Name (Comment) <email>`) is dropped from the name;
+ * when the UID is only a comment, the raw name is kept.
+ * @param {string} signerUid - Raw signer UID (for example: "Name (Comment) <email@example.com>").
+ * @returns {{authorName: string | null, authorEmail: string | null}} Parsed signer identity.
+ */
+export declare function parseSignerUid(signerUid: string): {
+    authorName: string | null;
+    authorEmail: string | null;
+};
+/**
  * Detects git author name and email from config or commit history.
  * @param {string} cwd - Project directory.
  * @param {{useGpgSignerAuthor?: boolean}} [options={}] - Detection options.

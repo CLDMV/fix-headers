@@ -55,7 +55,7 @@ Common CLI options:
 - `--sample-output`
 - `--force-author-update`
 - `--force-last-modified-author-update`
-- `--use-gpg-signer-author`
+- `--use-gpg-signer-author` (signer UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
 - `--input <path>`
 - `--include-folder <path>` (repeatable)
@@ -105,7 +105,7 @@ Important options:
 - `company?: string` - appends to `@Author` as `Name <Company>`
 - `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
 - `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
-- `useGpgSignerAuthor?: boolean` - use signed-commit UID (`%GS`) for detected `@Author` (includes signer comment when present)
+- `useGpgSignerAuthor?: boolean` - use the last commit's signer UID (`%GS`) for the detected `@Author` name. The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). An unsigned commit falls back to `git config user.name`, then the last commit's author
 - `companyName?: string` (default: `Catalyzed Motivation Inc.`)
 - `copyrightStartYear?: number` (default: current year)
 
