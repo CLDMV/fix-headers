@@ -15,6 +15,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
+import { checkHeaderDates, normalizeDatePayload, repairDateEpoch, resolveCreatedDate } from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
 import { compareHeaderFields } from "../header/fields.mjs";
 import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
@@ -28,6 +29,10 @@ import { toDatePayload } from "../utils/time.mjs";
  *  cwd?: string,
  *  input?: string,
  *  dryRun?: boolean,
+ *  check?: boolean,
+ *  fixCreatedDate?: boolean,
+ *  strictCreatedDate?: boolean,
+ *  normalizeDateFormat?: boolean,
  *  configFile?: string,
  *  sampleOutput?: boolean,
  *  forceAuthorUpdate?: boolean,
@@ -85,7 +90,10 @@ import { toDatePayload } from "../utils/time.mjs";
  *  filesScanned: number,
  *  filesUpdated: number,
  *  dryRun: boolean,
- *  changes: Array<{file: string, changed: boolean, sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
+ *  check: boolean,
+ *  filesWithDateDrift?: number,
+ *  dateAdvisories?: number,
+ *  changes: Array<{file: string, changed: boolean, dateIssues?: import("../header/dates.mjs").DateCheckIssue[], sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
  *   projectName: string,
  *   language: string,
  *   projectRoot: string,
@@ -224,7 +232,11 @@ export async function fixHeaders(options = {}) {
 		...effectiveOptions,
 		cwd: scanRoot
 	});
-	const dryRun = effectiveOptions.dryRun === true;
+	const check = effectiveOptions.check === true;
+	const dryRun = check || effectiveOptions.dryRun === true;
+	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
+	/** @type {(payload: {date: string, timestamp: number}) => {date: string, timestamp: number}} */
+	const formatDate = effectiveOptions.normalizeDateFormat === true ? normalizeDatePayload : (payload) => payload;
 
 	/** @type {string[]} */
 	let files;
@@ -269,6 +281,8 @@ export async function fixHeaders(options = {}) {
 	const changes = [];
 	const detectedProjects = new Set();
 	let filesUpdated = 0;
+	let filesWithDateDrift = 0;
+	let dateAdvisories = 0;
 
 	for (const filePath of files) {
 		const fileMetadata = await resolveProjectMetadata({
@@ -297,14 +311,24 @@ export async function fixHeaders(options = {}) {
 		const gitCreated = await getGitCreationDate(fileMetadata.projectRoot, metadataRelativePath);
 		const gitLastUpdated = await getGitLastModifiedDate(fileMetadata.projectRoot, metadataRelativePath);
 
-		const createdAtSource = existingCreatedAt ? "existing-header" : gitCreated ? "git-created" : "filesystem-created";
-		const comparisonLastModifiedAtSource = existingLastModifiedAt
+		// An epoch that disagrees with its own datetime text is recomputed from the text. @Date is
+		// "oldest wins": see resolveCreatedDate.
+		const filesystemCreatedAt = toDatePayload(filesystemDates.createdAt);
+		const resolvedCreatedAt = resolveCreatedDate({
+			existing: repairDateEpoch(existingCreatedAt),
+			gitCreated,
+			filesystemCreated: filesystemCreatedAt,
+			fixCreatedDate
+		});
+		const repairedLastModifiedAt = repairDateEpoch(existingLastModifiedAt);
+		const createdAtSource = resolvedCreatedAt.source;
+		const comparisonLastModifiedAtSource = repairedLastModifiedAt
 			? "existing-header"
 			: gitLastUpdated
 				? "git-last-modified"
 				: "filesystem-updated";
-		const createdAt = existingCreatedAt || gitCreated || toDatePayload(filesystemDates.createdAt);
-		const comparisonLastModifiedAt = existingLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt);
+		const createdAt = formatDate(resolvedCreatedAt.payload);
+		const comparisonLastModifiedAt = formatDate(repairedLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt));
 		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
 		const shouldForceLastModifiedAuthorUpdate = effectiveOptions.forceLastModifiedAuthorUpdate === true;
 
@@ -343,7 +367,7 @@ export async function fixHeaders(options = {}) {
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		});
 		const needsUpdate = comparisonReplacement.changed;
-		const finalLastModifiedAt = needsUpdate ? toDatePayload(new Date()) : comparisonLastModifiedAt;
+		const finalLastModifiedAt = needsUpdate ? formatDate(toDatePayload(new Date())) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
 
 		const header = needsUpdate
@@ -384,10 +408,23 @@ export async function fixHeaders(options = {}) {
 					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 				})
 			: comparisonReplacement;
+		/** @type {FixHeadersResult["changes"][number]} */
 		const changeEntry = {
 			file: relativePath,
 			changed: replacement.changed
 		};
+
+		if (check) {
+			const dateIssues = checkHeaderDates(
+				existingHeaderText,
+				{ gitCreated, gitLastModified: gitLastUpdated, filesystemCreated: filesystemCreatedAt },
+				{ strictCreatedDate: effectiveOptions.strictCreatedDate === true }
+			);
+			const advisoryCount = dateIssues.filter((issue) => issue.advisory).length;
+			changeEntry.dateIssues = dateIssues;
+			dateAdvisories += advisoryCount;
+			filesWithDateDrift += dateIssues.length > advisoryCount ? 1 : 0;
+		}
 
 		if (effectiveOptions.sampleOutput === true && replacement.changed) {
 			const previousValue = existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null;
@@ -437,6 +474,8 @@ export async function fixHeaders(options = {}) {
 		filesScanned: files.length,
 		filesUpdated,
 		dryRun,
+		check,
+		...(check ? { filesWithDateDrift, dateAdvisories } : {}),
 		changes
 	};
 }

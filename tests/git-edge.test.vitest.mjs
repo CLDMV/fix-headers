@@ -54,6 +54,34 @@ describe("git edge parsing", () => {
 		}
 	});
 
+	it("writes a UTC commit date as +00:00 whichever form git prints", async () => {
+		// Git 2.45+ prints a UTC %aI date as "…Z"; older versions print "…+00:00". Headers must
+		// not depend on the git version, so the shim reproduces the newer output.
+		const workspace = await createWorkspace("git-edge-utc-z");
+		const previousPath = process.env.PATH;
+
+		try {
+			await writeWorkspaceFile(join(workspace, "src", "main.mjs"), "export const x = true;\n");
+			await execFileAsync("git", ["init"], { cwd: workspace });
+
+			const shimPath = join(workspace, "git");
+			await writeFile(
+				shimPath,
+				'#!/usr/bin/env bash\nset -e\nif [[ "$*" == *"--format=%aI|%at"* ]]; then\n  echo "2026-09-20T15:33:32Z|1789918412"\n  exit 0\nfi\nexec /usr/bin/git "$@"\n'
+			);
+			await chmod(shimPath, 0o755);
+
+			process.env.PATH = `${workspace}:${previousPath}`;
+
+			const expected = { date: "2026-09-20T15:33:32+00:00", timestamp: 1789918412 };
+			expect(await getGitCreationDate(workspace, "src/main.mjs")).toEqual(expected);
+			expect(await getGitLastModifiedDate(workspace, "src/main.mjs")).toEqual(expected);
+		} finally {
+			process.env.PATH = previousPath;
+			await cleanupWorkspace(workspace);
+		}
+	});
+
 	it("returns null for NaN creation timestamp and malformed last-modified split", async () => {
 		const workspace = await createWorkspace("git-edge-2");
 		const previousPath = process.env.PATH;

@@ -23,7 +23,7 @@ import fixHeaders from "./fix-header.mjs";
  * @module fix-headers/cli
  */
 
-const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode; with --sample-output or --diff, also print each file's field differences\n      --sample-output                Show previous/new header sample for changed files\n      --diff                         Print a unified diff of each changed file's header (implies sample output)\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --include-folder-non-recursive <path>  Include only a folder's own files, not its subfolders (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          Override company name\n      --copyright-start-year <year>  Override copyright start year\n      --config <path>                Load JSON options file\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --dry-run --diff --verbose\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
+const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --check                        Validate header dates without writing; exit 1 on date drift\n      --fix-created-date             Move an existing @Date back to the oldest of git first commit / file creation\n      --strict-created-date          With --check, fail when @Date is later than git first commit / file creation\n      --normalize-date-format        Write every header date in the ISO 8601 T-form (git %aI)\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode; with --sample-output or --diff, also print each file's field differences\n      --sample-output                Show previous/new header sample for changed files\n      --diff                         Print a unified diff of each changed file's header (implies sample output)\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --include-folder-non-recursive <path>  Include only a folder's own files, not its subfolders (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          Override company name\n      --copyright-start-year <year>  Override copyright start year\n      --config <path>                Load JSON options file\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --dry-run --diff --verbose\n  fix-headers --check --verbose\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
 
 /**
  * Converts CLI flag token to camelCase key.
@@ -90,6 +90,22 @@ export function parseCliArgs(argv) {
 		}
 		if (arg === "--dry-run") {
 			options.dryRun = true;
+			continue;
+		}
+		if (arg === "--check") {
+			options.check = true;
+			continue;
+		}
+		if (arg === "--fix-created-date") {
+			options.fixCreatedDate = true;
+			continue;
+		}
+		if (arg === "--strict-created-date") {
+			options.strictCreatedDate = true;
+			continue;
+		}
+		if (arg === "--normalize-date-format") {
+			options.normalizeDateFormat = true;
 			continue;
 		}
 		if (arg === "--sample-output") {
@@ -336,6 +352,26 @@ function printDetails(stdout, result, options, diff) {
 }
 
 /**
+ * Prints `--check` date findings: failing issues always, advisory issues only in verbose mode.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {{changes?: Array<{file?: string, dateIssues?: Array<{advisory?: boolean, message?: string}>}>}} report - Check-mode result.
+ * @param {boolean} verbose - Whether to print advisory issues.
+ * @returns {void}
+ */
+function printDateIssues(stdout, report, verbose) {
+	const changes = Array.isArray(report.changes) ? report.changes : [];
+	for (const change of changes) {
+		const issues = Array.isArray(change?.dateIssues) ? change.dateIssues : [];
+		for (const issue of issues) {
+			if (issue.advisory === true && !verbose) {
+				continue;
+			}
+			stdout(`${issue.advisory === true ? "advisory" : "drift"}: ${change.file || "<unknown-file>"}: ${issue.message}`);
+		}
+	}
+}
+
+/**
  * Executes CLI flow and returns process-like exit code.
  * @param {string[]} argv - CLI arguments.
  * @param {{
@@ -359,10 +395,25 @@ export async function runCli(argv, deps = {}) {
 
 		const finalOptions = await applyConfigFile(parsed.options);
 		const result = await runner(parsed.diff ? { ...finalOptions, sampleOutput: true } : finalOptions);
+		const checkReport =
+			result && typeof result === "object" && /** @type {{check?: boolean}} */ (result).check === true
+				? /** @type {{filesScanned?: number, filesWithDateDrift?: number, dateAdvisories?: number, changes?: Array<{file?: string, dateIssues?: Array<{advisory?: boolean, message?: string}>}>}} */ (
+						result
+					)
+				: null;
+		const exitCode = checkReport && Number(checkReport.filesWithDateDrift) > 0 ? 1 : 0;
 
 		if (parsed.json) {
 			stdout(JSON.stringify(result, null, 2));
-			return 0;
+			return exitCode;
+		}
+
+		if (checkReport) {
+			stdout(
+				`fix-headers check: scanned=${checkReport.filesScanned ?? 0}, drift=${checkReport.filesWithDateDrift ?? 0}, advisories=${checkReport.dateAdvisories ?? 0}`
+			);
+			printDateIssues(stdout, checkReport, finalOptions.verbose === true);
+			return exitCode;
 		}
 
 		if (result && typeof result === "object") {

@@ -14,6 +14,10 @@ export type FixHeadersOptions = {
     cwd?: string;
     input?: string;
     dryRun?: boolean;
+    check?: boolean;
+    fixCreatedDate?: boolean;
+    strictCreatedDate?: boolean;
+    normalizeDateFormat?: boolean;
     configFile?: string;
     sampleOutput?: boolean;
     forceAuthorUpdate?: boolean;
@@ -61,9 +65,13 @@ export type FixHeadersResult = {
     filesScanned: number;
     filesUpdated: number;
     dryRun: boolean;
+    check: boolean;
+    filesWithDateDrift?: number;
+    dateAdvisories?: number;
     changes: Array<{
         file: string;
         changed: boolean;
+        dateIssues?: import("../header/dates.mjs").DateCheckIssue[];
         sample?: {
             previousValue: string | null;
             newValue: string;
