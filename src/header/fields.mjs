@@ -69,12 +69,19 @@ function splitLastModifiedBy(value) {
 		return { name: null, email: null };
 	}
 
-	const match = value.match(/^(.*?)\s*\(([^)]*)\)$/);
-	if (!match) {
+	// String scan rather than a regex: the email is the "(...)" group that closes the value,
+	// opening at the first "(" after any earlier ")". Same result as /^(.*?)\s*\(([^)]*)\)$/
+	// without that pattern's polynomial backtracking on long runs of spaces or "(".
+	if (!value.endsWith(")")) {
+		return { name: value, email: null };
+	}
+	const body = value.slice(0, -1);
+	const open = body.indexOf("(", body.lastIndexOf(")") + 1);
+	if (open === -1) {
 		return { name: value, email: null };
 	}
 
-	return { name: match[1] || null, email: match[2] || null };
+	return { name: body.slice(0, open).trimEnd() || null, email: body.slice(open + 1) || null };
 }
 
 /**
@@ -83,15 +90,30 @@ function splitLastModifiedBy(value) {
  * @returns {{ startYear: string | null, endYear: string | null, companyName: string | null }} Copyright parts.
  */
 function splitCopyright(value) {
-	const match = value?.match(/^Copyright\s+\(c\)\s+(\d{4})(?:\s*-\s*(\d{4}))?\s+(.*?)\s*All rights reserved\.?$/i);
-	if (!match) {
-		return { startYear: null, endYear: null, companyName: null };
+	const none = { startYear: null, endYear: null, companyName: null };
+	// Only anchored, unambiguous regex pieces plus string checks for the tail: a single
+	// regex with the optional year range and a lazy company before "All rights reserved"
+	// backtracks polynomially on long runs of spaces.
+	const start = value?.match(/^Copyright\s+\(c\)\s+(\d{4})/i);
+	if (!start) {
+		return none;
+	}
+	let rest = value.slice(start[0].length);
+	const range = rest.match(/^\s*-\s*(\d{4})/);
+	if (range) {
+		rest = rest.slice(range[0].length);
+	}
+
+	const lower = rest.toLowerCase();
+	const suffix = lower.endsWith("all rights reserved.") ? 20 : lower.endsWith("all rights reserved") ? 19 : 0;
+	if (suffix === 0 || !/^\s/.test(rest)) {
+		return none;
 	}
 
 	return {
-		startYear: match[1],
-		endYear: match[2] ?? null,
-		companyName: match[3] || null
+		startYear: start[1],
+		endYear: range ? range[1] : null,
+		companyName: rest.slice(0, -suffix).trim() || null
 	};
 }
 

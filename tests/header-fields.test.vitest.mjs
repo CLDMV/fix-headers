@@ -119,3 +119,55 @@ describe("compareHeaderFields", () => {
 		expect(issues[0].detected).toBe("@scope/pkg");
 	});
 });
+
+describe("parseHeaderFields splitting edge cases", () => {
+	/**
+	 * Parses a header holding only the given last-modified-by and copyright values.
+	 * @param {string} lastModifiedBy - Raw `@Last modified by` value.
+	 * @param {string} copyright - Raw `@Copyright` value.
+	 * @returns {ReturnType<typeof parseHeaderFields>} Parsed fields.
+	 */
+	function parse(lastModifiedBy, copyright) {
+		return parseHeaderFields(` *\t@Last modified by: ${lastModifiedBy}\n *\t@Copyright: ${copyright}\n`);
+	}
+
+	it("takes the closing parenthesised group as the last-modified email", () => {
+		expect(parse("Jane (Ops) (jane@example.com)", "x")).toMatchObject({
+			lastModifiedByName: "Jane (Ops)",
+			lastModifiedByEmail: "jane@example.com"
+		});
+		expect(parse("(jane@example.com)", "x")).toMatchObject({ lastModifiedByName: null, lastModifiedByEmail: "jane@example.com" });
+		expect(parse("Jane ()", "x")).toMatchObject({ lastModifiedByName: "Jane", lastModifiedByEmail: null });
+		expect(parse("Jane) x)", "x")).toMatchObject({ lastModifiedByName: "Jane) x)", lastModifiedByEmail: null });
+		expect(parse("Jane Doe", "x")).toMatchObject({ lastModifiedByName: "Jane Doe", lastModifiedByEmail: null });
+	});
+
+	it("splits copyright notices with and without a year range or trailing period", () => {
+		expect(parse("x", "Copyright (c) 2013 - 2026 ACME Inc. All rights reserved")).toMatchObject({
+			copyrightStartYear: "2013",
+			copyrightEndYear: "2026",
+			companyName: "ACME Inc."
+		});
+		expect(parse("x", "copyright (C) 2020 all rights reserved.")).toMatchObject({
+			copyrightStartYear: "2020",
+			copyrightEndYear: null,
+			companyName: null
+		});
+	});
+
+	it("rejects copyright notices that do not fit the shape", () => {
+		const none = { copyrightStartYear: null, copyrightEndYear: null, companyName: null };
+		expect(parse("x", "Copyright (c) 20134 ACME All rights reserved.")).toMatchObject(none);
+		expect(parse("x", "Copyright (c) 2013-20260 ACME All rights reserved.")).toMatchObject(none);
+		expect(parse("x", "Copyright (c) 2013 ACME")).toMatchObject(none);
+		expect(parse("x", "(c) 2013 ACME All rights reserved.")).toMatchObject(none);
+	});
+
+	it("parses adversarial values in linear time", () => {
+		// Inputs that make a backtracking regex for these fields run for minutes (CodeQL js/polynomial-redos).
+		const started = Date.now();
+		const fields = parse(`(${"(".repeat(100000)}`, `Copyright (c) 2013${" ".repeat(100000)}x`);
+		expect(Date.now() - started).toBeLessThan(2000);
+		expect(fields).toMatchObject({ lastModifiedByEmail: null, copyrightStartYear: null });
+	});
+});
