@@ -38,11 +38,57 @@ export async function runGit(cwd, args) {
 }
 
 /**
+ * Checks whether the character at an index is escaped by an odd run of preceding backslashes.
+ * @param {string} text - Source text.
+ * @param {number} index - Index of the character to check.
+ * @returns {boolean} True when the character is backslash-escaped.
+ */
+function isEscaped(text, index) {
+	let backslashes = 0;
+	for (let cursor = index - 1; cursor >= 0 && text[cursor] === "\\"; cursor--) {
+		backslashes++;
+	}
+	return backslashes % 2 === 1;
+}
+
+/**
+ * Removes a trailing OpenPGP user-ID comment from the name part of a UID.
+ * A UID has the form `Name (Comment) <email>`; the comment is the parenthesised
+ * group that ends the name part. Nested parentheses are balanced and
+ * backslash-escaped parentheses (RFC 2822 quoted-pair) are treated as literal
+ * text. Parentheses anywhere else in the name are kept.
+ * @param {string} namePart - UID text before the `<email>` (or the whole UID when there is no email).
+ * @returns {string} Name with the trailing comment removed, or the input unchanged when there is none.
+ */
+function stripUidComment(namePart) {
+	const text = namePart.trim();
+	if (!text.endsWith(")") || isEscaped(text, text.length - 1)) {
+		return text;
+	}
+
+	let depth = 0;
+	for (let index = text.length - 1; index >= 0; index--) {
+		const character = text[index];
+		if ((character !== "(" && character !== ")") || isEscaped(text, index)) {
+			continue;
+		}
+		depth += character === ")" ? 1 : -1;
+		if (depth === 0) {
+			return text.slice(0, index).trim();
+		}
+	}
+
+	return text;
+}
+
+/**
  * Parses a signer UID string into author name and optional email.
+ * The OpenPGP UID comment (`Name (Comment) <email>`) is dropped from the name;
+ * when the UID is only a comment, the raw name is kept.
  * @param {string} signerUid - Raw signer UID (for example: "Name (Comment) <email@example.com>").
  * @returns {{authorName: string | null, authorEmail: string | null}} Parsed signer identity.
  */
-function parseSignerUid(signerUid) {
+export function parseSignerUid(signerUid) {
 	const trimmed = signerUid.trim();
 	if (trimmed.length === 0) {
 		return { authorName: null, authorEmail: null };
@@ -50,7 +96,8 @@ function parseSignerUid(signerUid) {
 
 	const emailMatch = trimmed.match(/<([^>\n]+)>\s*$/);
 	const authorEmail = emailMatch?.[1]?.trim() || null;
-	const authorName = (emailMatch ? trimmed.slice(0, emailMatch.index) : trimmed).trim() || null;
+	const rawName = (emailMatch ? trimmed.slice(0, emailMatch.index) : trimmed).trim();
+	const authorName = stripUidComment(rawName) || rawName || null;
 
 	return { authorName, authorEmail };
 }
