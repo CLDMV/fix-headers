@@ -42,14 +42,16 @@ export declare function readTextIfExists(filePath: string): Promise<string | nul
  * @param {{
  *  allowedExtensions: Set<string>,
  *  ignoreFolders: Set<string>,
- *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean
- * }} options - Scan options.
+ *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean,
+ *  recursive?: boolean
+ * }} options - Scan options. `recursive: false` lists only the directory's own files.
  * @returns {Promise<string[]>} Matching file paths.
  */
 export declare function walkFiles(dirPath: string, options: {
     allowedExtensions: Set<string>;
     ignoreFolders: Set<string>;
     shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean;
+    recursive?: boolean;
 }): Promise<string[]>;
 /**
  * Gets creation-like and modified timestamps from filesystem stats.

@@ -10,6 +10,10 @@
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  */
+export type IncludeFolderEntry = string | {
+    path: string;
+    recursive?: boolean;
+};
 /**
  * Discovers source files for processing.
  * @param {{
@@ -18,11 +22,12 @@
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
- *  includeFolders?: string[],
+ *  includeFolders?: IncludeFolderEntry[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]
- * }} options - File discovery options. `includeFolders`: overlapping entries are collapsed, so
- *  each file is returned once however the folders nest or are spelled.
+ * }} options - File discovery options. `includeFolders`: a string entry is walked recursively;
+ *  `{ path, recursive: false }` includes only that folder's own files. Overlapping entries are
+ *  collapsed, so each file is returned once however the folders nest or are spelled.
  *  `gitignore`: `false` disables; a path or array of paths loads those ignore files; anything
  *  else / omitted auto-detects `<projectRoot>/.gitignore`.
  * @returns {Promise<string[]>} Absolute file paths, each listed once.
@@ -33,7 +38,7 @@ export declare function discoverFiles(options: {
     includeExtensions?: string[];
     enabledDetectors?: string[];
     disabledDetectors?: string[];
-    includeFolders?: string[];
+    includeFolders?: IncludeFolderEntry[];
     excludeFolders?: string[];
     gitignore?: boolean | string | string[];
 }): Promise<string[]>;

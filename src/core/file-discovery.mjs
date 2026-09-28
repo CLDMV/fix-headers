@@ -48,16 +48,33 @@ function normalizeFolderPath(folderPath) {
 }
 
 /**
- * Determines include roots from explicit include folders.
- * @param {string[] | undefined} includeFolders - Include folder option.
- * @returns {string[]} Effective include roots.
+ * An `includeFolders` entry: a project-relative folder path (walked recursively), or an object
+ * form that can switch recursion off so only the folder's own files are included.
+ * @typedef {string | { path: string, recursive?: boolean }} IncludeFolderEntry
+ */
+
+/**
+ * Normalizes `includeFolders` entries to `{ path, recursive }` records.
+ * @param {IncludeFolderEntry[] | undefined} includeFolders - Include folder option.
+ * @returns {Array<{ path: string, recursive: boolean }>} Effective include roots, in input order.
+ * @throws {TypeError} When an entry is neither a string nor an object with a string `path`.
  */
 function resolveIncludeFolders(includeFolders) {
-	if (Array.isArray(includeFolders) && includeFolders.length > 0) {
-		return includeFolders;
+	if (!Array.isArray(includeFolders)) {
+		return [];
 	}
 
-	return [];
+	return includeFolders.map((entry) => {
+		if (typeof entry === "string") {
+			return { path: entry, recursive: true };
+		}
+
+		if (entry && typeof entry === "object" && typeof entry.path === "string") {
+			return { path: entry.path, recursive: entry.recursive !== false };
+		}
+
+		throw new TypeError(`Invalid includeFolders entry: ${JSON.stringify(entry)} (expected a path string or { path, recursive? })`);
+	});
 }
 
 /**
@@ -131,11 +148,12 @@ function buildExclusionMatcher(projectRoot, excludeFolders) {
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
- *  includeFolders?: string[],
+ *  includeFolders?: IncludeFolderEntry[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]
- * }} options - File discovery options. `includeFolders`: overlapping entries are collapsed, so
- *  each file is returned once however the folders nest or are spelled.
+ * }} options - File discovery options. `includeFolders`: a string entry is walked recursively;
+ *  `{ path, recursive: false }` includes only that folder's own files. Overlapping entries are
+ *  collapsed, so each file is returned once however the folders nest or are spelled.
  *  `gitignore`: `false` disables; a path or array of paths loads those ignore files; anything
  *  else / omitted auto-detects `<projectRoot>/.gitignore`.
  * @returns {Promise<string[]>} Absolute file paths, each listed once.
@@ -183,10 +201,14 @@ export async function discoverFiles(options) {
 		rootIgnorePaths.has(resolve(targetPath)) || exclusionMatcher(targetPath, targetName) || isGitignored(targetPath);
 	const requestedRoots =
 		includeFolders.length > 0
-			? includeFolders.map((includeFolder) => ({ includeFolder, rootPath: join(options.projectRoot, includeFolder) }))
-			: [{ includeFolder: ".", rootPath: options.projectRoot }];
+			? includeFolders.map((entry) => ({
+					includeFolder: entry.path,
+					rootPath: join(options.projectRoot, entry.path),
+					recursive: entry.recursive
+				}))
+			: [{ includeFolder: ".", rootPath: options.projectRoot, recursive: true }];
 
-	/** @type {Array<{ includeFolder: string, rootPath: string, realRoot: string }>} */
+	/** @type {Array<{ includeFolder: string, rootPath: string, recursive: boolean, realRoot: string }>} */
 	const roots = [];
 	for (const root of requestedRoots) {
 		const rootStats = await stat(root.rootPath).catch((error) => error);
@@ -213,17 +235,17 @@ export async function discoverFiles(options) {
 
 	/**
 	 * Whether walking `container` already yields every file that walking `candidate` would.
-	 * @param {{ rootPath: string, realRoot: string }} container - Root that may cover the candidate.
-	 * @param {{ realRoot: string }} candidate - Root that may be redundant.
+	 * @param {{ rootPath: string, recursive: boolean, realRoot: string }} container - Root that may cover the candidate.
+	 * @param {{ recursive: boolean, realRoot: string }} candidate - Root that may be redundant.
 	 * @returns {boolean} True when the candidate's walk is redundant.
 	 */
 	const covers = (container, candidate) => {
 		if (container.realRoot === candidate.realRoot) {
-			return true;
+			return container.recursive || !candidate.recursive;
 		}
 
 		const containerPrefix = container.realRoot.endsWith(sep) ? container.realRoot : `${container.realRoot}${sep}`;
-		if (!candidate.realRoot.startsWith(containerPrefix)) {
+		if (!container.recursive || !candidate.realRoot.startsWith(containerPrefix)) {
 			return false;
 		}
 
@@ -244,9 +266,12 @@ export async function discoverFiles(options) {
 
 	// Drop every root another root already covers (nested includes, "." next to its subfolders,
 	// duplicate or differently spelled entries), so no directory is walked twice. Roots are
-	// considered shallowest-first, then in input order (the sort is stable), so any covering root
-	// has already been kept by the time the roots it covers are checked.
-	const byContainment = [...roots].sort((left, right) => left.realRoot.length - right.realRoot.length);
+	// considered shallowest-first — recursive before non-recursive for the same folder, then in
+	// input order (the sort is stable) — so any covering root has already been kept by the time
+	// the roots it covers are checked.
+	const byContainment = [...roots].sort(
+		(left, right) => left.realRoot.length - right.realRoot.length || Number(right.recursive) - Number(left.recursive)
+	);
 	/** @type {typeof roots} */
 	const keptRoots = [];
 	for (const root of byContainment) {
@@ -266,7 +291,8 @@ export async function discoverFiles(options) {
 		const discovered = await walkFiles(root.rootPath, {
 			allowedExtensions,
 			ignoreFolders: ALWAYS_IGNORED_FOLDERS,
-			shouldSkipDirectory
+			shouldSkipDirectory,
+			recursive: root.recursive
 		});
 		files.push(...discovered);
 	}

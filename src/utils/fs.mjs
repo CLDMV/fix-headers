@@ -79,8 +79,9 @@ export async function readTextIfExists(filePath) {
  * @param {{
  *  allowedExtensions: Set<string>,
  *  ignoreFolders: Set<string>,
- *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean
- * }} options - Scan options.
+ *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean,
+ *  recursive?: boolean
+ * }} options - Scan options. `recursive: false` lists only the directory's own files.
  * @returns {Promise<string[]>} Matching file paths.
  */
 export async function walkFiles(dirPath, options) {
@@ -89,6 +90,10 @@ export async function walkFiles(dirPath, options) {
 
 	for (const entry of entries) {
 		const fullPath = join(dirPath, entry.name);
+
+		if (entry.isDirectory() && options.recursive === false) {
+			continue;
+		}
 
 		if (entry.isDirectory() && options.ignoreFolders.has(entry.name)) {
 			continue;

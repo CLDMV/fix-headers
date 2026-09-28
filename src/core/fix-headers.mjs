@@ -34,7 +34,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
  *  detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>,
- *  includeFolders?: string[],
+ *  includeFolders?: Array<string | { path: string, recursive?: boolean }>,
  *  excludeFolders?: string[],
  *  includeExtensions?: string[],
  *  gitignore?: boolean | string | string[],
