@@ -131,6 +131,17 @@ export async function detectGitAuthor(cwd, options = {}) {
 }
 
 /**
+ * Canonicalises a git `%aI` date to the `±HH:MM` offset form. Git 2.45+ prints a UTC
+ * instant as `…Z`; older versions print `…+00:00`. Headers must not depend on the git
+ * version, so `Z` is written as `+00:00`.
+ * @param {string} date - `%aI` output.
+ * @returns {string} The same instant with a numeric offset.
+ */
+function canonicalGitDate(date) {
+	return date.replace(/z$/i, "+00:00");
+}
+
+/**
  * Gets a file's first commit date from git history.
  * @param {string} cwd - Project directory.
  * @param {string} filePath - Relative file path.
@@ -153,7 +164,7 @@ export async function getGitCreationDate(cwd, filePath) {
 		return null;
 	}
 
-	return { date, timestamp };
+	return { date: canonicalGitDate(date), timestamp };
 }
 
 /**
@@ -178,5 +189,5 @@ export async function getGitLastModifiedDate(cwd, filePath) {
 		return null;
 	}
 
-	return { date, timestamp };
+	return { date: canonicalGitDate(date), timestamp };
 }
