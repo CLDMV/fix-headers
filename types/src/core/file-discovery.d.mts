@@ -21,9 +21,11 @@
  *  includeFolders?: string[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]
- * }} options - File discovery options. `gitignore`: `false` disables; a path or array of
- *  paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`.
- * @returns {Promise<string[]>} Absolute file paths.
+ * }} options - File discovery options. `includeFolders`: overlapping entries are collapsed, so
+ *  each file is returned once however the folders nest or are spelled.
+ *  `gitignore`: `false` disables; a path or array of paths loads those ignore files; anything
+ *  else / omitted auto-detects `<projectRoot>/.gitignore`.
+ * @returns {Promise<string[]>} Absolute file paths, each listed once.
  */
 export declare function discoverFiles(options: {
     projectRoot: string;
