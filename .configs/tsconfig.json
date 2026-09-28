@@ -17,5 +17,5 @@
 		"forceConsistentCasingInFileNames": true
 	},
 	"include": ["../src/**/*.mjs", "../src/*.mjs"],
-	"exclude": ["../node_modules", "../tests", "../coverage", "../src/index.cjs.mjs"]
+	"exclude": ["../node_modules", "../tests", "../coverage"]
 }

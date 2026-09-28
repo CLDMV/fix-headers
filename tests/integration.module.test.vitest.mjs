@@ -21,7 +21,6 @@ import { pathToFileURL } from "node:url";
 import { build } from "tsup";
 import tsupConfigs from "../tsup.config.mjs";
 import fixHeadersDefault, { fixHeaders } from "../src/fix-header.mjs";
-import cjsEntryDefault from "../src/index.cjs.mjs";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
 import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/project.mjs";
@@ -76,7 +75,6 @@ describe("module integration and coverage", () => {
 		await initializeGitWorkspace(workspace);
 
 		expect(fixHeadersDefault).toBe(fixHeaders);
-		expect(cjsEntryDefault).toBe(fixHeaders);
 
 		const result = await fixHeaders({
 			cwd: workspace,
@@ -109,6 +107,13 @@ describe("module integration and coverage", () => {
 		const esmModule = await import(pathToFileURL(join(outRoot, "dist", "index.mjs")).href);
 		expect(typeof esmModule.default).toBe("function");
 		expect(esmModule.fixHeaders).toBe(esmModule.default);
+
+		// dist/index.cjs is the thin src/cjs/index.cjs wrapper copied verbatim, not a second
+		// bundle of the library: it must stay tiny and only delegate to dist/index.mjs.
+		const cjsSource = await readFile(join(outRoot, "dist", "index.cjs"), "utf8");
+		expect(cjsSource).toBe(await readFile(new URL("../src/cjs/index.cjs", import.meta.url), "utf8"));
+		expect(cjsSource).toContain('require("./index.mjs").default');
+		expect(Buffer.byteLength(cjsSource)).toBeLessThan(2048);
 
 		// `require()` must return the function itself (historical CJS shape), and an ESM
 		// `import()` of the CJS build sees a function as its default export. (Not asserted
