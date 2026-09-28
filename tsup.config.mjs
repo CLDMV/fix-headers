@@ -14,21 +14,21 @@
 /**
  * @fileoverview Bundler config — produces the published dist/ and bin/ output from source.
  *
- * Three entries:
+ * Two builds plus one copied file:
  *  - ESM API  → dist/index.mjs — `fixHeaders` named export plus the default export.
- *  - CJS API  → dist/index.cjs — built from src/index.cjs.mjs, which exposes only the
- *    default export; with `cjsInterop` that becomes `module.exports = fixHeaders`, the
- *    same shape the old hand-written index.cjs shim had, so `require()` callers keep
- *    getting the function itself.
+ *  - CJS API  → dist/index.cjs — not built: src/cjs/index.cjs is a thin wrapper that
+ *    `require()`s dist/index.mjs and returns its default export (`module.exports =
+ *    fixHeaders`, the historical shape). tsup copies it into the ESM build's outDir via
+ *    `publicDir`, so it follows any outDir override and never duplicates the library.
  *  - CLI      → bin/fix-headers.mjs — ESM only, bundled from src/cli.mjs. bin/ is the
  *    stable published path (package.json "bin") but is a build artifact like dist/ — not
  *    tracked in git. esbuild keeps the entry's shebang, so the output stays executable.
  *
- * Runtime dependencies (package.json "dependencies") stay external. Sourcemaps are
- * generated for local debugging and excluded from the tarball via package.json "files".
- * Each output is one self-contained file (no shared chunks). Nothing here cleans the
- * output folders because the three builds run in parallel and two share dist/; the
- * `build` script clears dist/ and bin/ before invoking tsup instead.
+ * Runtime dependencies (package.json "dependencies") stay external. Output is minified;
+ * sourcemaps are generated for local debugging and excluded from the tarball via
+ * package.json "files". Each output is one self-contained file (no shared chunks).
+ * Nothing here cleans the output folders; the `build` script clears dist/ and bin/
+ * before invoking tsup instead.
  */
 import { defineConfig } from "tsup";
 
@@ -40,7 +40,9 @@ const shared = {
 	removeNodeProtocol: false,
 	sourcemap: true,
 	dts: false,
-	minify: false
+	minify: true,
+	// Keep function and class names through minification (`fixHeaders.name`, stack traces).
+	keepNames: true
 };
 
 export default defineConfig([
@@ -48,25 +50,11 @@ export default defineConfig([
 		...shared,
 		entry: { index: "src/fix-header.mjs" },
 		format: ["esm"],
+		publicDir: "src/cjs",
 		outDir: "dist",
 		clean: false,
 		outExtension() {
 			return { js: ".mjs" };
-		}
-	},
-	{
-		...shared,
-		entry: { index: "src/index.cjs.mjs" },
-		format: ["cjs"],
-		cjsInterop: true,
-		// tsup only records a CJS chunk's exports (which cjsInterop needs) when the
-		// CJS output is produced via its splitting path; with one entry there are no
-		// extra chunks, so this changes nothing else about the output.
-		splitting: true,
-		outDir: "dist",
-		clean: false,
-		outExtension() {
-			return { js: ".cjs" };
 		}
 	},
 	{
