@@ -212,7 +212,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-preserve-author" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-preserve-author\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) ${currentYear}-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-preserve-author\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({
@@ -246,7 +246,7 @@ describe("core edge coverage", () => {
 			);
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) ${currentYear}-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({

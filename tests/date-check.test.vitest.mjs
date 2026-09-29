@@ -484,7 +484,7 @@ describe("fixHeaders date correction", GIT_FIXTURE_TIMEOUT, () => {
 				join(workspace, "src", "one.mjs"),
 				fileWithHeader("src/one.mjs", "2026-09-20 08:33:32 -07:00 (1789918412)", "2026-09-20 08:33:32 -07:00 (1758382412)").replace(
 					"2020-2026",
-					`${current}-${current}`
+					`2026-${current}`
 				)
 			);
 			const result = await fixHeaders({

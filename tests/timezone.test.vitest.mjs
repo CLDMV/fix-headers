@@ -80,7 +80,8 @@ function expectZonedValue(value, timeZone, form) {
 
 /**
  * Renders a JS header block with the given date values. With the `Someone Else` author override and
- * a current-year copyright, the rendered header matches it exactly, so only date changes rewrite it.
+ * a `2026-<current year>` copyright (every fixture `@Date` is in 2026, the start year fix-headers
+ * derives from it), the rendered header matches it exactly, so only date changes rewrite it.
  * @param {string} fileName - Project-relative file path (without leading slash).
  * @param {string} createdValue - Raw `@Date` value.
  * @param {string} modifiedValue - Raw `@Last modified time` value.
@@ -88,7 +89,7 @@ function expectZonedValue(value, timeZone, form) {
  */
 function fileWithHeader(fileName, createdValue, modifiedValue) {
 	const year = new Date().getFullYear();
-	return `/**\n *\t@Project: tz-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) ${year}-${year} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
+	return `/**\n *\t@Project: tz-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${year} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
 }
 
 /** The fixtures' `package.json`: its author supplies the `@Copyright` holder {@link fileWithHeader} writes. */

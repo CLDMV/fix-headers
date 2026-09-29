@@ -107,6 +107,24 @@ export function resolveCreatedDate({ existing, gitCreated, filesystemCreated, fi
 }
 
 /**
+ * Reads the calendar year of a header date, for the `@Copyright` start year. With a time zone the
+ * year is the zone's at the date's instant; without one it is the year the datetime text is
+ * written in, in its own offset. Text that is not a recognised datetime falls back to the year of
+ * its epoch in the local time zone, the zone fix-headers writes dates in by default.
+ * @param {DatePayload} payload - Date payload, with an epoch consistent with its text.
+ * @param {string | null} [timeZone=null] - IANA zone name, already validated.
+ * @returns {number} Calendar year.
+ */
+export function dateYear(payload, timeZone = null) {
+	if (timeZone) {
+		return toZonedDateParts(payload.timestamp, timeZone).year;
+	}
+
+	const parsed = parseHeaderDate(payload.date);
+	return parsed ? parsed.year : new Date(payload.timestamp * 1000).getFullYear();
+}
+
+/**
  * Checks one date field's value: it must be a `<datetime> (<epoch>)` pair whose epoch is the
  * instant the datetime describes.
  * @param {string} value - Raw field value.

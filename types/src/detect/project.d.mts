@@ -102,9 +102,11 @@ export declare function detectProjectFromMarkers(cwd: string, options?: {
  *  authorEmail: string,
  *  companyName: string | null,
  *  companyNameSource: CompanyNameSource,
- *  copyrightStartYear: number
+ *  copyrightStartYear: number | null
  * }>} Final metadata. `companyName` is the `companyName` option when it is set, else the
  * holder the project's manifests provide, else null (no holder on the `@Copyright` line).
+ * `copyrightStartYear` is null when the option is not set: each file's start year then comes
+ * from its own `@Date`.
  */
 export declare function resolveProjectMetadata(options?: {
     cwd?: string;
@@ -131,5 +133,5 @@ export declare function resolveProjectMetadata(options?: {
     authorEmail: string;
     companyName: string | null;
     companyNameSource: CompanyNameSource;
-    copyrightStartYear: number;
+    copyrightStartYear: number | null;
 }>;

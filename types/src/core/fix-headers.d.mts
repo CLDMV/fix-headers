@@ -70,7 +70,7 @@ export type FixHeadersResult = {
         authorEmail: string;
         companyName: string | null;
         companyNameSource: import("../detect/project.mjs").CompanyNameSource;
-        copyrightStartYear: number;
+        copyrightStartYear: number | null;
     };
     detectedProjects: string[];
     filesScanned: number;
@@ -99,6 +99,7 @@ export type FixHeadersResult = {
                 companyName: string | null;
                 companyNameSource: import("../detect/project.mjs").CompanyNameSource;
                 copyrightStartYear: number;
+                copyrightStartYearSource: "option" | "created-date";
                 createdAtSource: string;
                 lastModifiedAtSource: string;
                 createdAt: {

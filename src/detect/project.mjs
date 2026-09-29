@@ -142,9 +142,11 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
  *  authorEmail: string,
  *  companyName: string | null,
  *  companyNameSource: CompanyNameSource,
- *  copyrightStartYear: number
+ *  copyrightStartYear: number | null
  * }>} Final metadata. `companyName` is the `companyName` option when it is set, else the
  * holder the project's manifests provide, else null (no holder on the `@Copyright` line).
+ * `copyrightStartYear` is null when the option is not set: each file's start year then comes
+ * from its own `@Date`.
  */
 export async function resolveProjectMetadata(options = {}) {
 	const basePath = options.targetFilePath || options.cwd || process.cwd();
@@ -157,7 +159,6 @@ export async function resolveProjectMetadata(options = {}) {
 	const gitAuthor = await detectGitAuthor(detected.rootDir, {
 		useGpgSignerAuthor: options.useGpgSignerAuthor === true
 	});
-	const currentYear = new Date().getFullYear();
 	const baseAuthorName = options.authorName || gitAuthor.authorName || "Unknown Author";
 	const companyOption = typeof options.companyName === "string" ? options.companyName.trim() : "";
 
@@ -171,6 +172,6 @@ export async function resolveProjectMetadata(options = {}) {
 		authorEmail: options.authorEmail || gitAuthor.authorEmail || "unknown@example.com",
 		companyName: companyOption || detected.companyName,
 		companyNameSource: companyOption ? { from: "option" } : detected.companyNameSource,
-		copyrightStartYear: Number.isInteger(options.copyrightStartYear) ? Number(options.copyrightStartYear) : currentYear
+		copyrightStartYear: Number.isInteger(options.copyrightStartYear) ? Number(options.copyrightStartYear) : null
 	};
 }
