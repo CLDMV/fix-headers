@@ -20,7 +20,7 @@ export declare const detector: {
         root: string;
         marker: string;
     }>;
-    parseProjectName(_marker: any, _markerContent: any, rootDirName: any): string;
+    parseProjectName(marker: any, markerContent: any, rootDirName: any): any;
     resolveCommentSyntax(filePath: any): {
         kind: "html";
         blockStart: string;

@@ -12,7 +12,7 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
+import { findNearestMarker, parsePackageJsonName } from "./shared.mjs";
 
 /**
  * @fileoverview CSS detector implementation.
@@ -21,15 +21,6 @@ import { findNearestMarker } from "./shared.mjs";
 
 const markers = ["package.json", "postcss.config.js", "postcss.config.cjs", "postcss.config.mjs"];
 const extensions = [".css"];
-
-/**
- * Parses CSS project name from marker context.
- * @param {string} rootDirName - Fallback directory name.
- * @returns {string} Project name.
- */
-function parseCssProjectName(rootDirName) {
-	return rootDirName;
-}
 
 /**
  * Resolves block comment syntax for CSS files.
@@ -58,8 +49,10 @@ export const detector = {
 	findNearestConfig(startPath) {
 		return findNearestMarker(startPath, markers);
 	},
-	parseProjectName(_marker, _markerContent, rootDirName) {
-		return parseCssProjectName(rootDirName);
+	// CSS lives in the project it belongs to: take the name from its package.json, like the
+	// Node detector; a postcss config alone carries no name, so the folder name is used then.
+	parseProjectName(marker, markerContent, rootDirName) {
+		return marker === "package.json" ? parsePackageJsonName(markerContent, rootDirName) : rootDirName;
 	},
 	resolveCommentSyntax(filePath) {
 		return resolveCssCommentSyntax(filePath);

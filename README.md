@@ -11,6 +11,7 @@ Multi-language source header normalizer for Node.js projects.
 ## Features
 
 - Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`) and YAML files (`.yaml`, `.yml`)
+- `@Project` is the name from the project's own config file: `package.json` `name` for JS/TS, JSON, YAML, CSS and HTML files; `pyproject.toml` for Python; `Cargo.toml` for Rust; the `go.mod` module for Go; `composer.json` for PHP. The project folder name is used only when there is no such file or it has no name. Override it with `projectName`
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration, with project-root-scoped build/cache ignores and optional `.gitignore` respect
