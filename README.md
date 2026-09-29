@@ -13,7 +13,7 @@ Multi-language source header normalizer for Node.js projects.
 - Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`) and YAML files (`.yaml`, `.yml`)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
-- Supports folder inclusion and exclusion configuration, with project-root-scoped build/cache ignores and optional `.gitignore` respect
+- Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
 - Supports detector-based monorepo scanning with nearest config resolution per file
 - Supports per-detector syntax overrides for line and block comment tokens
 - Supports both ESM and CJS consumers
@@ -105,8 +105,8 @@ Important options:
 - `disabledDetectors?: string[]` - detector ids to disable
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
-- `excludeFolders?: string[]` - folder names or relative paths to exclude
-- `gitignore?: boolean | string | string[]` - respect `.gitignore` during discovery. `false` disables; a path or array of paths loads those ignore files; anything else / omitted auto-detects `<projectRoot>/.gitignore`. Matched files and directories are skipped.
+- `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude
+- `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#which-files-are-processed)). `false`: no ignore files, every file is processed. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
 - `projectName?: string`
 - `language?: string`
 - `projectRoot?: string`
@@ -189,12 +189,29 @@ Advisories are counted in the summary and listed with `--verbose`; `--json` prin
 
 In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-newer-than-source` is corrected only with `fixCreatedDate` / `--fix-created-date`.
 
+## Which files are processed
+
+By default every file with a supported extension is processed. Nothing is skipped because of its name: `node_modules`, `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
+
+- the project's ignore files ignore them, or
+- you exclude them with `excludeFolders` / `--exclude-folder`.
+
+The one exception is `.git`, git's own storage, which is never walked.
+
+"Ignore files" means everything git itself honours: the root `.gitignore`, `.gitignore` files in subfolders (each applying to its own folder), `.git/info/exclude`, and the global excludes file (`core.excludesFile`), including negation patterns.
+
+- **Inside a git work tree**, git decides. Discovery runs `git ls-files --cached --others --exclude-standard` once per repository and processes the files it lists. Tracked files are always processed, even when an ignore pattern matches them, because git does not treat tracked files as ignored. Starting discovery in a subfolder of a repository applies that repository's rules.
+- **Outside a git work tree** (or when git is not installed), the `.gitignore` files found under the discovery root are parsed instead, each one scoped to its own folder, with deeper files taking precedence. `.git/info/exclude` and `core.excludesFile` belong to a repository, so they do not apply here.
+- **A folder holding several repositories** is walked as usual, and every repository found inside it (a folder containing `.git`, including submodules and nested clones) applies its own ignore rules to its own files. The rules of the folder around a nested repository still decide whether that repository is walked at all.
+- **A discovery root that the enclosing repository ignores** (for example `--input vendor/lib` when `vendor/` is in the repository's `.gitignore`) was asked for explicitly, so it is treated as a standalone folder: its own `.gitignore` files apply, the enclosing repository's do not.
+
+`gitignore: false` turns all of this off, and `gitignore: "<file>"` / `["<file>", ...]` replaces it with exactly the listed files.
+
 ## Notes
 
 - `excludeFolders` supports both folder-name and nested path matching.
-- `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters (for example one under `node_modules` or under a root build folder such as `dist`), which keeps being walked on its own because it was named explicitly.
-- Built-in ignores are scoped: `.git` and `node_modules` are skipped at **any depth**, while build/cache directories (`dist`, `build`, `coverage`, `tmp`, `.next`, `.turbo`) are skipped **only at the project root** — so a source directory that happens to share a name (for example `tools/build`) is still processed.
-- With `gitignore` enabled (the default, auto-detecting the project's `.gitignore`), anything the project ignores is skipped during discovery — generated paths are excluded by the project's own rules without hard-coding names. Pass `gitignore: false` to disable, or a path/array to use specific ignore files.
+- `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters because `excludeFolders` excludes it (for example `node_modules/pkg` listed explicitly while `node_modules` is excluded), which keeps being walked on its own because it was named explicitly. An `includeFolders` entry does not override the ignore files: a folder they ignore contributes no files.
+- File discovery is described in [Which files are processed](#which-files-are-processed).
 - For monorepos, each file resolves metadata from the closest detector config in its parent tree.
 - With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, `diff`, `issues`, and `detectedValues` in results.
 

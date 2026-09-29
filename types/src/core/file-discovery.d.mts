@@ -28,8 +28,9 @@ export type IncludeFolderEntry = string | {
  * }} options - File discovery options. `includeFolders`: a string entry is walked recursively;
  *  `{ path, recursive: false }` includes only that folder's own files. Overlapping entries are
  *  collapsed, so each file is returned once however the folders nest or are spelled.
- *  `gitignore`: `false` disables; a path or array of paths loads those ignore files; anything
- *  else / omitted auto-detects `<projectRoot>/.gitignore`.
+ *  `gitignore`: `false` disables ignore files; a path or array of paths (relative to the project
+ *  root) uses exactly those files; anything else / omitted applies every ignore file git honours
+ *  (see {@link createIgnoreFilter}). Nothing is excluded by name except `.git`.
  * @returns {Promise<string[]>} Absolute file paths, each listed once.
  */
 export declare function discoverFiles(options: {

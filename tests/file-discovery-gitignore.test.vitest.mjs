@@ -18,10 +18,11 @@ import { join } from "node:path";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 
 /**
- * @fileoverview Real-filesystem coverage for discoverFiles' ignore behavior: project-root
- * anchored build/cache dirs (a nested `tools/build` is SOURCE and must be processed while a
- * top-level `/build` is skipped), any-depth `node_modules`/`.git`, and `.gitignore` support
- * (auto-detect, disable, and explicit-file).
+ * @fileoverview Real-filesystem coverage for discoverFiles' `.gitignore` support outside a git
+ * work tree (auto-detect, disable, and explicit-file). Only the ignore file decides: `/build`
+ * skips the top-level build folder while a nested `tools/build` is still processed, and
+ * `node_modules` is processed because nothing ignores it (issue #71). Git-backed ignore rules are
+ * covered in file-discovery-ignore-files.test.vitest.mjs.
  * @module fix-headers/tests/file-discovery-gitignore
  */
 
@@ -37,7 +38,7 @@ describe("discoverFiles ignore scoping + .gitignore", () => {
 	});
 
 	/**
-	 * Builds a fixture tree with a .gitignore, a nested vs top-level `build`, and node_modules.
+	 * Builds a fixture tree with a .gitignore, a nested vs top-level `build`, and an unignored node_modules.
 	 * @returns {Promise<string>} Absolute fixture root.
 	 */
 	async function fixture() {
@@ -51,7 +52,7 @@ describe("discoverFiles ignore scoping + .gitignore", () => {
 		await writeFile(join(root, "ignored", "a.mjs"), "// inside a gitignored dir");
 		await writeFile(join(root, "tools", "build", "nested.mjs"), "// nested build = source, keep");
 		await writeFile(join(root, "build", "out.mjs"), "// top-level build = output, skip");
-		await writeFile(join(root, "node_modules", "pkg", "dep.mjs"), "// vendored, skip at any depth");
+		await writeFile(join(root, "node_modules", "pkg", "dep.mjs"), "// vendored, but not ignored by the .gitignore");
 		return root;
 	}
 
@@ -63,17 +64,24 @@ describe("discoverFiles ignore scoping + .gitignore", () => {
 	 */
 	const rel = (base, files) => files.map((f) => f.slice(base.length + 1).replace(/\\/g, "/")).sort();
 
-	it("auto-detects .gitignore: keeps nested build, skips top-level build / node_modules / gitignored", async () => {
+	it("auto-detects .gitignore: skips what it lists (top-level /build, ignored/, *.skip.mjs) and nothing else", async () => {
 		const base = await fixture();
 		const files = await discoverFiles({ projectRoot: base, includeExtensions: [".mjs"] });
-		expect(rel(base, files)).toEqual(["src/keep.mjs", "tools/build/nested.mjs"]);
+		// node_modules is not in the .gitignore, so it is processed
+		expect(rel(base, files)).toEqual(["node_modules/pkg/dep.mjs", "src/keep.mjs", "tools/build/nested.mjs"]);
 	});
 
-	it("gitignore:false falls back to top-level anchoring + always-ignore only", async () => {
+	it("gitignore:false skips nothing", async () => {
 		const base = await fixture();
 		const files = await discoverFiles({ projectRoot: base, includeExtensions: [".mjs"], gitignore: false });
-		// top-level /build and node_modules still skipped; gitignored ignored/ + *.skip kept
-		expect(rel(base, files)).toEqual(["ignored/a.mjs", "src/drop.skip.mjs", "src/keep.mjs", "tools/build/nested.mjs"]);
+		expect(rel(base, files)).toEqual([
+			"build/out.mjs",
+			"ignored/a.mjs",
+			"node_modules/pkg/dep.mjs",
+			"src/drop.skip.mjs",
+			"src/keep.mjs",
+			"tools/build/nested.mjs"
+		]);
 	});
 
 	it("accepts an explicit gitignore file path", async () => {
