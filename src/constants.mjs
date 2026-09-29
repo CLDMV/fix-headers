@@ -25,26 +25,3 @@ export const DEFAULT_COMPANY_NAME = "Catalyzed Motivation Inc.";
  *	run long; cap the scan generously so a long block's closing comment delimiter is still seen.
  * @type {number} */
 export const DEFAULT_MAX_HEADER_SCAN_LINES = 200;
-
-/**
- * Folders skipped at ANY depth — vendored / VCS directories that are never source and can
- * legitimately nest (hoisted `node_modules`, submodule `.git`).
- * @type {Set<string>}
- */
-export const ALWAYS_IGNORE_FOLDERS = new Set([".git", "node_modules"]);
-
-/**
- * Folders skipped ONLY at the project root — build / cache output directories. Anchored to
- * the root so a nested SOURCE directory that happens to share the name (e.g. `tools/build`,
- * `packages/x/dist`-style source) is still processed; only the top-level `/build`, `/dist`,
- * `/coverage`, … are ignored.
- * @type {Set<string>}
- */
-export const ROOT_IGNORE_FOLDERS = new Set(["dist", "build", "coverage", "tmp", ".next", ".turbo"]);
-
-/**
- * Backward-compatible union of {@link ALWAYS_IGNORE_FOLDERS} and {@link ROOT_IGNORE_FOLDERS}.
- * Discovery applies the two sets with different scoping; prefer the specific sets.
- * @type {Set<string>}
- */
-export const DEFAULT_IGNORE_FOLDERS = new Set([...ALWAYS_IGNORE_FOLDERS, ...ROOT_IGNORE_FOLDERS]);

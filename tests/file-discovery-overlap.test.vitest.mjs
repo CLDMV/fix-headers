@@ -49,7 +49,8 @@ async function fixture(files, extra = {}) {
 
 /**
  * Builds the slothlet-shaped tree: root files, dot-folders, several source folders, plus
- * node_modules / coverage / tmp noise that must stay out of the result.
+ * node_modules / coverage / tmp noise, kept out of the result by the fixture's .gitignore (coverage,
+ * tmp) and the tests' excludeFolders (node_modules).
  * @returns {Promise<string>} Absolute workspace path.
  */
 async function slothletShapedFixture() {
@@ -204,6 +205,29 @@ describe("discoverFiles with overlapping includeFolders (issue #59)", () => {
 	});
 
 	it("still walks an explicitly listed folder the containing walk never enters", async () => {
+		const root = await fixture(["src/a.mjs", "node_modules/pkg/dep.mjs", "build/out.mjs", "build/sub/deep.mjs"], {
+			".gitignore": "build/\n"
+		});
+		const { discover, walked } = await loadWithWalkSpy();
+
+		const files = await discover({
+			projectRoot: root,
+			includeExtensions: [".mjs"],
+			excludeFolders: ["node_modules"],
+			includeFolders: [".", "node_modules/pkg", "build", "build/sub"]
+		});
+
+		// The "." walk never enters the excluded node_modules, so the explicit node_modules/pkg is
+		// walked on its own and keeps contributing its files (a name exclusion only stops the walk
+		// from entering the folder). The gitignored build/ is different: an includeFolders entry does
+		// not override the ignore file, everything under build/ is ignored, so neither build nor
+		// build/sub is walked and they contribute nothing.
+		expect(rel(root, files).sort()).toEqual(["node_modules/pkg/dep.mjs", "src/a.mjs"]);
+		expect(files.length).toBe(new Set(files).size);
+		expect(rel(root, walked)).toEqual(["", "node_modules/pkg"]);
+	});
+
+	it("walks node_modules and root build folders from '.' when nothing ignores them (issue #71)", async () => {
 		const root = await fixture(["src/a.mjs", "node_modules/pkg/dep.mjs", "build/out.mjs", "build/sub/deep.mjs"]);
 		const { discover, walked } = await loadWithWalkSpy();
 
@@ -213,12 +237,8 @@ describe("discoverFiles with overlapping includeFolders (issue #59)", () => {
 			includeFolders: [".", "node_modules/pkg", "build", "build/sub"]
 		});
 
-		// node_modules (any depth) and a root build dir are skipped by the "." walk, so the explicit
-		// entries keep contributing their files, as they did before overlap detection; build/sub is
-		// covered by the explicit build walk and is not walked again.
 		expect(rel(root, files).sort()).toEqual(["build/out.mjs", "build/sub/deep.mjs", "node_modules/pkg/dep.mjs", "src/a.mjs"]);
-		expect(files.length).toBe(new Set(files).size);
-		expect(rel(root, walked)).toEqual(["", "node_modules/pkg", "build"]);
+		expect(rel(root, walked)).toEqual([""]);
 	});
 
 	it("collapses a symlinked root onto the real folder it points at", async () => {

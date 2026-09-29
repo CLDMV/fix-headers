@@ -12,11 +12,10 @@
  */
 
 import { join, relative, resolve, sep } from "node:path";
-import { readFile, realpath, stat } from "node:fs/promises";
-import ignore from "ignore";
-import { ALWAYS_IGNORE_FOLDERS, ROOT_IGNORE_FOLDERS } from "../constants.mjs";
+import { realpath, stat } from "node:fs/promises";
 import { getAllowedExtensions } from "../detectors/index.mjs";
 import { walkFiles } from "../utils/fs.mjs";
+import { createIgnoreFilter } from "./ignore-rules.mjs";
 
 /**
  * @fileoverview Resolves candidate source files for header updates based on language and options.
@@ -36,7 +35,12 @@ function resolveExtensions(options) {
 	return getAllowedExtensions(options);
 }
 
-const ALWAYS_IGNORED_FOLDERS = new Set(ALWAYS_IGNORE_FOLDERS);
+/**
+ * Git's own storage is never a project file, so discovery never walks into it. Nothing else is
+ * skipped by name: ignore files and the consumer's `excludeFolders` decide.
+ * @type {Set<string>}
+ */
+const NEVER_WALKED_FOLDERS = new Set([".git"]);
 
 /**
  * Normalizes a user-provided folder path to a project-relative value.
@@ -154,8 +158,9 @@ function buildExclusionMatcher(projectRoot, excludeFolders) {
  * }} options - File discovery options. `includeFolders`: a string entry is walked recursively;
  *  `{ path, recursive: false }` includes only that folder's own files. Overlapping entries are
  *  collapsed, so each file is returned once however the folders nest or are spelled.
- *  `gitignore`: `false` disables; a path or array of paths loads those ignore files; anything
- *  else / omitted auto-detects `<projectRoot>/.gitignore`.
+ *  `gitignore`: `false` disables ignore files; a path or array of paths (relative to the project
+ *  root) uses exactly those files; anything else / omitted applies every ignore file git honours
+ *  (see {@link createIgnoreFilter}). Nothing is excluded by name except `.git`.
  * @returns {Promise<string[]>} Absolute file paths, each listed once.
  */
 export async function discoverFiles(options) {
@@ -163,42 +168,15 @@ export async function discoverFiles(options) {
 	const includeFolders = resolveIncludeFolders(options.includeFolders);
 	const excludeFolders = Array.isArray(options.excludeFolders) ? options.excludeFolders : [];
 	const exclusionMatcher = buildExclusionMatcher(options.projectRoot, excludeFolders);
-	// Build/cache dirs (ROOT_IGNORE_FOLDERS) are ignored only at the PROJECT ROOT, so a nested
-	// source directory with the same name (e.g. tools/build) is still processed. node_modules /
-	// .git stay any-depth via walkFiles' `ignoreFolders` below.
-	const absoluteRoot = resolve(options.projectRoot);
-	const rootIgnorePaths = new Set(Array.from(ROOT_IGNORE_FOLDERS, (name) => resolve(absoluteRoot, name)));
-	// Optional .gitignore support: skip anything the project's .gitignore matches, so generated /
-	// output paths are excluded by the project's own rules without hard-coding names. `options.gitignore`
-	// may be `false` (disabled), a file path or array of paths, or anything else / undefined
-	// (auto-detect `<projectRoot>/.gitignore`).
-	let gitignoreMatcher = null;
-	if (options.gitignore !== false) {
-		const gitignoreFiles =
-			typeof options.gitignore === "string"
-				? [options.gitignore]
-				: Array.isArray(options.gitignore)
-					? options.gitignore.filter((entry) => typeof entry === "string")
-					: [".gitignore"];
-		const ig = ignore();
-		let loaded = false;
-		for (const rel of gitignoreFiles) {
-			try {
-				ig.add(await readFile(resolve(absoluteRoot, rel), "utf8"));
-				loaded = true;
-			} catch {
-				/* missing .gitignore — nothing to add */
-			}
-		}
-		gitignoreMatcher = loaded ? ig : null;
-	}
-	const isGitignored = (targetPath) => {
-		if (!gitignoreMatcher) return false;
-		const rel = relative(absoluteRoot, resolve(targetPath)).replace(/\\/g, "/");
-		return rel.length > 0 && !rel.startsWith("..") && gitignoreMatcher.ignores(rel);
-	};
-	const shouldSkipDirectory = (targetPath, targetName) =>
-		rootIgnorePaths.has(resolve(targetPath)) || exclusionMatcher(targetPath, targetName) || isGitignored(targetPath);
+	const ignoreFilter = createIgnoreFilter({ root: options.projectRoot, gitignore: options.gitignore });
+	/**
+	 * Whether the walk skips a directory: the consumer excluded it, or an ignore file ignores it.
+	 * @param {string} targetPath - Directory path.
+	 * @param {string} targetName - Directory name.
+	 * @returns {Promise<boolean>} True when the directory is skipped.
+	 */
+	const shouldSkipDirectory = async (targetPath, targetName) =>
+		exclusionMatcher(targetPath, targetName) || (await ignoreFilter.isIgnored(targetPath, true));
 	const requestedRoots =
 		includeFolders.length > 0
 			? includeFolders.map((entry) => ({
@@ -250,13 +228,14 @@ export async function discoverFiles(options) {
 		}
 
 		// The container's walk only reaches the candidate if it descends through every directory in
-		// between. A directory it skips (node_modules, a root build folder, an exclusion, a .gitignore
-		// match) hides the candidate's files from it, so an explicitly listed folder under such a
-		// directory keeps being walked on its own, as it always was.
+		// between. A directory it never enters (`.git`, a consumer exclusion) hides the candidate's
+		// files from it, so an explicitly listed folder under such a directory keeps being walked on
+		// its own. A directory an ignore file ignores does not: everything inside it is ignored too,
+		// so walking the candidate separately could only return files that are then dropped.
 		let current = container.rootPath;
 		for (const segment of candidate.realRoot.slice(containerPrefix.length).split(sep)) {
 			current = join(current, segment);
-			if (ALWAYS_IGNORED_FOLDERS.has(segment) || shouldSkipDirectory(current, segment)) {
+			if (NEVER_WALKED_FOLDERS.has(segment) || exclusionMatcher(current, segment)) {
 				return false;
 			}
 		}
@@ -290,16 +269,22 @@ export async function discoverFiles(options) {
 
 		const discovered = await walkFiles(root.rootPath, {
 			allowedExtensions,
-			ignoreFolders: ALWAYS_IGNORED_FOLDERS,
+			ignoreFolders: NEVER_WALKED_FOLDERS,
 			shouldSkipDirectory,
 			recursive: root.recursive
 		});
 		files.push(...discovered);
 	}
 
-	// The kept roots never overlap, so this is a guard rather than the mechanism: each path is
-	// returned once, in first-seen order.
-	return Array.from(new Set(files)).filter(
-		(filePath) => !exclusionMatcher(filePath, filePath.split("/").at(-1) || "") && !isGitignored(filePath)
-	);
+	// The kept roots never overlap, so de-duplication is a guard rather than the mechanism: each
+	// path is returned once, in first-seen order. Files are checked against the ignore files here;
+	// the walk only prunes directories.
+	const result = [];
+	for (const filePath of new Set(files)) {
+		if (!exclusionMatcher(filePath, filePath.split("/").at(-1) || "") && !(await ignoreFilter.isIgnored(filePath, false))) {
+			result.push(filePath);
+		}
+	}
+
+	return result;
 }
