@@ -56,7 +56,7 @@ const FS_OLD_TIMESTAMP = 1788220800;
  * @returns {string} File content with header.
  */
 function fileWithHeader(fileName, createdValue, modifiedValue, author = "Someone Else") {
-	return `/**\n *\t@Project: date-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: ${author}\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: ${author} (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) 2020-2026 Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
+	return `/**\n *\n *\t@Project: date-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: ${author}\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: ${author} (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) 2020-2026 Catalyzed Motivation Inc. All rights reserved.\n *\n */\n\n\nexport const value = 1;\n`;
 }
 
 /**
@@ -203,7 +203,7 @@ describe("checkHeaderDates", () => {
 
 	it("reports nothing for consistent dates, a header without date fields, and no header", () => {
 		expect(checkHeaderDates(header(consistent, consistent))).toEqual([]);
-		expect(checkHeaderDates("/**\n *\t@Project: x\n */")).toEqual([]);
+		expect(checkHeaderDates("/**\n *\n *\t@Project: x\n */")).toEqual([]);
 		expect(checkHeaderDates("")).toEqual([]);
 	});
 

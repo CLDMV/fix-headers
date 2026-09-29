@@ -94,6 +94,7 @@ Common CLI options:
 - `--author-name <name>` / `--author-email <email>`
 - `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
 - `--copyright-start-year <year>` - the `@Copyright` start year for every file (default: the year of each file's `@Date`)
+- `--spacing <n>` / `--margin <n>` - the header's layout: empty comment lines inside the header's edges (default `1`) and blank lines after it (default `2`), see [Header layout](#header-layout)
 - `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
 
 ### CommonJS
@@ -142,6 +143,8 @@ Important options:
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
 - `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#copyright-holder))
 - `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#copyright-years)
+- `spacing?: number` - empty comment lines just inside the header's opening and just before its closing. Default `1`, see [Header layout](#header-layout)
+- `margin?: number` - blank lines between the header and the file's next content. Default `2`, see [Header layout](#header-layout)
 
 Example:
 
@@ -299,6 +302,45 @@ The filesystem creation time is the earlier of the file's birth time and its mod
 - **`<end>`** is the year of the run.
 
 A file created in 2019 therefore gets `2019-2026` when fix-headers runs in 2026, not `2026-2026`.
+
+## Header layout
+
+Two options set the shape of the header, and both apply to every file type.
+
+- **`spacing`** (default `1`) is the number of empty comment lines just inside the header's opening and just before its closing. A block header gets an empty ` *` line under `/**` and above ` */`; a line-comment header gets a bare `#` (or the language's own prefix) above and below the fields.
+- **`margin`** (default `2`) is the number of blank lines between the header and the file's next content.
+
+With the defaults a JavaScript file and a YAML file look like this:
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	@Filename: /src/index.mjs
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ */
+
+
+export const value = 1;
+```
+
+```text
+#
+#	@Project: @cldmv/example
+#	@Filename: /.github/workflows/ci.yml
+#	...
+#	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+#
+
+
+name: CI
+```
+
+With `spacing: 0, margin: 1` the header is compact, with no empty comment lines and a single blank line after it. Both accept any whole number of `0` or more; anything else is rejected before a file is touched.
+
+An existing header is restyled in place to match, so changing either option rewrites the layout of every header on the next run, and a run with unchanged options finds nothing to update. A line-comment header always keeps at least one blank line after it, even with `margin: 0`, so a comment that follows the file's header is not read as part of it.
 
 ## Date checks
 
