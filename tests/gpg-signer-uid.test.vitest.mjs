@@ -17,7 +17,8 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fixHeaders } from "../src/fix-header.mjs";
-import { detectGitAuthor, parseSignerUid } from "../src/utils/git.mjs";
+import { detectGitAuthor, parseSignerUid, readSigningKeyUid } from "../src/utils/git.mjs";
+import { SIGNING_KEY_UID_ENV } from "./helpers/signing-key.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -67,6 +68,28 @@ async function createShimmedWorkspace(name, rules) {
 		}
 	};
 }
+
+/**
+ * Writes an executable stand-in for gpg into the workspace (which is first on PATH) that
+ * prints a fixed `--with-colons` listing, or exits 2 with no output when listing is null.
+ * @param {string} workspace - Workspace path.
+ * @param {string} name - Executable name (e.g. "gpg").
+ * @param {string[] | null} lines - Listing lines.
+ * @returns {Promise<void>} Completion promise.
+ */
+async function writeGpgShim(workspace, name, lines) {
+	const body = lines === null ? "exit 2\n" : `cat <<'LISTING'\n${lines.join("\n")}\nLISTING\n`;
+	const shimPath = join(workspace, name);
+	await writeFile(shimPath, `#!/usr/bin/env bash\n${body}`);
+	await chmod(shimPath, 0o755);
+}
+
+const KEY_LISTING = [
+	"tru::1:1790000000:0:3:1:5",
+	"pub:u:255:22:B9C512AC985D8BFE:1770767349:::u:::scESC:::::ed25519:::0:",
+	"fpr:::::::::0123456789ABCDEF0123456789ABCDEFB9C512AC985D8BFE:",
+	"uid:u::::1770767349::HASH1::Nate Corcoran (2023 PC) <Shinrai@users.noreply.github.com>::::::::::0:"
+];
 
 describe("parseSignerUid", () => {
 	it("drops the OpenPGP UID comment before the email", () => {
@@ -195,6 +218,161 @@ describe("fixHeaders with useGpgSignerAuthor and company", () => {
 			expect(header).not.toContain("2023 PC");
 		} finally {
 			await restore();
+		}
+	});
+});
+
+describe("readSigningKeyUid and the signing key as the author source", () => {
+	/** git config answers shared by these tests: an OpenPGP signing key and no custom gpg program. */
+	const signingKeyRules = [
+		{ match: "config --get gpg.format", output: null },
+		{ match: "config --get user.signingkey", output: "B9C512AC985D8BFE" },
+		{ match: "config --get gpg.openpgp.program", output: null },
+		{ match: "config --get gpg.program", output: null }
+	];
+
+	it("takes the author from the configured signing key, not the last commit's signer", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key", [
+			...signingKeyRules,
+			{ match: "log -1 --format=%GS", output: "GitHub <noreply@github.com>" }
+		]);
+		try {
+			await writeGpgShim(workspace, "gpg", KEY_LISTING);
+			expect(await readSigningKeyUid(workspace)).toBe("Nate Corcoran (2023 PC) <Shinrai@users.noreply.github.com>");
+			const author = await detectGitAuthor(workspace, { useGpgSignerAuthor: true });
+			expect(author).toEqual({ authorName: "Nate Corcoran", authorEmail: "configured@example.com" });
+		} finally {
+			await restore();
+		}
+	});
+
+	it("skips revoked and expired user IDs and decodes GnuPG's \\xNN escapes", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key-uids", signingKeyRules);
+		try {
+			await writeGpgShim(workspace, "gpg", [
+				KEY_LISTING[1],
+				"uid:r::::1::HASH0::Revoked Name <old@example.com>::::::::::0:",
+				"uid:e::::1::HASH2::Expired Name <exp@example.com>::::::::::0:",
+				"uid:u::::1::HASH3::Team\\x3a Ops <ops@example.com>::::::::::0:"
+			]);
+			expect(await readSigningKeyUid(workspace)).toBe("Team: Ops <ops@example.com>");
+		} finally {
+			await restore();
+		}
+	});
+
+	it("falls back to the last commit's signer when git signs with SSH", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key-ssh", [
+			{ match: "config --get gpg.format", output: "ssh" },
+			{ match: "config --get user.signingkey", output: "~/.ssh/id_ed25519.pub" },
+			{ match: "log -1 --format=%GS", output: "Signer Name <signer@example.com>" }
+		]);
+		try {
+			await writeGpgShim(workspace, "gpg", KEY_LISTING);
+			expect(await readSigningKeyUid(workspace)).toBeNull();
+			expect((await detectGitAuthor(workspace, { useGpgSignerAuthor: true })).authorName).toBe("Signer Name");
+		} finally {
+			await restore();
+		}
+	});
+
+	it("falls back to the last commit's signer when no signing key is configured", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key-none", [
+			{ match: "config --get gpg.format", output: null },
+			{ match: "config --get user.signingkey", output: null },
+			{ match: "log -1 --format=%GS", output: "Signer Name <signer@example.com>" }
+		]);
+		try {
+			expect(await readSigningKeyUid(workspace)).toBeNull();
+			expect((await detectGitAuthor(workspace, { useGpgSignerAuthor: true })).authorName).toBe("Signer Name");
+		} finally {
+			await restore();
+		}
+	});
+
+	it("falls back when the gpg program is missing or lists no usable user ID", async () => {
+		const missing = await createShimmedWorkspace("gpg-signing-key-missing", [
+			{ match: "config --get gpg.format", output: null },
+			{ match: "config --get user.signingkey", output: "B9C512AC985D8BFE" },
+			{ match: "config --get gpg.openpgp.program", output: "gpg-does-not-exist" },
+			{ match: "log -1 --format=%GS", output: "Signer Name <signer@example.com>" }
+		]);
+		try {
+			expect(await readSigningKeyUid(missing.workspace)).toBeNull();
+			expect((await detectGitAuthor(missing.workspace, { useGpgSignerAuthor: true })).authorName).toBe("Signer Name");
+		} finally {
+			await missing.restore();
+		}
+
+		const unknown = await createShimmedWorkspace("gpg-signing-key-unknown", signingKeyRules);
+		try {
+			await writeGpgShim(unknown.workspace, "gpg", null);
+			expect(await readSigningKeyUid(unknown.workspace)).toBeNull();
+			// gpg succeeds but prints nothing
+			await writeGpgShim(unknown.workspace, "gpg", []);
+			expect(await readSigningKeyUid(unknown.workspace)).toBeNull();
+			await writeGpgShim(unknown.workspace, "gpg", [KEY_LISTING[1], "uid:r::::1::HASH0::Revoked Name <old@example.com>::::::::::0:"]);
+			expect(await readSigningKeyUid(unknown.workspace)).toBeNull();
+		} finally {
+			await unknown.restore();
+		}
+	});
+
+	it("prefers gpg.openpgp.program over gpg.program", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key-program", [
+			{ match: "config --get gpg.format", output: "openpgp" },
+			{ match: "config --get user.signingkey", output: "B9C512AC985D8BFE" },
+			{ match: "config --get gpg.openpgp.program", output: "gpg-openpgp" },
+			{ match: "config --get gpg.program", output: "gpg-generic" }
+		]);
+		try {
+			await writeGpgShim(workspace, "gpg-openpgp", [KEY_LISTING[1], "uid:u::::1::H::OpenPGP Program <a@example.com>::::::::::0:"]);
+			await writeGpgShim(workspace, "gpg-generic", [KEY_LISTING[1], "uid:u::::1::H::Generic Program <b@example.com>::::::::::0:"]);
+			expect(await readSigningKeyUid(workspace)).toBe("OpenPGP Program <a@example.com>");
+		} finally {
+			await restore();
+		}
+	});
+
+	it("writes the signing key's name with the company suffix into a new header", async () => {
+		const { workspace, restore } = await createShimmedWorkspace("gpg-signing-key-fix-headers", [
+			...signingKeyRules,
+			{ match: "log -1 --format=%GS", output: null }
+		]);
+		try {
+			await writeGpgShim(workspace, "gpg", KEY_LISTING);
+			const result = await fixHeaders({
+				cwd: workspace,
+				input: "src/main.mjs",
+				useGpgSignerAuthor: true,
+				company: "CLDMV",
+				sampleOutput: true,
+				dryRun: true
+			});
+			const header = result.changes[0]?.sample?.newValue;
+			expect(header).toContain("@Author: Nate Corcoran <CLDMV>");
+			expect(header).not.toContain("2023 PC");
+		} finally {
+			await restore();
+		}
+	});
+});
+
+describe("the signing key configured on the machine running the suite", () => {
+	// Derived once per test run, straight from git and gpg (tests/helpers/signing-key.mjs); null skips.
+	const expectedUid = JSON.parse(process.env[SIGNING_KEY_UID_ENV] ?? "null");
+
+	it.skipIf(expectedUid === null)("readSigningKeyUid returns that key's user ID from the real git config and gpg", async () => {
+		const workspace = await createWorkspace("real-signing-key");
+		// Lift the suite-wide isolation from the global/system git config for this one check.
+		const isolated = { GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
+		delete process.env.GIT_CONFIG_GLOBAL;
+		delete process.env.GIT_CONFIG_NOSYSTEM;
+		try {
+			expect(await readSigningKeyUid(workspace)).toBe(expectedUid);
+		} finally {
+			Object.assign(process.env, isolated);
+			await cleanupWorkspace(workspace);
 		}
 	});
 });
