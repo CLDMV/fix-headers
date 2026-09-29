@@ -10,10 +10,6 @@
  *	-----
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
-export type DiffOperation = {
-    type: " " | "-" | "+";
-    line: string;
-};
 /**
  * @fileoverview Minimal line-level unified diff for header blocks. Header blocks are a
  * handful of lines, so a plain longest-common-subsequence table is fast enough and keeps
@@ -29,7 +25,7 @@ export type DiffOperation = {
  * @param {string[]} next - New lines.
  * @returns {DiffOperation[]} Ordered keep/remove/add operations.
  */
-export declare function diffLines(previous: string[], next: string[]): DiffOperation[];
+export function diffLines(previous: string[], next: string[]): DiffOperation[];
 /**
  * Builds a unified diff between two texts.
  * @param {string | null} previous - Old text, or null when there was none.
@@ -45,9 +41,13 @@ export declare function diffLines(previous: string[], next: string[]): DiffOpera
  * both texts, so hunk line numbers match the file.
  * @returns {string} Unified diff text, or an empty string when the texts are identical.
  */
-export declare function createUnifiedDiff(previous: string | null, next: string, options?: {
+export function createUnifiedDiff(previous: string | null, next: string, options?: {
     fromFile?: string;
     toFile?: string;
     context?: number;
     lineOffset?: number;
 }): string;
+export type DiffOperation = {
+    type: " " | "-" | "+";
+    line: string;
+};

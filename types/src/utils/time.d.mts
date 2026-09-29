@@ -19,13 +19,13 @@
  * @param {Date} date - Input date.
  * @returns {string} Formatted date string.
  */
-export declare function formatDateWithTimezone(date: Date): string;
+export function formatDateWithTimezone(date: Date): string;
 /**
  * Renders datetime parts in the space form (`YYYY-MM-DD HH:mm:ss ±HH:MM`), keeping their offset.
  * @param {DateParts} parts - Datetime parts.
  * @returns {string} Formatted date string.
  */
-export declare function formatSpaceDate(parts: DateParts): string;
+export function formatSpaceDate(parts: DateParts): string;
 /**
  * Validates an IANA time zone name with Intl (`new Intl.DateTimeFormat` throws a RangeError for a
  * zone it does not know).
@@ -33,7 +33,7 @@ export declare function formatSpaceDate(parts: DateParts): string;
  * @returns {string} The zone name.
  * @throws {Error} When the value is not a string, or Intl does not know the zone.
  */
-export declare function assertTimeZone(timeZone: unknown): string;
+export function assertTimeZone(timeZone: unknown): string;
 /**
  * Expresses an instant in a zone: its wall-clock parts there and the zone's UTC offset at that
  * instant (DST included), read from Intl's time zone data rather than a fixed table. The offset is
@@ -43,22 +43,13 @@ export declare function assertTimeZone(timeZone: unknown): string;
  * @param {string} timeZone - IANA zone name.
  * @returns {DateParts} Wall-clock parts and offset in the zone.
  */
-export declare function toZonedDateParts(timestamp: number, timeZone: string): DateParts;
-export type DateParts = {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-    second: number;
-    offsetMinutes: number;
-};
+export function toZonedDateParts(timestamp: number, timeZone: string): DateParts;
 /**
  * Returns a formatted date and unix timestamp.
  * @param {Date} [date=new Date()] - Date value to format.
  * @returns {{ date: string, timestamp: number }} Formatted datetime payload.
  */
-export declare function toDatePayload(date?: Date): {
+export function toDatePayload(date?: Date): {
     date: string;
     timestamp: number;
 };
@@ -68,7 +59,7 @@ export declare function toDatePayload(date?: Date): {
  * @param {string} text - Datetime text as written in a header.
  * @returns {{ year: number, month: number, day: number, hour: number, minute: number, second: number, offsetMinutes: number, timestamp: number } | null} Parsed datetime, or null when unrecognised.
  */
-export declare function parseHeaderDate(text: string): {
+export function parseHeaderDate(text: string): {
     year: number;
     month: number;
     day: number;
@@ -83,4 +74,13 @@ export declare function parseHeaderDate(text: string): {
  * @param {DateParts} parts - Parsed datetime parts.
  * @returns {string} ISO 8601 datetime text.
  */
-export declare function formatIsoDate(parts: DateParts): string;
+export function formatIsoDate(parts: DateParts): string;
+export type DateParts = {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+    offsetMinutes: number;
+};

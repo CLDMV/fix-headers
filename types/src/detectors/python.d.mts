@@ -1,22 +1,16 @@
-/**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/detectors/python.mjs
- *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
- *	@Author: Nate Corcoran <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
- *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-export declare const detector: {
-    id: string;
-    extensions: string[];
-    enabledByDefault: boolean;
-    resolvePreservedPrefix(filePath: any, content: any): string;
-    resolveCommentSyntax(filePath: any): {
+export namespace detector {
+    export let id: string;
+    export { extensions };
+    export let enabledByDefault: boolean;
+    export function resolvePreservedPrefix(filePath: any, content: any): string;
+    export function resolveCommentSyntax(filePath: any): {
         kind: string;
         linePrefix: string;
     };
-};
+}
+/**
+ * @fileoverview Python detector implementation.
+ * @module fix-headers/detectors/python
+ */
+declare const extensions: string[];
+export {};

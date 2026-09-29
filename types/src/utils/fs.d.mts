@@ -1,16 +1,4 @@
 /**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/utils/fs.mjs
- *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
- *	@Author: Nate Corcoran <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
- *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-/**
  * @fileoverview Filesystem helpers for project discovery and recursive scanning.
  * @module fix-headers/utils/fs
  */
@@ -19,14 +7,14 @@
  * @param {string} filePath - Absolute or relative path.
  * @returns {Promise<boolean>} True when the path exists.
  */
-export declare function pathExists(filePath: string): Promise<boolean>;
+export function pathExists(filePath: string): Promise<boolean>;
 /**
  * Finds a marker file by traversing upward from a directory.
  * @param {string} startDir - Starting directory.
  * @param {string[]} markerFiles - Candidate marker file names.
  * @returns {Promise<{root: string, marker: string} | null>} First match with root path.
  */
-export declare function findProjectRoot(startDir: string, markerFiles: string[]): Promise<{
+export function findProjectRoot(startDir: string, markerFiles: string[]): Promise<{
     root: string;
     marker: string;
 } | null>;
@@ -35,7 +23,7 @@ export declare function findProjectRoot(startDir: string, markerFiles: string[])
  * @param {string} filePath - File path.
  * @returns {Promise<string | null>} File content or null when missing.
  */
-export declare function readTextIfExists(filePath: string): Promise<string | null>;
+export function readTextIfExists(filePath: string): Promise<string | null>;
 /**
  * Recursively discovers files matching allowed extensions.
  * @param {string} dirPath - Root directory to scan.
@@ -48,7 +36,7 @@ export declare function readTextIfExists(filePath: string): Promise<string | nul
  *  `shouldSkipDirectory` may be async. Symlinked directories are never followed.
  * @returns {Promise<string[]>} Matching file paths.
  */
-export declare function walkFiles(dirPath: string, options: {
+export function walkFiles(dirPath: string, options: {
     allowedExtensions: Set<string>;
     ignoreFolders: Set<string>;
     shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean | Promise<boolean>;
@@ -63,7 +51,7 @@ export declare function walkFiles(dirPath: string, options: {
  * @param {string} filePath - Absolute file path.
  * @returns {Promise<{createdAt: Date, updatedAt: Date}>} Date pair.
  */
-export declare function readFileDates(filePath: string): Promise<{
+export function readFileDates(filePath: string): Promise<{
     createdAt: Date;
     updatedAt: Date;
 }>;

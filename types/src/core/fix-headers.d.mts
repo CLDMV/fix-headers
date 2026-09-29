@@ -1,15 +1,13 @@
 /**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/core/fix-headers.mjs
- *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
- *	@Author: Nate Corcoran <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
- *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ * @fileoverview Main header-fixing engine with auto-detection and override support.
+ * @module fix-headers/core/fix-headers
  */
+/**
+ * Fixes headers in a project using auto-detected metadata unless overridden.
+ * @param {FixHeadersOptions} [options={}] - Runtime options.
+ * @returns {Promise<FixHeadersResult>} Process report.
+ */
+export function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;
 export type FixHeadersOptions = {
     cwd?: string;
     input?: string;
@@ -52,6 +50,9 @@ export type FixHeadersOptions = {
     copyrightStartYear?: number;
 };
 export type HeaderFieldIssue = import("../header/fields.mjs").HeaderFieldIssue;
+/**
+ * Rewrites a header date payload (format or zone), keeping its instant.
+ */
 export type DateRewrite = (payload: {
     date: string;
     timestamp: number;
@@ -59,6 +60,26 @@ export type DateRewrite = (payload: {
     date: string;
     timestamp: number;
 };
+/**
+ * Result of a run. With `sampleOutput: true`, each changed entry carries a `sample`:
+ * - `previousValue` / `newValue` - the header block before (null when the file had none) and after.
+ * - `diff` - a unified diff of the header block (`--- a/<file>` / `+++ b/<file>`, `/dev/null`
+ *   when there was no previous header), with hunk line numbers relative to the file.
+ * - `issues` - one `{ field, previous, detected }` entry per header field whose written value
+ *   differs from the existing header. Values are the field text as written in the header
+ *   (dates keep their `date (timestamp)` form; `previous` is null when the field was missing).
+ *   Fields fix-headers preserves - the original `@Author`/`@Email` and `@Last modified by`
+ *   identity, unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set - are compared
+ *   against what is actually written, so they only appear when they really change. Because an
+ *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
+ *   changed file that already had a header.
+ * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
+ *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
+ *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
+ *   (null when nothing provides one, and the line then carries none), and `companyNameSource`
+ *   says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }`
+ *   or `{ from: "none" }`.
+ */
 export type FixHeadersResult = {
     metadata: {
         projectName: string;
@@ -113,13 +134,3 @@ export type FixHeadersResult = {
         };
     }>;
 };
-/**
- * @fileoverview Main header-fixing engine with auto-detection and override support.
- * @module fix-headers/core/fix-headers
- */
-/**
- * Fixes headers in a project using auto-detected metadata unless overridden.
- * @param {FixHeadersOptions} [options={}] - Runtime options.
- * @returns {Promise<FixHeadersResult>} Process report.
- */
-export declare function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;

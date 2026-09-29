@@ -1,20 +1,4 @@
 /**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/core/file-discovery.mjs
- *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
- *	@Author: Nate Corcoran <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-04 20:59:30 -08:00 (1772686770)
- *	-----
- *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-export type IncludeFolderEntry = string | {
-    path: string;
-    recursive?: boolean;
-};
-/**
  * Discovers source files for processing.
  * @param {{
  *  projectRoot: string,
@@ -33,7 +17,7 @@ export type IncludeFolderEntry = string | {
  *  (see {@link createIgnoreFilter}). Nothing is excluded by name except `.git`.
  * @returns {Promise<string[]>} Absolute file paths, each listed once.
  */
-export declare function discoverFiles(options: {
+export function discoverFiles(options: {
     projectRoot: string;
     language?: string;
     includeExtensions?: string[];
@@ -43,3 +27,11 @@ export declare function discoverFiles(options: {
     excludeFolders?: string[];
     gitignore?: boolean | string | string[];
 }): Promise<string[]>;
+/**
+ * An `includeFolders` entry: a project-relative folder path (walked recursively), or an object
+ * form that can switch recursion off so only the folder's own files are included.
+ */
+export type IncludeFolderEntry = string | {
+    path: string;
+    recursive?: boolean;
+};
