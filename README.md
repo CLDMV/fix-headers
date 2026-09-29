@@ -93,7 +93,7 @@ Common CLI options:
 - `--project-name <name>`
 - `--author-name <name>` / `--author-email <email>`
 - `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
-- `--copyright-start-year <year>`
+- `--copyright-start-year <year>` - the `@Copyright` start year for every file (default: the year of each file's `@Date`)
 - `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
 
 ### CommonJS
@@ -141,7 +141,7 @@ Important options:
 - `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
 - `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#copyright-holder))
-- `copyrightStartYear?: number` (default: current year)
+- `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#copyright-years)
 
 Example:
 
@@ -291,6 +291,15 @@ With `sampleOutput`, `detectedValues.companyName` is the resolved holder (`null`
 
 The filesystem creation time is the earlier of the file's birth time and its modification time. Content last written at the modification time existed by then, so it bounds creation even when the birth time is later (an extracted archive or a `cp -p` copy keeps the source's modification time). Where the platform reports no birth time, the modification time is used. A fresh clone or CI checkout gives every file a current filesystem time, so there the git first commit decides.
 
+## Copyright years
+
+`@Copyright: Copyright (c) <start>-<end> <companyName> All rights reserved.`
+
+- **`<start>`** is `copyrightStartYear` when it is set. Otherwise it is the year of the file's `@Date` as resolved above: the existing value, the git first commit or filesystem creation time for a new header, or the earlier date `fixCreatedDate` moves it to. The year is read in the zone the date is written in: the `timezone` option when it is set, else the date's own offset. `2019-12-31T23:30:00-08:00` gives `2019`, and `2020` with `timezone: "UTC"`. An `@Date` whose datetime is not recognised gives the year of its epoch in the local time zone.
+- **`<end>`** is the year of the run.
+
+A file created in 2019 therefore gets `2019-2026` when fix-headers runs in 2026, not `2026-2026`.
+
 ## Date checks
 
 `check: true` / `--check` validates the `@Date` and `@Last modified time` values of every existing header and writes nothing. It compares instants, not strings, so the same moment written with another offset or in the space/`T` form is not drift. It is independent of the rendered-header diff: an author, identity, copyright, or other content difference never fails the check. Files without a header are skipped.
@@ -387,7 +396,7 @@ With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed en
 - `newValue` - the header block this run writes.
 - `diff` - a ready-to-print unified diff of the header block. The `---`/`+++` lines name the file (`a/<file>` / `b/<file>`, or `/dev/null` when there was no previous header, in which case the whole new header shows as added), and hunk line numbers are file line numbers.
 - `issues` - one `{ field, previous, detected }` entry per header field whose written value differs from the existing header, in header order. Fields: `projectName`, `filename`, `createdAt`, `authorName`, `authorEmail`, `lastModifiedByName`, `lastModifiedByEmail`, `lastModifiedAt`, `copyrightStartYear`, `copyrightEndYear`, `companyName`. Values are the field text as written in the header (dates keep their `date (timestamp)` form); `previous` is `null` when the field was missing.
-- `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`).
+- `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`). `copyrightStartYear` is the start year written for the file, and `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or `"created-date"` (the year of the file's `@Date`, see [Copyright years](#copyright-years)). The run-level `result.metadata.copyrightStartYear` is the `copyrightStartYear` option, or `null` when it is not set.
 
 `issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` and `@Last modified by` identity unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set, so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
 

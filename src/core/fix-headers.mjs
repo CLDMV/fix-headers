@@ -16,7 +16,14 @@ import { relative, resolve } from "node:path";
 import { applyConfigOption } from "../config/load.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
-import { checkHeaderDates, convertDatePayload, normalizeDatePayload, repairDateEpoch, resolveCreatedDate } from "../header/dates.mjs";
+import {
+	checkHeaderDates,
+	convertDatePayload,
+	dateYear,
+	normalizeDatePayload,
+	repairDateEpoch,
+	resolveCreatedDate
+} from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
 import { compareHeaderFields } from "../header/fields.mjs";
 import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
@@ -87,7 +94,11 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
  *   (null when nothing provides one, and the line then carries none), and `companyNameSource`
  *   says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }`
- *   or `{ from: "none" }`.
+ *   or `{ from: "none" }`. `copyrightStartYear` is the start year written for the file, and
+ *   `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or
+ *   `"created-date"` (the year of the file's `@Date`).
+ *
+ * `metadata.copyrightStartYear` is the `copyrightStartYear` option, or null when it is not set.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
@@ -99,7 +110,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   authorEmail: string,
  *   companyName: string | null,
  *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
- *   copyrightStartYear: number
+ *   copyrightStartYear: number | null
  *  },
  *  detectedProjects: string[],
  *  filesScanned: number,
@@ -119,6 +130,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   companyName: string | null,
  *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
  *   copyrightStartYear: number,
+ *   copyrightStartYearSource: "option" | "created-date",
  *   createdAtSource: string,
  *   lastModifiedAtSource: string,
  *   createdAt: {date: string, timestamp: number},
@@ -340,6 +352,10 @@ export async function fixHeaders(options = {}) {
 		const createdAt = formatDate(
 			createdAtSource === "existing-header" ? toZoneIfSweeping(resolvedCreatedAt.payload) : toZone(resolvedCreatedAt.payload)
 		);
+		// Without the copyrightStartYear option, the start year is the year of the @Date written,
+		// read in the zone it is written in: `timezone` when set, else the date's own offset.
+		const copyrightStartYearSource = fileMetadata.copyrightStartYear === null ? "created-date" : "option";
+		const copyrightStartYear = fileMetadata.copyrightStartYear ?? dateYear(createdAt, timeZone);
 		const comparisonLastModifiedAt = formatDate(
 			repairedLastModifiedAt ? toZoneIfSweeping(repairedLastModifiedAt) : toZone(gitLastUpdated || toDatePayload(filesystemDates.updatedAt))
 		);
@@ -369,7 +385,7 @@ export async function fixHeaders(options = {}) {
 			authorEmail: fileMetadata.authorEmail,
 			createdAt,
 			lastModifiedAt: comparisonLastModifiedAt,
-			copyrightStartYear: fileMetadata.copyrightStartYear,
+			copyrightStartYear,
 			companyName: fileMetadata.companyName,
 			currentYear
 		});
@@ -408,7 +424,7 @@ export async function fixHeaders(options = {}) {
 					authorEmail: fileMetadata.authorEmail,
 					createdAt,
 					lastModifiedAt: finalLastModifiedAt,
-					copyrightStartYear: fileMetadata.copyrightStartYear,
+					copyrightStartYear,
 					companyName: fileMetadata.companyName,
 					currentYear
 				})
@@ -463,7 +479,8 @@ export async function fixHeaders(options = {}) {
 					authorEmail: fileMetadata.authorEmail,
 					companyName: fileMetadata.companyName,
 					companyNameSource: fileMetadata.companyNameSource,
-					copyrightStartYear: fileMetadata.copyrightStartYear,
+					copyrightStartYear,
+					copyrightStartYearSource,
 					createdAtSource,
 					lastModifiedAtSource,
 					createdAt,
