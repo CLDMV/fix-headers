@@ -9,13 +9,14 @@
  *  lineSeparator?: string,
  *  blockStart?: string,
  *  blockLinePrefix?: string,
- *  blockEnd?: string
+ *  blockEnd?: string,
+ *  spacing?: number
  * }} HeaderSyntax
  */
 /**
  * Resolves comment syntax for a file path based on extension.
  * @param {string} filePath - Absolute or relative file path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Syntax resolution options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number }} [options={}] - Syntax resolution options. `spacing` is the number of empty comment lines just inside the header's opening and closing (default 1).
  * @returns {HeaderSyntax} Header syntax descriptor.
  */
 export function getHeaderSyntaxForFile(filePath: string, options?: {
@@ -29,9 +30,12 @@ export function getHeaderSyntaxForFile(filePath: string, options?: {
         blockLinePrefix?: string;
         blockEnd?: string;
     }>;
+    spacing?: number;
 }): HeaderSyntax;
 /**
- * Renders header body lines using a chosen syntax.
+ * Renders header body lines using a chosen syntax. `syntax.spacing` empty comment lines (default 1) sit
+ * just inside the opening and just before the closing delimiter, or a bare comment-prefix line above
+ * and below a line-comment header.
  * @param {HeaderSyntax} syntax - Header syntax descriptor.
  * @param {string[]} lines - Header lines without comment wrappers.
  * @returns {string} Formatted header block.
@@ -44,4 +48,5 @@ export type HeaderSyntax = {
     blockStart?: string;
     blockLinePrefix?: string;
     blockEnd?: string;
+    spacing?: number;
 };

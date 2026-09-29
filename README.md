@@ -10,18 +10,17 @@ Multi-language source header normalizer for Node.js projects.
 
 ## ✨ What's New
 
-### Latest: v2.0.0 (September 2026)
+### Latest: v2.1.0 (September 2026)
 
-- **Breaking: built package, discovery and `@Project`** — npm now ships a tsup-built `dist/` and `bin/` instead of `src/`, so deep imports into `src/` stop resolving; the package entry point and the `fix-headers` binary work as before ([#56](https://github.com/CLDMV/fix-headers/pull/56), [#65](https://github.com/CLDMV/fix-headers/pull/65), [#78](https://github.com/CLDMV/fix-headers/pull/78)). Nothing is skipped by name any more: `node_modules`, `dist`, `build`, `coverage`, `tmp`, `.next` and `.turbo` are processed unless an ignore file (everything git honours) or `excludeFolders` excludes them ([#73](https://github.com/CLDMV/fix-headers/pull/73)). `@Project` and the project root come from the project's manifest (`package.json`, `pyproject.toml`, `Cargo.toml`, …) whatever the file's type, so some CSS, HTML, YAML, JSON and Python headers are rewritten on the next run ([#72](https://github.com/CLDMV/fix-headers/pull/72), [#75](https://github.com/CLDMV/fix-headers/pull/75)). The `@Copyright` holder has no built-in default: it is the manifest's author unless `companyName` is set, and is left out when there is none; the start year is the year of each file's `@Date` ([#91](https://github.com/CLDMV/fix-headers/pull/91), [#89](https://github.com/CLDMV/fix-headers/pull/89)). Preview the first run with `--dry-run --diff --verbose`.
-- **Date checks, time zones, header diffs and include options** — `--check` validates header dates without writing and exits `1` on drift, `@Date` follows "oldest wins" across the header, git and the filesystem, and mismatched epochs are repaired ([#67](https://github.com/CLDMV/fix-headers/pull/67)); an opt-in `--timezone` writes, and `--convert-timezone` sweeps, header dates into one IANA zone ([#81](https://github.com/CLDMV/fix-headers/pull/81)). `--diff` prints a unified header diff and `sampleOutput` lists per-field issues ([#66](https://github.com/CLDMV/fix-headers/pull/66)); `includeFolders` takes non-recursive entries and never processes a file twice ([#60](https://github.com/CLDMV/fix-headers/pull/60)); a config file can `extends` a shared config by URL, npm package or path ([#88](https://github.com/CLDMV/fix-headers/pull/88)).
-- [View full v2.0.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.0.0.md)
+- **Header layout: `spacing` and `margin`** — every header is now framed with empty comment lines (`/**`, ` *`, fields, ` *`, ` */` for block headers; a bare `#` above and below for line-comment headers) and followed by two blank lines, set by the new `spacing` (default `1`) and `margin` (default `2`) options in a config file, the API and the CLI (`--spacing`, `--margin`) ([#101](https://github.com/CLDMV/fix-headers/pull/101)). This fixes YAML and Python headers losing their padded `#` lines on the first run. Existing headers are restyled on the next run; use `spacing: 0` and `margin: 1` to keep the compact layout.
+- [View full v2.1.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md)
 
 ### Recent Releases
 
+- **v2.0.0** (September 2026) — built package (`dist/` and `bin/` instead of `src/`), discovery without name-based skips, `@Project` and the copyright holder from the project manifest, `--check` date validation, `--diff`, `--timezone` and config `extends` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.0.0.md))
 - **v1.3.12** (September 2026) — `engines.node` raised to `>=22.12.0` with the move to vitest 5; `ignore` bumped to 7.0.8 ([#38](https://github.com/CLDMV/fix-headers/pull/38), [#40](https://github.com/CLDMV/fix-headers/pull/40), [#43](https://github.com/CLDMV/fix-headers/pull/43)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.12))
 - **v1.3.11** (September 2026) — CI and release automation only, no runtime change: bot identity and GPG secrets passed to the v4 release and hotfix-redirect workflows ([#32](https://github.com/CLDMV/fix-headers/pull/32), [#36](https://github.com/CLDMV/fix-headers/pull/36)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.11))
 - **v1.3.10** (August 2026) — tests only, no runtime change: fallback-path tests run in a workspace with no project ancestry ([#28](https://github.com/CLDMV/fix-headers/pull/28)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.10))
-- **v1.3.9** (August 2026) — an existing header's `@Last modified by` identity is preserved unless `forceLastModifiedAuthorUpdate` / `--force-last-modified-author-update` is set, so a different local git identity no longer rewrites headers tree-wide ([#25](https://github.com/CLDMV/fix-headers/pull/25)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.9))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder and the [GitHub Releases](https://github.com/CLDMV/fix-headers/releases).
 
@@ -94,6 +93,7 @@ Common CLI options:
 - `--author-name <name>` / `--author-email <email>`
 - `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
 - `--copyright-start-year <year>` - the `@Copyright` start year for every file (default: the year of each file's `@Date`)
+- `--spacing <n>` / `--margin <n>` - the header's layout: empty comment lines inside the header's edges (default `1`) and blank lines after it (default `2`), see [Header layout](#header-layout)
 - `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
 
 ### CommonJS
@@ -142,6 +142,8 @@ Important options:
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
 - `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#copyright-holder))
 - `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#copyright-years)
+- `spacing?: number` - empty comment lines just inside the header's opening and just before its closing. Default `1`, see [Header layout](#header-layout)
+- `margin?: number` - blank lines between the header and the file's next content. Default `2`, see [Header layout](#header-layout)
 
 Example:
 
@@ -299,6 +301,45 @@ The filesystem creation time is the earlier of the file's birth time and its mod
 - **`<end>`** is the year of the run.
 
 A file created in 2019 therefore gets `2019-2026` when fix-headers runs in 2026, not `2026-2026`.
+
+## Header layout
+
+Two options set the shape of the header, and both apply to every file type.
+
+- **`spacing`** (default `1`) is the number of empty comment lines just inside the header's opening and just before its closing. A block header gets an empty ` *` line under `/**` and above ` */`; a line-comment header gets a bare `#` (or the language's own prefix) above and below the fields.
+- **`margin`** (default `2`) is the number of blank lines between the header and the file's next content.
+
+With the defaults a JavaScript file and a YAML file look like this:
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	@Filename: /src/index.mjs
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ */
+
+
+export const value = 1;
+```
+
+```text
+#
+#	@Project: @cldmv/example
+#	@Filename: /.github/workflows/ci.yml
+#	...
+#	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+#
+
+
+name: CI
+```
+
+With `spacing: 0, margin: 1` the header is compact, with no empty comment lines and a single blank line after it. Both accept any whole number of `0` or more; anything else is rejected before a file is touched.
+
+An existing header is restyled in place to match, so changing either option rewrites the layout of every header on the next run, and a run with unchanged options finds nothing to update. A line-comment header always keeps at least one blank line after it, even with `margin: 0`, so a comment that follows the file's header is not read as part of it.
 
 ## Date checks
 

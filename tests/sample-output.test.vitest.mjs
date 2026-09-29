@@ -24,7 +24,7 @@ import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers
  * @returns {string} File content with the stale header.
  */
 function staleFile(prefix = "") {
-	return `${prefix}/**\n *\t@Project: old-project-name\n *\t@Filename: /src/old-name.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Old Company All rights reserved.\n */\n\nexport const one = true;\n`;
+	return `${prefix}/**\n *\n *\t@Project: old-project-name\n *\t@Filename: /src/old-name.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Old Company All rights reserved.\n *\n */\n\n\nexport const one = true;\n`;
 }
 
 /**
@@ -79,7 +79,7 @@ describe("sample output field issues and diff", () => {
 		expect(byField.lastModifiedByName).toBeUndefined();
 
 		const diff = change.sample.diff;
-		expect(diff.startsWith("--- a/src/one.mjs\n+++ b/src/one.mjs\n@@ -1,12 +1,12 @@\n")).toBe(true);
+		expect(diff.startsWith("--- a/src/one.mjs\n+++ b/src/one.mjs\n@@ -1,14 +1,14 @@\n")).toBe(true);
 		expect(diff).toContain("\n- *\t@Project: old-project-name\n");
 		expect(diff).toContain("\n+ *\t@Project: sample-issues-stale\n");
 		expect(diff).toContain("\n  *\t@Author: Existing Author\n");
@@ -112,19 +112,19 @@ describe("sample output field issues and diff", () => {
 		expect(change.sample.issues.map((issue) => issue.field)).toEqual([...HEADER_FIELDS]);
 		expect(change.sample.issues.every((issue) => issue.previous === null)).toBe(true);
 		const lines = change.sample.diff.split("\n");
-		expect(lines.slice(0, 3)).toEqual(["--- /dev/null", "+++ b/src/one.mjs", "@@ -0,0 +1,12 @@"]);
+		expect(lines.slice(0, 3)).toEqual(["--- /dev/null", "+++ b/src/one.mjs", "@@ -0,0 +1,14 @@"]);
 		expect(lines.slice(3).every((line) => line.startsWith("+"))).toBe(true);
 		expect(lines.slice(3).map((line) => line.slice(1))).toEqual(change.sample.newValue.split("\n"));
 	});
 
 	it("numbers hunks relative to the file when a shebang precedes the header", async () => {
 		const existing = await sampleFor("sample-issues-shebang", staleFile("#!/usr/bin/env node\n"), { sampleOutput: true });
-		expect(existing.sample.diff).toContain("@@ -2,12 +2,12 @@");
+		expect(existing.sample.diff).toContain("@@ -2,14 +2,14 @@");
 
 		const inserted = await sampleFor("sample-issues-shebang-new", "#!/usr/bin/env node\nexport const one = true;\n", {
 			sampleOutput: true
 		});
-		expect(inserted.sample.diff).toContain("@@ -1,0 +2,12 @@");
+		expect(inserted.sample.diff).toContain("@@ -1,0 +2,14 @@");
 	});
 
 	it("adds no sample when sampleOutput is off", async () => {
@@ -268,7 +268,7 @@ describe("cli --diff and --verbose issue output", () => {
 			expect(code).toBe(0);
 			expect(output).toContain("updated: src/one.mjs");
 			expect(output).toContain('  projectName: found "old-project-name", expected "sample-cli-e2e"');
-			expect(output).toContain("--- a/src/one.mjs\n+++ b/src/one.mjs\n@@ -1,12 +1,12 @@");
+			expect(output).toContain("--- a/src/one.mjs\n+++ b/src/one.mjs\n@@ -1,14 +1,14 @@");
 			expect(output).toContain("\n- *\t@Project: old-project-name\n");
 			expect(output).toContain("\n+ *\t@Project: sample-cli-e2e\n");
 		} finally {

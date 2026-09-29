@@ -138,16 +138,16 @@ describe("branch coverage helpers", () => {
 		expect(html.startsWith("<!--")).toBe(true);
 
 		const hash = renderHeaderLines({ kind: "line", linePrefix: "#" }, ["@Project: demo"]);
-		expect(hash.startsWith("#\t@Project")).toBe(true);
+		expect(hash.startsWith("#\n#\t@Project")).toBe(true);
 
 		const hashDefault = renderHeaderLines({ kind: "line" }, ["@Project: demo"]);
-		expect(hashDefault.startsWith("#\t@Project")).toBe(true);
+		expect(hashDefault.startsWith("#\n#\t@Project")).toBe(true);
 
 		const hashSpace = renderHeaderLines({ kind: "line", linePrefix: "#", lineSeparator: " " }, ["@Project: demo"]);
-		expect(hashSpace.startsWith("# @Project")).toBe(true);
+		expect(hashSpace.startsWith("#\n# @Project")).toBe(true);
 
 		const hashNone = renderHeaderLines({ kind: "line", linePrefix: "#", lineSeparator: "" }, ["@Project: demo"]);
-		expect(hashNone.startsWith("#@Project")).toBe(true);
+		expect(hashNone.startsWith("#\n#@Project")).toBe(true);
 
 		const block = renderHeaderLines({ kind: "block" }, ["@Project: demo"]);
 		expect(block.startsWith("/**")).toBe(true);

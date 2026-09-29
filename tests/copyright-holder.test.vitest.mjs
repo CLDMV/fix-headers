@@ -368,7 +368,7 @@ describe("fixHeaders writes the resolved holder", () => {
 			await writeFiles(workspace, {
 				"package.json": JSON.stringify({ name: "no-holder" }),
 				"src/new.mjs": "export const x = 1;\n",
-				"src/old.mjs": `/**\n *\t@Project: no-holder\n *\t@Filename: /src/old.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Holder Tester\n *\t@Email: <holder@example.com>\n *\t-----\n *\t@Last modified by: Holder Tester (holder@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) ${CURRENT_YEAR}-${CURRENT_YEAR} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const old = true;\n`
+				"src/old.mjs": `/**\n *\n *\t@Project: no-holder\n *\t@Filename: /src/old.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Holder Tester\n *\t@Email: <holder@example.com>\n *\t-----\n *\t@Last modified by: Holder Tester (holder@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) ${CURRENT_YEAR}-${CURRENT_YEAR} Catalyzed Motivation Inc. All rights reserved.\n *\n */\n\n\nexport const old = true;\n`
 			});
 			const result = await fixHeaders({ cwd: workspace, ...IDENTITY, sampleOutput: true });
 			expect(result.metadata).toMatchObject({ companyName: null, companyNameSource: { from: "none" } });
