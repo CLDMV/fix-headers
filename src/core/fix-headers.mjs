@@ -15,14 +15,14 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
-import { checkHeaderDates, normalizeDatePayload, repairDateEpoch, resolveCreatedDate } from "../header/dates.mjs";
+import { checkHeaderDates, convertDatePayload, normalizeDatePayload, repairDateEpoch, resolveCreatedDate } from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
 import { compareHeaderFields } from "../header/fields.mjs";
 import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
 import { createUnifiedDiff } from "../utils/diff.mjs";
 import { readFileDates } from "../utils/fs.mjs";
 import { getGitCreationDate, getGitLastModifiedDate } from "../utils/git.mjs";
-import { toDatePayload } from "../utils/time.mjs";
+import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
 
 /**
  * @typedef {{
@@ -33,6 +33,8 @@ import { toDatePayload } from "../utils/time.mjs";
  *  fixCreatedDate?: boolean,
  *  strictCreatedDate?: boolean,
  *  normalizeDateFormat?: boolean,
+ *  timezone?: string,
+ *  convertTimezone?: boolean,
  *  configFile?: string,
  *  sampleOutput?: boolean,
  *  forceAuthorUpdate?: boolean,
@@ -59,6 +61,11 @@ import { toDatePayload } from "../utils/time.mjs";
 
 /**
  * @typedef {import("../header/fields.mjs").HeaderFieldIssue} HeaderFieldIssue
+ */
+
+/**
+ * Rewrites a header date payload (format or zone), keeping its instant.
+ * @typedef {(payload: {date: string, timestamp: number}) => {date: string, timestamp: number}} DateRewrite
  */
 
 /**
@@ -231,6 +238,14 @@ function extractHeaderLastModifiedAt(headerText) {
  */
 export async function fixHeaders(options = {}) {
 	const effectiveOptions = await resolveRuntimeOptions(options);
+	const timeZone =
+		effectiveOptions.timezone === undefined || effectiveOptions.timezone === null ? null : assertTimeZone(effectiveOptions.timezone);
+	const convertTimezone = effectiveOptions.convertTimezone === true;
+	if (convertTimezone && !timeZone) {
+		throw new Error(
+			"convertTimezone requires timezone: set timezone (CLI --timezone <name>) to the IANA zone to convert header dates into"
+		);
+	}
 	const scanRoot = resolve(effectiveOptions.projectRoot || effectiveOptions.cwd || process.cwd());
 	const metadata = await resolveProjectMetadata({
 		...effectiveOptions,
@@ -239,8 +254,15 @@ export async function fixHeaders(options = {}) {
 	const check = effectiveOptions.check === true;
 	const dryRun = check || effectiveOptions.dryRun === true;
 	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
-	/** @type {(payload: {date: string, timestamp: number}) => {date: string, timestamp: number}} */
-	const formatDate = effectiveOptions.normalizeDateFormat === true ? normalizeDatePayload : (payload) => payload;
+	/** @type {DateRewrite} */
+	const keepDate = (payload) => payload;
+	/** @type {DateRewrite} */
+	const formatDate = effectiveOptions.normalizeDateFormat === true ? normalizeDatePayload : keepDate;
+	// Dates taken from git, the filesystem, or the clock are written in `timezone`; dates already
+	// in a header are only moved into it by the `convertTimezone` sweep. Either way the instant is kept.
+	/** @type {DateRewrite} */
+	const toZone = timeZone ? (payload) => convertDatePayload(payload, timeZone) : keepDate;
+	const toZoneIfSweeping = convertTimezone ? toZone : keepDate;
 
 	/** @type {string[]} */
 	let files;
@@ -331,8 +353,12 @@ export async function fixHeaders(options = {}) {
 			: gitLastUpdated
 				? "git-last-modified"
 				: "filesystem-updated";
-		const createdAt = formatDate(resolvedCreatedAt.payload);
-		const comparisonLastModifiedAt = formatDate(repairedLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt));
+		const createdAt = formatDate(
+			createdAtSource === "existing-header" ? toZoneIfSweeping(resolvedCreatedAt.payload) : toZone(resolvedCreatedAt.payload)
+		);
+		const comparisonLastModifiedAt = formatDate(
+			repairedLastModifiedAt ? toZoneIfSweeping(repairedLastModifiedAt) : toZone(gitLastUpdated || toDatePayload(filesystemDates.updatedAt))
+		);
 		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
 		const shouldForceLastModifiedAuthorUpdate = effectiveOptions.forceLastModifiedAuthorUpdate === true;
 
@@ -371,7 +397,7 @@ export async function fixHeaders(options = {}) {
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		});
 		const needsUpdate = comparisonReplacement.changed;
-		const finalLastModifiedAt = needsUpdate ? formatDate(toDatePayload(new Date())) : comparisonLastModifiedAt;
+		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
 
 		const header = needsUpdate

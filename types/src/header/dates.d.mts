@@ -96,3 +96,15 @@ export declare function repairDateEpoch(payload: DatePayload | null): DatePayloa
  * @returns {DatePayload} Payload with ISO 8601 text.
  */
 export declare function normalizeDatePayload(payload: DatePayload): DatePayload;
+/**
+ * Rewrites a date payload's text in a time zone, keeping its instant: the wall-clock time and
+ * offset become the zone's at that instant (DST included). The text keeps its shape: the T-form
+ * stays in the T-form and anything else is written in the space form. The payload is returned
+ * unchanged when its text is unrecognised (there is no instant to convert), when it is already
+ * in the zone's offset at that instant, or when the zone's offset then is not a whole number of
+ * minutes (historical local mean time), which a `±HH:MM` offset cannot express.
+ * @param {DatePayload} payload - Date payload.
+ * @param {string} timeZone - IANA zone name, already validated.
+ * @returns {DatePayload} Payload expressed in the zone.
+ */
+export declare function convertDatePayload(payload: DatePayload, timeZone: string): DatePayload;

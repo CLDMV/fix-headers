@@ -11,7 +11,7 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { formatIsoDate, parseHeaderDate } from "../utils/time.mjs";
+import { formatIsoDate, formatSpaceDate, parseHeaderDate, toZonedDateParts } from "../utils/time.mjs";
 
 /**
  * @fileoverview Header date validation, creation-date resolution ("oldest wins"), and date repair/normalization.
@@ -224,4 +224,30 @@ export function repairDateEpoch(payload) {
 export function normalizeDatePayload(payload) {
 	const parsed = parseHeaderDate(payload.date);
 	return parsed ? { date: formatIsoDate(parsed), timestamp: parsed.timestamp } : payload;
+}
+
+/**
+ * Rewrites a date payload's text in a time zone, keeping its instant: the wall-clock time and
+ * offset become the zone's at that instant (DST included). The text keeps its shape: the T-form
+ * stays in the T-form and anything else is written in the space form. The payload is returned
+ * unchanged when its text is unrecognised (there is no instant to convert), when it is already
+ * in the zone's offset at that instant, or when the zone's offset then is not a whole number of
+ * minutes (historical local mean time), which a `±HH:MM` offset cannot express.
+ * @param {DatePayload} payload - Date payload.
+ * @param {string} timeZone - IANA zone name, already validated.
+ * @returns {DatePayload} Payload expressed in the zone.
+ */
+export function convertDatePayload(payload, timeZone) {
+	const parsed = parseHeaderDate(payload.date);
+	if (!parsed) {
+		return payload;
+	}
+
+	const zoned = toZonedDateParts(parsed.timestamp, timeZone);
+	if (zoned.offsetMinutes === parsed.offsetMinutes || !Number.isInteger(zoned.offsetMinutes)) {
+		return payload;
+	}
+
+	const isIsoForm = /^\d{4}-\d{2}-\d{2}T/i.test(payload.date.trim());
+	return { date: isIsoForm ? formatIsoDate(zoned) : formatSpaceDate(zoned), timestamp: parsed.timestamp };
 }
