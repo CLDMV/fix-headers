@@ -16,9 +16,11 @@ import { formatDateWithTimezone, toDatePayload } from "../src/utils/time.mjs";
 
 describe("utils/time", () => {
 	it("formats date with timezone offset", () => {
-		const date = new Date("2026-03-01T21:30:00.000Z");
+		// Built from local components so the calendar date holds in every time zone (a fixed UTC
+		// instant late in the day is already the next day east of UTC+2:30).
+		const date = new Date(2026, 2, 1, 12, 0, 0);
 		const formatted = formatDateWithTimezone(date);
-		expect(formatted).toMatch(/^2026-03-01\s\d{2}:\d{2}:\d{2}\s[+-]\d{2}:\d{2}$/);
+		expect(formatted).toMatch(/^2026-03-01 12:00:00 [+-]\d{2}:\d{2}$/);
 	});
 
 	it("formats timezone with explicit plus and minus signs", () => {

@@ -10,7 +10,34 @@
  */
 export function runGit(cwd: string, args: string[]): Promise<string | null>;
 /**
+ * Parses a signer UID string into author name and optional email.
+ * The OpenPGP UID comment (`Name (Comment) <email>`) is dropped from the name;
+ * when the UID is only a comment, the raw name is kept.
+ * @param {string} signerUid - Raw signer UID (for example: "Name (Comment) <email@example.com>").
+ * @returns {{authorName: string | null, authorEmail: string | null}} Parsed signer identity.
+ */
+export function parseSignerUid(signerUid: string): {
+    authorName: string | null;
+    authorEmail: string | null;
+};
+/**
+ * Reads the user ID of the OpenPGP key git signs commits with (`user.signingkey`).
+ * Returns the first user ID that is not revoked or expired (GnuPG lists the primary
+ * one first), or null when git signs with SSH/X.509, no signing key is configured,
+ * or GnuPG is unavailable or doesn't know the key.
+ * @param {string} cwd - Project directory (git config is read as git sees it there).
+ * @returns {Promise<string | null>} The signing key's user ID.
+ */
+export function readSigningKeyUid(cwd: string): Promise<string | null>;
+/**
  * Detects git author name and email from config or commit history.
+ *
+ * With `useGpgSignerAuthor`, the name comes from the user ID of the OpenPGP key git is
+ * configured to sign with (`user.signingkey`), so it describes whoever is running the
+ * tool. When no such key can be read, it falls back to the signer of the last commit
+ * (`%GS`), and then to `user.name`. The last commit alone is unreliable: on a branch
+ * whose tip is a squash merge made by GitHub or a bot, it has no locally verifiable
+ * signer.
  * @param {string} cwd - Project directory.
  * @param {{useGpgSignerAuthor?: boolean}} [options={}] - Detection options.
  * @returns {Promise<{authorName: string | null, authorEmail: string | null}>} Author information.

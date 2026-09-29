@@ -212,7 +212,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-preserve-author" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-preserve-author\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) ${currentYear}-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-preserve-author\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({
@@ -220,6 +220,7 @@ describe("core edge coverage", () => {
 				input: "src/one.mjs",
 				authorName: "New Updater",
 				authorEmail: "new@example.com",
+				companyName: "Catalyzed Motivation Inc.",
 				dryRun: false
 			});
 
@@ -227,7 +228,7 @@ describe("core edge coverage", () => {
 			expect(updated).toContain("@Author: Original Author");
 			expect(updated).toContain("@Email: <original@example.com>");
 			expect(updated).toContain("@Last modified by: Old Updater (old@example.com)");
-			expect(updated).toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)");
+			expect(updated).toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)");
 			expect(result.filesUpdated).toBe(0);
 		} finally {
 			await cleanupWorkspace(workspace);
@@ -245,7 +246,7 @@ describe("core edge coverage", () => {
 			);
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) ${currentYear}-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-force-last-modified-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({
@@ -261,7 +262,7 @@ describe("core edge coverage", () => {
 			expect(updated).toContain("@Author: Original Author");
 			expect(updated).toContain("@Email: <original@example.com>");
 			expect(updated).toContain("@Last modified by: New Updater (new@example.com)");
-			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)");
+			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)");
 			expect(result.filesUpdated).toBe(1);
 		} finally {
 			await cleanupWorkspace(workspace);
@@ -275,7 +276,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-force-author-update" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-force-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-force-author-update\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			await coreFixHeaders({
@@ -290,7 +291,7 @@ describe("core edge coverage", () => {
 			const updated = await readFile(join(workspace, "src", "one.mjs"), "utf8");
 			expect(updated).toContain("@Author: Forced Author");
 			expect(updated).toContain("@Email: <forced@example.com>");
-			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)");
+			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -303,7 +304,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-force-author-no-cascade" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-force-author-no-cascade\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-force-author-no-cascade\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			await coreFixHeaders({
@@ -318,7 +319,7 @@ describe("core edge coverage", () => {
 			const updated = await readFile(join(workspace, "src", "one.mjs"), "utf8");
 			expect(updated).toContain("@Author: Forced Author");
 			expect(updated).toContain("@Last modified by: Old Updater (old@example.com)");
-			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)");
+			expect(updated).not.toContain("@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -381,7 +382,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-missing-last-modified-time" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-missing-last-modified-time\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-missing-last-modified-time\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({
@@ -405,7 +406,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-preserve-created-date" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-preserve-created-date\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-preserve-created-date\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			await coreFixHeaders({
@@ -415,7 +416,7 @@ describe("core edge coverage", () => {
 			});
 
 			const updated = await readFile(join(workspace, "src", "one.mjs"), "utf8");
-			expect(updated).toContain("@Date: 2026-01-01 00:00:00 +00:00 (1735689600)");
+			expect(updated).toContain("@Date: 2026-01-01 00:00:00 +00:00 (1767225600)");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -431,7 +432,7 @@ describe("core edge coverage", () => {
 			);
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-preserve-created-date-with-git\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-preserve-created-date-with-git\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 			await initializeGitWorkspace(workspace);
 
@@ -442,7 +443,7 @@ describe("core edge coverage", () => {
 			});
 
 			const updated = await readFile(join(workspace, "src", "one.mjs"), "utf8");
-			expect(updated).toContain("@Date: 2026-01-01 00:00:00 +00:00 (1735689600)");
+			expect(updated).toContain("@Date: 2026-01-01 00:00:00 +00:00 (1767225600)");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -455,7 +456,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-malformed-created-date" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-malformed-created-date\n *\t@Filename: /src/one.mjs\n *\t@Date: malformed-date-without-timestamp\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-malformed-created-date\n *\t@Filename: /src/one.mjs\n *\t@Date: malformed-date-without-timestamp\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			await coreFixHeaders({
@@ -480,7 +481,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-created-date-parse-nan" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-created-date-parse-nan\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-created-date-parse-nan\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			await coreFixHeaders({
@@ -532,7 +533,7 @@ describe("core edge coverage", () => {
 			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "core-edge-sample-existing-header" }, null, 2));
 			await writeWorkspaceFile(
 				join(workspace, "src", "one.mjs"),
-				`/**\n *\t@Project: core-edge-sample-existing-header\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1735689600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1735776000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
+				`/**\n *\t@Project: core-edge-sample-existing-header\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n */\n\nexport const one = true;\n`
 			);
 
 			const result = await coreFixHeaders({

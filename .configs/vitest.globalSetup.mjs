@@ -10,10 +10,13 @@
  * @module fix-headers/vitest-global-setup
  */
 
+import { ensureSigningKeyUid } from "../tests/helpers/signing-key.mjs";
 import { reapStaleWorkspaces } from "../tests/helpers/workspace.mjs";
 
 /** Reap orphans left by a prior aborted run (age-guarded). @returns {Promise<void>} */
 export async function setup() {
+	// Already derived by tests/run-vitest.mjs for a normal run; this covers vitest started directly.
+	ensureSigningKeyUid();
 	await reapStaleWorkspaces();
 }
 

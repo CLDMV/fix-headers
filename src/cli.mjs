@@ -12,10 +12,9 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { readFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { applyConfigOption } from "./config/load.mjs";
 import fixHeaders from "./fix-header.mjs";
 
 /**
@@ -23,7 +22,7 @@ import fixHeaders from "./fix-header.mjs";
  * @module fix-headers/cli
  */
 
-const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode\n      --sample-output                Show previous/new header sample for changed files\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          Override company name\n      --copyright-start-year <year>  Override copyright start year\n      --config <path>                Load JSON options file\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
+const HELP_TEXT = `fix-headers CLI\n\nUsage:\n  fix-headers [options]\n\nOptions:\n  -h, --help                         Show help\n      --dry-run                      Compute changes without writing files\n      --check                        Validate header dates without writing; exit 1 on date drift\n      --fix-created-date             Move an existing @Date back to the oldest of git first commit / file creation\n      --strict-created-date          With --check, fail when @Date is later than git first commit / file creation\n      --normalize-date-format        Write every header date in the ISO 8601 T-form (git %aI)\n      --timezone <name>              Write new dates in an IANA time zone (e.g. America/Los_Angeles, UTC); the instant never changes\n      --convert-timezone             With --timezone, also rewrite existing @Date/@Last modified time values into that zone\n      --json                         Print JSON output\n      --verbose                      Print updated file paths in summary mode; with --sample-output or --diff, also print each file's field differences\n      --sample-output                Show previous/new header sample for changed files\n      --diff                         Print a unified diff of each changed file's header (implies sample output)\n      --force-author-update          Always update @Author/@Email to detected/current values\n      --force-last-modified-author-update  Always update @Last modified by to detected/current values\n      --use-gpg-signer-author        Use signed-commit UID (%GS) for detected @Author\n      --cwd <path>                   Working directory for project detection\n      --input <path>                 Single file or folder input\n      --include-folder <path>        Include folder (repeatable)\n      --include-folder-non-recursive <path>  Include only a folder's own files, not its subfolders (repeatable)\n      --exclude-folder <path>        Exclude folder name/path (repeatable)\n      --include-extension <ext>      Include extension (repeatable)\n      --enable-detector <id>         Enable only specific detector (repeatable)\n      --disable-detector <id>        Disable detector by id (repeatable)\n      --project-name <name>          Override project name\n      --language <id>                Override language id\n      --project-root <path>          Override project root\n      --marker <name|null>           Override marker filename\n      --author-name <name>           Override author name\n      --author-email <email>         Override author email\n      --company <name>               Append company suffix to @Author (Name <Company>)\n      --company-name <name>          @Copyright holder (default: the project manifest's author; omitted when none)\n      --copyright-start-year <year>  Set the copyright start year (default: each file's @Date year)\n      --config <path>                Load JSON options file; its 'extends' can pull in shared configs (URL, package or path)\n\nExamples:\n  fix-headers --dry-run --include-folder src\n  fix-headers --dry-run --diff --verbose\n  fix-headers --check --verbose\n  fix-headers --timezone America/Los_Angeles --convert-timezone\n  fix-headers --project-name @scope/pkg --company-name "Catalyzed Motivation Inc."\n`;
 
 /**
  * Converts CLI flag token to camelCase key.
@@ -40,13 +39,14 @@ function toCamelCase(token) {
  * @returns {{
  *  options: Record<string, unknown>,
  *  help: boolean,
- *  json: boolean
+ *  json: boolean,
+ *  diff: boolean
  * }} Parsed CLI payload.
  */
 export function parseCliArgs(argv) {
 	/** @type {Record<string, unknown>} */
 	const options = {};
-	const control = { help: false, json: false };
+	const control = { help: false, json: false, diff: false };
 	const multiMap = {
 		"include-folder": "includeFolders",
 		"exclude-folder": "excludeFolders",
@@ -66,6 +66,7 @@ export function parseCliArgs(argv) {
 		company: "company",
 		"company-name": "companyName",
 		"copyright-start-year": "copyrightStartYear",
+		timezone: "timezone",
 		config: "config"
 	};
 
@@ -79,12 +80,36 @@ export function parseCliArgs(argv) {
 			control.json = true;
 			continue;
 		}
+		if (arg === "--diff") {
+			control.diff = true;
+			continue;
+		}
 		if (arg === "--verbose") {
 			options.verbose = true;
 			continue;
 		}
 		if (arg === "--dry-run") {
 			options.dryRun = true;
+			continue;
+		}
+		if (arg === "--check") {
+			options.check = true;
+			continue;
+		}
+		if (arg === "--fix-created-date") {
+			options.fixCreatedDate = true;
+			continue;
+		}
+		if (arg === "--strict-created-date") {
+			options.strictCreatedDate = true;
+			continue;
+		}
+		if (arg === "--normalize-date-format") {
+			options.normalizeDateFormat = true;
+			continue;
+		}
+		if (arg === "--convert-timezone") {
+			options.convertTimezone = true;
 			continue;
 		}
 		if (arg === "--sample-output") {
@@ -108,6 +133,17 @@ export function parseCliArgs(argv) {
 		}
 
 		const flag = arg.slice(2);
+		if (flag === "include-folder-non-recursive") {
+			const value = argv[index + 1];
+			if (!value || value.startsWith("--")) {
+				throw new Error(`Missing value for --${flag}`);
+			}
+			index += 1;
+			const list = Array.isArray(options.includeFolders) ? options.includeFolders : [];
+			options.includeFolders = [...list, { path: value, recursive: false }];
+			continue;
+		}
+
 		if (multiMap[flag]) {
 			const value = argv[index + 1];
 			if (!value || value.startsWith("--")) {
@@ -152,33 +188,93 @@ export function parseCliArgs(argv) {
 	return {
 		options,
 		help: control.help,
-		json: control.json
+		json: control.json,
+		diff: control.diff
 	};
 }
 
 /**
- * Loads extra options from a JSON config file.
+ * Loads extra options from the JSON config file named by `--config` (and everything it
+ * `extends`); options given on the command line win over the file.
  * @param {Record<string, unknown>} options - Current options object.
  * @returns {Promise<Record<string, unknown>>} Merged options object.
  */
-export async function applyConfigFile(options) {
-	if (typeof options.config !== "string" || options.config.trim().length === 0) {
-		return options;
+export function applyConfigFile(options) {
+	return applyConfigOption(options, "config");
+}
+
+/**
+ * @typedef {{
+ *  file?: string,
+ *  changed?: boolean,
+ *  sample?: {
+ *   previousValue?: string | null,
+ *   newValue?: string,
+ *   diff?: string,
+ *   issues?: Array<{ field?: string, previous?: string | null, detected?: string | null }>,
+ *   detectedValues?: Record<string, unknown>
+ *  }
+ * }} CliChangeEntry
+ */
+
+/**
+ * Returns the changed entries that carry a usable sample payload.
+ * @param {unknown} result - Runner result object.
+ * @returns {CliChangeEntry[]} Changed entries with a sample.
+ */
+function getSampledChanges(result) {
+	if (!result || typeof result !== "object") {
+		return [];
 	}
 
-	const baseDir = typeof options.cwd === "string" && options.cwd.length > 0 ? options.cwd : process.cwd();
-	const configPath = isAbsolute(options.config) ? options.config : join(baseDir, options.config);
-	const raw = await readFile(configPath, "utf8");
-	const parsed = JSON.parse(raw);
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new Error("Config file must contain a JSON object");
-	}
+	const report = /** @type {{changes?: CliChangeEntry[]}} */ (result);
+	const changes = Array.isArray(report.changes) ? report.changes : [];
+	return changes.filter((change) => change && change.changed === true && change.sample && typeof change.sample.newValue === "string");
+}
 
-	const merged = { ...parsed, ...options };
-	delete merged.config;
-	/** @type {Record<string, unknown>} */
-	const output = merged;
-	return output;
+/**
+ * Formats a header field value for issue output.
+ * @param {unknown} value - Field value.
+ * @returns {string} Printable value.
+ */
+function formatIssueValue(value) {
+	return typeof value === "string" ? `"${value}"` : "(missing)";
+}
+
+/**
+ * Prints each changed file's per-field differences.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @returns {void}
+ */
+function printIssues(stdout, result) {
+	for (const change of getSampledChanges(result)) {
+		const issues = Array.isArray(change.sample.issues) ? change.sample.issues : [];
+		stdout(`issues: ${change.file || "<unknown-file>"}`);
+		if (issues.length === 0) {
+			stdout("  (no field differences; header formatting only)");
+			continue;
+		}
+		for (const issue of issues) {
+			stdout(
+				`  ${issue?.field || "<unknown-field>"}: found ${formatIssueValue(issue?.previous)}, expected ${formatIssueValue(issue?.detected)}`
+			);
+		}
+	}
+}
+
+/**
+ * Prints each changed file's unified header diff.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @returns {void}
+ */
+function printDiffs(stdout, result) {
+	for (const change of getSampledChanges(result)) {
+		if (typeof change.sample.diff === "string" && change.sample.diff.length > 0) {
+			stdout(change.sample.diff);
+		}
+	}
 }
 
 /**
@@ -188,20 +284,7 @@ export async function applyConfigFile(options) {
  * @returns {void}
  */
 function printSampleOutput(stdout, result) {
-	if (!result || typeof result !== "object") {
-		return;
-	}
-
-	const report =
-		/** @type {{changes?: Array<{file?: string, changed?: boolean, sample?: { previousValue?: string | null, newValue?: string, detectedValues?: Record<string, unknown> }}>}} */ (
-			result
-		);
-	const changes = Array.isArray(report.changes) ? report.changes : [];
-	for (const change of changes) {
-		if (!change || change.changed !== true || !change.sample || typeof change.sample.newValue !== "string") {
-			continue;
-		}
-
+	for (const change of getSampledChanges(result)) {
 		stdout(`sample: ${change.file || "<unknown-file>"}`);
 		stdout("previous:");
 		stdout(change.sample.previousValue === null ? "(none)" : String(change.sample.previousValue));
@@ -234,6 +317,50 @@ function printChangedFiles(stdout, result) {
 }
 
 /**
+ * Prints the optional per-file detail sections selected by the CLI flags.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {unknown} result - Runner result object.
+ * @param {Record<string, unknown>} options - Effective runner options.
+ * @param {boolean} diff - Whether `--diff` was passed.
+ * @returns {void}
+ */
+function printDetails(stdout, result, options, diff) {
+	const sampled = options.sampleOutput === true || diff;
+	if (options.verbose === true) {
+		printChangedFiles(stdout, result);
+		if (sampled) {
+			printIssues(stdout, result);
+		}
+	}
+	if (options.sampleOutput === true) {
+		printSampleOutput(stdout, result);
+	}
+	if (diff) {
+		printDiffs(stdout, result);
+	}
+}
+
+/**
+ * Prints `--check` date findings: failing issues always, advisory issues only in verbose mode.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {{changes?: Array<{file?: string, dateIssues?: Array<{advisory?: boolean, message?: string}>}>}} report - Check-mode result.
+ * @param {boolean} verbose - Whether to print advisory issues.
+ * @returns {void}
+ */
+function printDateIssues(stdout, report, verbose) {
+	const changes = Array.isArray(report.changes) ? report.changes : [];
+	for (const change of changes) {
+		const issues = Array.isArray(change?.dateIssues) ? change.dateIssues : [];
+		for (const issue of issues) {
+			if (issue.advisory === true && !verbose) {
+				continue;
+			}
+			stdout(`${issue.advisory === true ? "advisory" : "drift"}: ${change.file || "<unknown-file>"}: ${issue.message}`);
+		}
+	}
+}
+
+/**
  * Executes CLI flow and returns process-like exit code.
  * @param {string[]} argv - CLI arguments.
  * @param {{
@@ -256,11 +383,26 @@ export async function runCli(argv, deps = {}) {
 		}
 
 		const finalOptions = await applyConfigFile(parsed.options);
-		const result = await runner(finalOptions);
+		const result = await runner(parsed.diff ? { ...finalOptions, sampleOutput: true } : finalOptions);
+		const checkReport =
+			result && typeof result === "object" && /** @type {{check?: boolean}} */ (result).check === true
+				? /** @type {{filesScanned?: number, filesWithDateDrift?: number, dateAdvisories?: number, changes?: Array<{file?: string, dateIssues?: Array<{advisory?: boolean, message?: string}>}>}} */ (
+						result
+					)
+				: null;
+		const exitCode = checkReport && Number(checkReport.filesWithDateDrift) > 0 ? 1 : 0;
 
 		if (parsed.json) {
 			stdout(JSON.stringify(result, null, 2));
-			return 0;
+			return exitCode;
+		}
+
+		if (checkReport) {
+			stdout(
+				`fix-headers check: scanned=${checkReport.filesScanned ?? 0}, drift=${checkReport.filesWithDateDrift ?? 0}, advisories=${checkReport.dateAdvisories ?? 0}`
+			);
+			printDateIssues(stdout, checkReport, finalOptions.verbose === true);
+			return exitCode;
 		}
 
 		if (result && typeof result === "object") {
@@ -268,19 +410,9 @@ export async function runCli(argv, deps = {}) {
 			stdout(
 				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}, dryRun=${report.dryRun === true}`
 			);
-			if (finalOptions.verbose === true) {
-				printChangedFiles(stdout, result);
-			}
-			if (finalOptions.sampleOutput === true) {
-				printSampleOutput(stdout, result);
-			}
+			printDetails(stdout, result, finalOptions, parsed.diff);
 		} else {
-			if (finalOptions.verbose === true) {
-				printChangedFiles(stdout, result);
-			}
-			if (finalOptions.sampleOutput === true) {
-				printSampleOutput(stdout, result);
-			}
+			printDetails(stdout, result, finalOptions, parsed.diff);
 			stdout("fix-headers complete");
 		}
 		return 0;

@@ -13,19 +13,36 @@
 
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { applyConfigOption } from "../config/load.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
+import {
+	checkHeaderDates,
+	convertDatePayload,
+	dateYear,
+	normalizeDatePayload,
+	repairDateEpoch,
+	resolveCreatedDate
+} from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
+import { compareHeaderFields } from "../header/fields.mjs";
 import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
+import { createUnifiedDiff } from "../utils/diff.mjs";
 import { readFileDates } from "../utils/fs.mjs";
 import { getGitCreationDate, getGitLastModifiedDate } from "../utils/git.mjs";
-import { toDatePayload } from "../utils/time.mjs";
+import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
 
 /**
  * @typedef {{
  *  cwd?: string,
  *  input?: string,
  *  dryRun?: boolean,
+ *  check?: boolean,
+ *  fixCreatedDate?: boolean,
+ *  strictCreatedDate?: boolean,
+ *  normalizeDateFormat?: boolean,
+ *  timezone?: string,
+ *  convertTimezone?: boolean,
  *  configFile?: string,
  *  sampleOutput?: boolean,
  *  forceAuthorUpdate?: boolean,
@@ -34,7 +51,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
  *  detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>,
- *  includeFolders?: string[],
+ *  includeFolders?: Array<string | { path: string, recursive?: boolean }>,
  *  excludeFolders?: string[],
  *  includeExtensions?: string[],
  *  gitignore?: boolean | string | string[],
@@ -51,30 +68,69 @@ import { toDatePayload } from "../utils/time.mjs";
  */
 
 /**
+ * @typedef {import("../header/fields.mjs").HeaderFieldIssue} HeaderFieldIssue
+ */
+
+/**
+ * Rewrites a header date payload (format or zone), keeping its instant.
+ * @typedef {(payload: {date: string, timestamp: number}) => {date: string, timestamp: number}} DateRewrite
+ */
+
+/**
+ * Result of a run. With `sampleOutput: true`, each changed entry carries a `sample`:
+ * - `previousValue` / `newValue` - the header block before (null when the file had none) and after.
+ * - `diff` - a unified diff of the header block (`--- a/<file>` / `+++ b/<file>`, `/dev/null`
+ *   when there was no previous header), with hunk line numbers relative to the file.
+ * - `issues` - one `{ field, previous, detected }` entry per header field whose written value
+ *   differs from the existing header. Values are the field text as written in the header
+ *   (dates keep their `date (timestamp)` form; `previous` is null when the field was missing).
+ *   Fields fix-headers preserves - the original `@Author`/`@Email` and `@Last modified by`
+ *   identity, unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set - are compared
+ *   against what is actually written, so they only appear when they really change. Because an
+ *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
+ *   changed file that already had a header.
+ * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
+ *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
+ *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
+ *   (null when nothing provides one, and the line then carries none), and `companyNameSource`
+ *   says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }`
+ *   or `{ from: "none" }`. `copyrightStartYear` is the start year written for the file, and
+ *   `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or
+ *   `"created-date"` (the year of the file's `@Date`).
+ *
+ * `metadata.copyrightStartYear` is the `copyrightStartYear` option, or null when it is not set.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
+ *   projectNameSource: import("../detect/project.mjs").ProjectNameSource,
  *   language: string,
  *   projectRoot: string,
  *   marker: string | null,
  *   authorName: string,
  *   authorEmail: string,
- *   companyName: string,
- *   copyrightStartYear: number
+ *   companyName: string | null,
+ *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
+ *   copyrightStartYear: number | null
  *  },
  *  detectedProjects: string[],
  *  filesScanned: number,
  *  filesUpdated: number,
  *  dryRun: boolean,
- *  changes: Array<{file: string, changed: boolean, sample?: { previousValue: string | null, newValue: string, detectedValues?: {
+ *  check: boolean,
+ *  filesWithDateDrift?: number,
+ *  dateAdvisories?: number,
+ *  changes: Array<{file: string, changed: boolean, dateIssues?: import("../header/dates.mjs").DateCheckIssue[], sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
  *   projectName: string,
+ *   projectNameSource: import("../detect/project.mjs").ProjectNameSource,
  *   language: string,
  *   projectRoot: string,
  *   marker: string | null,
  *   authorName: string,
  *   authorEmail: string,
- *   companyName: string,
+ *   companyName: string | null,
+ *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
  *   copyrightStartYear: number,
+ *   copyrightStartYearSource: "option" | "created-date",
  *   createdAtSource: string,
  *   lastModifiedAtSource: string,
  *   createdAt: {date: string, timestamp: number},
@@ -84,35 +140,13 @@ import { toDatePayload } from "../utils/time.mjs";
  */
 
 /**
- * Resolves runtime options including optional JSON config file loading.
+ * Resolves runtime options including optional JSON config file loading (with `extends`).
+ * Options passed directly win over everything from the config file.
  * @param {FixHeadersOptions} options - Runtime options.
  * @returns {Promise<FixHeadersOptions>} Effective runtime options.
  */
-async function resolveRuntimeOptions(options) {
-	const configFile = typeof options.configFile === "string" && options.configFile.trim().length > 0 ? options.configFile.trim() : null;
-
-	if (!configFile) {
-		return options;
-	}
-
-	const baseCwd = typeof options.cwd === "string" && options.cwd.length > 0 ? options.cwd : process.cwd();
-	const absoluteConfigPath = resolve(baseCwd, configFile);
-	const raw = await readFile(absoluteConfigPath, "utf8");
-	const parsed = JSON.parse(raw);
-
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new Error(`Config file must contain a JSON object: ${configFile}`);
-	}
-
-	const merged = {
-		...parsed,
-		...options
-	};
-
-	delete merged.configFile;
-	/** @type {FixHeadersOptions} */
-	const output = merged;
-	return output;
+function resolveRuntimeOptions(options) {
+	return applyConfigOption(options, "configFile");
 }
 
 /**
@@ -200,14 +234,34 @@ function extractHeaderLastModifiedAt(headerText) {
  */
 export async function fixHeaders(options = {}) {
 	const effectiveOptions = await resolveRuntimeOptions(options);
+	const timeZone =
+		effectiveOptions.timezone === undefined || effectiveOptions.timezone === null ? null : assertTimeZone(effectiveOptions.timezone);
+	const convertTimezone = effectiveOptions.convertTimezone === true;
+	if (convertTimezone && !timeZone) {
+		throw new Error(
+			"convertTimezone requires timezone: set timezone (CLI --timezone <name>) to the IANA zone to convert header dates into"
+		);
+	}
 	const scanRoot = resolve(effectiveOptions.projectRoot || effectiveOptions.cwd || process.cwd());
 	const metadata = await resolveProjectMetadata({
 		...effectiveOptions,
 		cwd: scanRoot
 	});
-	const dryRun = effectiveOptions.dryRun === true;
+	const check = effectiveOptions.check === true;
+	const dryRun = check || effectiveOptions.dryRun === true;
+	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
+	/** @type {DateRewrite} */
+	const keepDate = (payload) => payload;
+	/** @type {DateRewrite} */
+	const formatDate = effectiveOptions.normalizeDateFormat === true ? normalizeDatePayload : keepDate;
+	// Dates taken from git, the filesystem, or the clock are written in `timezone`; dates already
+	// in a header are only moved into it by the `convertTimezone` sweep. Either way the instant is kept.
+	/** @type {DateRewrite} */
+	const toZone = timeZone ? (payload) => convertDatePayload(payload, timeZone) : keepDate;
+	const toZoneIfSweeping = convertTimezone ? toZone : keepDate;
 
-	let files = [];
+	/** @type {string[]} */
+	let files;
 	if (typeof effectiveOptions.input === "string" && effectiveOptions.input.trim().length > 0) {
 		const inputPath = resolve(scanRoot, effectiveOptions.input);
 		const targetStats = await stat(inputPath).catch(() => null);
@@ -249,6 +303,8 @@ export async function fixHeaders(options = {}) {
 	const changes = [];
 	const detectedProjects = new Set();
 	let filesUpdated = 0;
+	let filesWithDateDrift = 0;
+	let dateAdvisories = 0;
 
 	for (const filePath of files) {
 		const fileMetadata = await resolveProjectMetadata({
@@ -277,14 +333,32 @@ export async function fixHeaders(options = {}) {
 		const gitCreated = await getGitCreationDate(fileMetadata.projectRoot, metadataRelativePath);
 		const gitLastUpdated = await getGitLastModifiedDate(fileMetadata.projectRoot, metadataRelativePath);
 
-		const createdAtSource = existingCreatedAt ? "existing-header" : gitCreated ? "git-created" : "filesystem-created";
-		const comparisonLastModifiedAtSource = existingLastModifiedAt
+		// An epoch that disagrees with its own datetime text is recomputed from the text. @Date is
+		// "oldest wins": see resolveCreatedDate.
+		const filesystemCreatedAt = toDatePayload(filesystemDates.createdAt);
+		const resolvedCreatedAt = resolveCreatedDate({
+			existing: repairDateEpoch(existingCreatedAt),
+			gitCreated,
+			filesystemCreated: filesystemCreatedAt,
+			fixCreatedDate
+		});
+		const repairedLastModifiedAt = repairDateEpoch(existingLastModifiedAt);
+		const createdAtSource = resolvedCreatedAt.source;
+		const comparisonLastModifiedAtSource = repairedLastModifiedAt
 			? "existing-header"
 			: gitLastUpdated
 				? "git-last-modified"
 				: "filesystem-updated";
-		const createdAt = existingCreatedAt || gitCreated || toDatePayload(filesystemDates.createdAt);
-		const comparisonLastModifiedAt = existingLastModifiedAt || gitLastUpdated || toDatePayload(filesystemDates.updatedAt);
+		const createdAt = formatDate(
+			createdAtSource === "existing-header" ? toZoneIfSweeping(resolvedCreatedAt.payload) : toZone(resolvedCreatedAt.payload)
+		);
+		// Without the copyrightStartYear option, the start year is the year of the @Date written,
+		// read in the zone it is written in: `timezone` when set, else the date's own offset.
+		const copyrightStartYearSource = fileMetadata.copyrightStartYear === null ? "created-date" : "option";
+		const copyrightStartYear = fileMetadata.copyrightStartYear ?? dateYear(createdAt, timeZone);
+		const comparisonLastModifiedAt = formatDate(
+			repairedLastModifiedAt ? toZoneIfSweeping(repairedLastModifiedAt) : toZone(gitLastUpdated || toDatePayload(filesystemDates.updatedAt))
+		);
 		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
 		const shouldForceLastModifiedAuthorUpdate = effectiveOptions.forceLastModifiedAuthorUpdate === true;
 
@@ -311,7 +385,7 @@ export async function fixHeaders(options = {}) {
 			authorEmail: fileMetadata.authorEmail,
 			createdAt,
 			lastModifiedAt: comparisonLastModifiedAt,
-			copyrightStartYear: fileMetadata.copyrightStartYear,
+			copyrightStartYear,
 			companyName: fileMetadata.companyName,
 			currentYear
 		});
@@ -323,7 +397,7 @@ export async function fixHeaders(options = {}) {
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		});
 		const needsUpdate = comparisonReplacement.changed;
-		const finalLastModifiedAt = needsUpdate ? toDatePayload(new Date()) : comparisonLastModifiedAt;
+		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
 
 		const header = needsUpdate
@@ -350,7 +424,7 @@ export async function fixHeaders(options = {}) {
 					authorEmail: fileMetadata.authorEmail,
 					createdAt,
 					lastModifiedAt: finalLastModifiedAt,
-					copyrightStartYear: fileMetadata.copyrightStartYear,
+					copyrightStartYear,
 					companyName: fileMetadata.companyName,
 					currentYear
 				})
@@ -364,24 +438,49 @@ export async function fixHeaders(options = {}) {
 					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 				})
 			: comparisonReplacement;
+		/** @type {FixHeadersResult["changes"][number]} */
 		const changeEntry = {
 			file: relativePath,
 			changed: replacement.changed
 		};
 
+		if (check) {
+			const dateIssues = checkHeaderDates(
+				existingHeaderText,
+				{ gitCreated, gitLastModified: gitLastUpdated, filesystemCreated: filesystemCreatedAt },
+				{ strictCreatedDate: effectiveOptions.strictCreatedDate === true }
+			);
+			const advisoryCount = dateIssues.filter((issue) => issue.advisory).length;
+			changeEntry.dateIssues = dateIssues;
+			dateAdvisories += advisoryCount;
+			filesWithDateDrift += dateIssues.length > advisoryCount ? 1 : 0;
+		}
+
 		if (effectiveOptions.sampleOutput === true && replacement.changed) {
+			const previousValue = existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null;
+			const diffPath = relativePath.replace(/\\/g, "/");
+			const headerLineOffset = replacement.nextContent.slice(0, replacement.nextContent.indexOf(header)).split("\n").length - 1;
 			changeEntry.sample = {
-				previousValue: existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null,
+				previousValue,
 				newValue: header,
+				diff: createUnifiedDiff(previousValue, header, {
+					fromFile: `a/${diffPath}`,
+					toFile: `b/${diffPath}`,
+					lineOffset: headerLineOffset
+				}),
+				issues: compareHeaderFields(previousValue, header),
 				detectedValues: {
 					projectName: fileMetadata.projectName,
+					projectNameSource: fileMetadata.projectNameSource,
 					language: fileMetadata.language,
 					projectRoot: fileMetadata.projectRoot,
 					marker: fileMetadata.marker,
 					authorName: fileMetadata.authorName,
 					authorEmail: fileMetadata.authorEmail,
 					companyName: fileMetadata.companyName,
-					copyrightStartYear: fileMetadata.copyrightStartYear,
+					companyNameSource: fileMetadata.companyNameSource,
+					copyrightStartYear,
+					copyrightStartYearSource,
 					createdAtSource,
 					lastModifiedAtSource,
 					createdAt,
@@ -408,6 +507,8 @@ export async function fixHeaders(options = {}) {
 		filesScanned: files.length,
 		filesUpdated,
 		dryRun,
+		check,
+		...(check ? { filesWithDateDrift, dateAdvisories } : {}),
 		changes
 	};
 }

@@ -23,8 +23,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -94,7 +94,16 @@ describe("header/template + parser", () => {
 		const NEW = "/**\n *\t@Project: new\n */";
 
 		it("preserves the body when an existing `**/` header precedes a `*/` inside a // comment", () => {
-			const content = ["/**", " *\t@Project: old", " **/", "", "{", '\t"compilerOptions": { "x": true } // see /** @internal */ note', "}", ""].join("\n");
+			const content = [
+				"/**",
+				" *\t@Project: old",
+				" **/",
+				"",
+				"{",
+				'\t"compilerOptions": { "x": true } // see /** @internal */ note',
+				"}",
+				""
+			].join("\n");
 			const { nextContent } = replaceOrInsertHeader(content, NEW, "/repo/tsconfig.jsonc");
 			expect(nextContent).toContain("@Project: new");
 			expect(nextContent).not.toContain("@Project: old");
@@ -173,8 +182,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -193,8 +202,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -212,8 +221,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -241,8 +250,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -271,8 +280,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026
@@ -298,8 +307,8 @@ describe("header/template + parser", () => {
 			projectName: "my-project",
 			authorName: "Test Author",
 			authorEmail: "test@example.com",
-			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1735689600 },
-			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1735776000 },
+			createdAt: { date: "2026-01-01 00:00:00 +00:00", timestamp: 1767225600 },
+			lastModifiedAt: { date: "2026-01-02 00:00:00 +00:00", timestamp: 1767312000 },
 			copyrightStartYear: 2013,
 			companyName: "Catalyzed Motivation Inc.",
 			currentYear: 2026

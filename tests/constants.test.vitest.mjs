@@ -12,14 +12,21 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_COMPANY_NAME, DEFAULT_IGNORE_FOLDERS, DEFAULT_MAX_HEADER_SCAN_LINES, DETECTOR_PROFILES } from "../src/constants.mjs";
+import * as constants from "../src/constants.mjs";
+import { DEFAULT_MAX_HEADER_SCAN_LINES, DETECTOR_PROFILES } from "../src/constants.mjs";
 
 describe("constants", () => {
 	it("exports expected defaults", () => {
-		expect(DEFAULT_COMPANY_NAME).toBe("Catalyzed Motivation Inc.");
 		expect(DEFAULT_MAX_HEADER_SCAN_LINES).toBe(200);
-		expect(DEFAULT_IGNORE_FOLDERS.has("node_modules")).toBe(true);
 		expect(DETECTOR_PROFILES.some((profile) => profile.id === "node")).toBe(true);
 		expect(DETECTOR_PROFILES.some((profile) => profile.id === "json")).toBe(true);
+	});
+
+	it("exports no default copyright holder: it comes from the project's manifests (issue #90)", () => {
+		expect(constants).not.toHaveProperty("DEFAULT_COMPANY_NAME");
+	});
+
+	it("exports no hard-coded ignore folders: ignore files decide what discovery skips (issue #71)", () => {
+		expect(Object.keys(constants).filter((name) => name.includes("IGNORE"))).toEqual([]);
 	});
 });

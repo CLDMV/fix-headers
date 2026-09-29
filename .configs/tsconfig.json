@@ -16,6 +16,6 @@
 		"resolveJsonModule": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["../index.mjs", "../src/**/*.mjs", "../src/*.mjs"],
+	"include": ["../src/**/*.mjs", "../src/*.mjs"],
 	"exclude": ["../node_modules", "../tests", "../coverage"]
 }

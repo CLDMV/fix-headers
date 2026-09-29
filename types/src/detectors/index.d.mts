@@ -61,17 +61,39 @@ export function getPreservedPrefixForFile(filePath: string, content: string, opt
     enabledDetectors?: string[];
     disabledDetectors?: string[];
 }): string;
+/**
+ * @fileoverview Detector registry and shared selector helpers.
+ * @module fix-headers/detectors
+ */
+/**
+ * @typedef {{
+ *  id: string,
+ *  extensions: string[],
+ *  enabledByDefault: boolean,
+ *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
+ *  resolvePreservedPrefix?: (filePath: string, content: string) => string
+ * }} DetectorProfile
+ * A file-type detector: which extensions it handles and the comment syntax (and preserved
+ * leading prefix) of those files. Which project a file belongs to is resolved separately,
+ * from the manifest drivers in `src/drivers/`.
+ */
+/**
+ * Registered detector profiles, in alphabetical order by module name. Imported
+ * statically (not discovered from the directory at runtime) so the registry
+ * survives bundling into dist/. Add a new detector module here. The cast keeps the
+ * public type `DetectorProfile[]`: the detector modules' object literals widen their
+ * `kind` strings, which the typedef narrows to its literal union.
+ */
 export const DETECTOR_PROFILES: DetectorProfile[];
+/**
+ * A file-type detector: which extensions it handles and the comment syntax (and preserved
+ * leading prefix) of those files. Which project a file belongs to is resolved separately,
+ * from the manifest drivers in `src/drivers/`.
+ */
 export type DetectorProfile = {
     id: string;
-    markers: string[];
     extensions: string[];
     enabledByDefault: boolean;
-    findNearestConfig: (startPath: string) => Promise<{
-        root: string;
-        marker: string;
-    } | null>;
-    parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string;
     resolveCommentSyntax: (filePath: string) => ({
         kind: "block" | "line" | "html";
         linePrefix?: string;
@@ -81,5 +103,4 @@ export type DetectorProfile = {
         blockEnd?: string;
     } | null);
     resolvePreservedPrefix?: (filePath: string, content: string) => string;
-    priority?: number;
 };

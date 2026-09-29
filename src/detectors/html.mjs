@@ -12,24 +12,13 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
 
 /**
  * @fileoverview HTML detector implementation.
  * @module fix-headers/detectors/html
  */
 
-const markers = ["index.html", "vite.config.js", "vite.config.mjs", "next.config.js", "next.config.mjs"];
 const extensions = [".html", ".htm"];
-
-/**
- * Parses HTML project name from marker context.
- * @param {string} rootDirName - Fallback directory name.
- * @returns {string} Project name.
- */
-function parseHtmlProjectName(rootDirName) {
-	return rootDirName;
-}
 
 /**
  * Resolves HTML comment syntax for HTML-like files.
@@ -51,16 +40,8 @@ function resolveHtmlCommentSyntax(filePath) {
 
 export const detector = {
 	id: "html",
-	priority: 70,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	parseProjectName(_marker, _markerContent, rootDirName) {
-		return parseHtmlProjectName(rootDirName);
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveHtmlCommentSyntax(filePath);
 	}

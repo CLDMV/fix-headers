@@ -5,16 +5,19 @@
  * @returns {{
  *  options: Record<string, unknown>,
  *  help: boolean,
- *  json: boolean
+ *  json: boolean,
+ *  diff: boolean
  * }} Parsed CLI payload.
  */
 export function parseCliArgs(argv: string[]): {
     options: Record<string, unknown>;
     help: boolean;
     json: boolean;
+    diff: boolean;
 };
 /**
- * Loads extra options from a JSON config file.
+ * Loads extra options from the JSON config file named by `--config` (and everything it
+ * `extends`); options given on the command line win over the file.
  * @param {Record<string, unknown>} options - Current options object.
  * @returns {Promise<Record<string, unknown>>} Merged options object.
  */
@@ -42,3 +45,18 @@ export function runCli(argv: string[], deps?: {
  * @returns {boolean} Whether the entrypoint branch was executed.
  */
 export function runCliAsMain(argv?: string[], moduleUrl?: string, executor?: (args: string[]) => Promise<number>): boolean;
+export type CliChangeEntry = {
+    file?: string;
+    changed?: boolean;
+    sample?: {
+        previousValue?: string | null;
+        newValue?: string;
+        diff?: string;
+        issues?: Array<{
+            field?: string;
+            previous?: string | null;
+            detected?: string | null;
+        }>;
+        detectedValues?: Record<string, unknown>;
+    };
+};

@@ -22,116 +22,70 @@ import { cleanupWorkspace, createIsolatedWorkspace, createWorkspace, writeWorksp
 const execFileAsync = promisify(execFile);
 
 describe("project metadata edge branches", () => {
-	it("skips detectors missing findNearestConfig and prefers deeper roots", async () => {
-		const detectorWithoutFinder = {
-			id: "no-finder",
-			extensions: [".mjs"],
-			parseProjectName() {
-				return "ignored";
-			}
-		};
-
-		const shallowDetector = {
-			id: "shallow",
-			extensions: [".mjs"],
-			priority: 1,
-			async findNearestConfig() {
-				return {
-					root: "/srv/repos/fix-headers",
-					marker: "missing-a.marker"
-				};
+	/**
+	 * Builds a fake manifest driver that claims the given folders.
+	 * @param {string} id - Driver id.
+	 * @param {Record<string, string | undefined>} claimed - Folder → name its manifest provides.
+	 * @param {string[]} [languages=[]] - Native file-type detector ids.
+	 * @returns {import("../src/drivers/index.mjs").ManifestDriver} Driver.
+	 */
+	function fakeDriver(id, claimed, languages = []) {
+		return {
+			id,
+			languages,
+			manifests: [`${id}.manifest`],
+			async detect(dirPath) {
+				return dirPath in claimed ? { dir: dirPath, manifest: `${id}.manifest`, files: [{ file: `${id}.manifest`, content: "" }] } : null;
 			},
-			parseProjectName() {
-				return "shallow";
+			read(detection) {
+				return { name: claimed[detection.dir] };
 			}
 		};
+	}
 
-		const deepDetector = {
-			id: "deep",
-			extensions: [".mjs"],
-			priority: 0,
-			async findNearestConfig() {
-				return {
-					root: "/srv/repos/fix-headers/src",
-					marker: "missing-b.marker"
-				};
-			},
-			parseProjectName() {
-				return "deep";
-			}
-		};
+	it("takes the root from the nearest folder any driver claims", async () => {
+		const shallow = fakeDriver("shallow", { "/fix-headers-no-such-dir": "shallow-name" });
+		const deep = fakeDriver("deep", { "/fix-headers-no-such-dir/src": "deep-name" });
 
-		const detected = await detectProjectFromMarkers("/srv/repos/fix-headers", {
-			detectors: [detectorWithoutFinder, shallowDetector, deepDetector],
-			preferredExtension: ".mjs"
-		});
+		const detected = await detectProjectFromMarkers("/fix-headers-no-such-dir/src/core", { drivers: [shallow, deep] });
 
 		expect(detected.language).toBe("deep");
-		expect(detected.rootDir).toBe("/srv/repos/fix-headers/src");
-		expect(detected.projectName).toBe("deep");
+		expect(detected.rootDir).toBe("/fix-headers-no-such-dir/src");
+		expect(detected.projectName).toBe("deep-name");
+		expect(detected.marker).toBe("deep.manifest");
+		expect(detected.drivers).toEqual(["deep"]);
 	});
 
-	it("handles non-string preferredExtension and non-finite detector priorities", async () => {
-		const lowPriority = {
-			id: "low",
-			extensions: [".mjs"],
-			priority: Number.NaN,
-			async findNearestConfig() {
-				return {
-					root: "/srv/repos/fix-headers",
-					marker: "missing-low.marker"
-				};
-			},
-			parseProjectName() {
-				return "low";
-			}
-		};
+	it("reads the native driver first and ignores a non-string preferredExtension", async () => {
+		const first = fakeDriver("first", { "/fix-headers-no-such-dir": "first-name" });
+		const native = fakeDriver("native", { "/fix-headers-no-such-dir": "native-name" }, ["node"]);
 
-		const highPriority = {
-			id: "high",
-			extensions: [".mjs"],
-			priority: undefined,
-			async findNearestConfig() {
-				return {
-					root: "/srv/repos/fix-headers",
-					marker: "missing-high.marker"
-				};
-			},
-			parseProjectName() {
-				return "high";
-			}
-		};
-
-		const detected = await detectProjectFromMarkers("/srv/repos/fix-headers", {
-			detectors: [lowPriority, highPriority],
-			preferredExtension: 123
-		});
-
-		expect(detected.language).toBe("low");
-		expect(detected.projectName).toBe("low");
-	});
-
-	it("falls back to project name when located root basename is empty", async () => {
-		const rootDetector = {
-			id: "root",
-			extensions: [".mjs"],
-			async findNearestConfig() {
-				return {
-					root: "/",
-					marker: "missing-root.marker"
-				};
-			},
-			parseProjectName(_marker, _content, rootDirName) {
-				return rootDirName;
-			}
-		};
-
-		const detected = await detectProjectFromMarkers("/srv/repos/fix-headers", {
-			detectors: [rootDetector],
+		const nativeFirst = await detectProjectFromMarkers("/fix-headers-no-such-dir", {
+			drivers: [first, native],
 			preferredExtension: ".mjs"
 		});
+		expect(nativeFirst.language).toBe("node");
+		expect(nativeFirst.projectName).toBe("native-name");
+		expect(nativeFirst.drivers).toEqual(["native", "first"]);
+
+		const registryOrder = await detectProjectFromMarkers("/fix-headers-no-such-dir", { drivers: [first, native], preferredExtension: 123 });
+		expect(registryOrder.language).toBe("first");
+		expect(registryOrder.projectName).toBe("first-name");
+
+		const noDetector = await detectProjectFromMarkers("/fix-headers-no-such-dir", {
+			drivers: [first, native],
+			preferredExtension: ".unknown-ext"
+		});
+		expect(noDetector.language).toBe("first");
+	});
+
+	it("falls back to project name when the claimed root is the filesystem root", async () => {
+		const rootDriver = fakeDriver("root", { "/": undefined });
+
+		const detected = await detectProjectFromMarkers("/fix-headers-no-such-dir", { drivers: [rootDriver] });
 
 		expect(detected.projectName).toBe("project");
+		expect(detected.projectNameSource).toEqual({ from: "folder", dir: "/" });
 		expect(detected.rootDir).toBe("/");
 	});
 
@@ -262,7 +216,7 @@ describe("project metadata edge branches", () => {
 				useGpgSignerAuthor: true
 			});
 
-			expect(metadata.authorName).toBe("Signer Name (2026 Laptop)");
+			expect(metadata.authorName).toBe("Signer Name");
 			expect(metadata.authorEmail).toBe("configured@example.com");
 		} finally {
 			process.env.PATH = previousPath;

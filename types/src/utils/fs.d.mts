@@ -30,17 +30,24 @@ export function readTextIfExists(filePath: string): Promise<string | null>;
  * @param {{
  *  allowedExtensions: Set<string>,
  *  ignoreFolders: Set<string>,
- *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean
- * }} options - Scan options.
+ *  shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean | Promise<boolean>,
+ *  recursive?: boolean
+ * }} options - Scan options. `recursive: false` lists only the directory's own files.
+ *  `shouldSkipDirectory` may be async. Symlinked directories are never followed.
  * @returns {Promise<string[]>} Matching file paths.
  */
 export function walkFiles(dirPath: string, options: {
     allowedExtensions: Set<string>;
     ignoreFolders: Set<string>;
-    shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean;
+    shouldSkipDirectory?: (directoryPath: string, directoryName: string) => boolean | Promise<boolean>;
+    recursive?: boolean;
 }): Promise<string[]>;
 /**
  * Gets creation-like and modified timestamps from filesystem stats.
+ * The creation time is the earlier of the birth time and the modification time: content last
+ * written at `mtime` existed by then, so `mtime` bounds creation even when the birth time is
+ * later (an archive extraction or `cp -p` keeps the source's `mtime` but gets a new birth time).
+ * Where the platform reports no birth time (`birthtimeMs` 0), `mtime` is used.
  * @param {string} filePath - Absolute file path.
  * @returns {Promise<{createdAt: Date, updatedAt: Date}>} Date pair.
  */
