@@ -13,6 +13,9 @@ import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { walkFiles } from "../src/utils/fs.mjs";
 import { cleanupWorkspace, createWorkspace } from "./helpers/workspace.mjs";
 
+/** A full CLI run looks up git history for every file, too slow for vitest's 5s default under load. */
+const CLI_RUN_TIMEOUT = { timeout: 30_000 };
+
 /** @type {string[]} */
 const workspaces = [];
 
@@ -167,7 +170,7 @@ describe("--include-folder-non-recursive CLI flag", () => {
 		expect(output.join("\n")).toContain("--include-folder-non-recursive <path>");
 	});
 
-	it("scans root files once next to a recursive include of the same folder", async () => {
+	it("scans root files once next to a recursive include of the same folder", CLI_RUN_TIMEOUT, async () => {
 		const root = await fixture();
 		/** @type {string[]} */
 		const output = [];
@@ -194,7 +197,7 @@ describe("--include-folder-non-recursive CLI flag", () => {
 		expect(JSON.parse(output.join("\n")).filesScanned).toBe(5);
 	});
 
-	it("scans only root files when it is the only include", async () => {
+	it("scans only root files when it is the only include", CLI_RUN_TIMEOUT, async () => {
 		const root = await fixture();
 		/** @type {string[]} */
 		const output = [];
