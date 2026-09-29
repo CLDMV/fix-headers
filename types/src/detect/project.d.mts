@@ -1,37 +1,4 @@
 /**
- *	@Project: @cldmv/fix-headers
- *	@Filename: /src/detect/project.mjs
- *	@Date: 2026-03-01 13:32:57 -08:00 (1772400777)
- *	@Author: Nate Corcoran <CLDMV>
- *	@Email: <Shinrai@users.noreply.github.com>
- *	-----
- *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
- *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-export type ProjectNameSource = {
-    from: "manifest";
-    driver: string;
-    manifest: string;
-    dir: string;
-} | {
-    from: "folder";
-    dir: string;
-} | {
-    from: "option";
-};
-export type CompanyNameSource = {
-    from: "manifest";
-    driver: string;
-    manifest: string;
-    dir: string;
-} | {
-    from: "option";
-} | {
-    from: "none";
-};
-/**
  * Detects the project a path belongs to from the manifests of the project it sits in (see
  * {@link resolveManifestProject}), independent of the file's type.
  *
@@ -54,7 +21,7 @@ export type CompanyNameSource = {
  *  drivers: string[]
  * }>} Detection result.
  */
-export declare function detectProjectFromMarkers(cwd: string, options?: {
+export function detectProjectFromMarkers(cwd: string, options?: {
     detectors?: {
         id: string;
         extensions: string[];
@@ -106,7 +73,7 @@ export declare function detectProjectFromMarkers(cwd: string, options?: {
  * }>} Final metadata. `companyName` is the `companyName` option when it is set, else the
  * holder the project's manifests provide, else null (no holder on the `@Copyright` line).
  */
-export declare function resolveProjectMetadata(options?: {
+export function resolveProjectMetadata(options?: {
     cwd?: string;
     targetFilePath?: string;
     enabledDetectors?: string[];
@@ -133,3 +100,33 @@ export declare function resolveProjectMetadata(options?: {
     companyNameSource: CompanyNameSource;
     copyrightStartYear: number;
 }>;
+/**
+ * Where `projectName` came from: a manifest (the driver, its manifest and the folder it sits
+ * in), the project root's folder name, or the `projectName` option.
+ */
+export type ProjectNameSource = {
+    from: "manifest";
+    driver: string;
+    manifest: string;
+    dir: string;
+} | {
+    from: "folder";
+    dir: string;
+} | {
+    from: "option";
+};
+/**
+ * Where `companyName` (the `@Copyright` holder) came from: a manifest's author (the driver, its
+ * manifest and the folder it sits in), the `companyName` option, or nothing (`companyName` is
+ * null and the `@Copyright` line carries no holder).
+ */
+export type CompanyNameSource = {
+    from: "manifest";
+    driver: string;
+    manifest: string;
+    dir: string;
+} | {
+    from: "option";
+} | {
+    from: "none";
+};
