@@ -30,15 +30,14 @@ import { detector as yamlDetector } from "./yaml.mjs";
 /**
  * @typedef {{
  *  id: string,
- *  markers: string[],
  *  extensions: string[],
  *  enabledByDefault: boolean,
- *  findNearestConfig: (startPath: string) => Promise<{root: string, marker: string} | null>,
- *  parseProjectName: (marker: string, markerContent: string, rootDirName: string) => string,
  *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
- *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
- *  priority?: number
+ *  resolvePreservedPrefix?: (filePath: string, content: string) => string
  * }} DetectorProfile
+ * A file-type detector: which extensions it handles and the comment syntax (and preserved
+ * leading prefix) of those files. Which project a file belongs to is resolved separately,
+ * from the manifest drivers in `src/drivers/`.
  */
 
 /**

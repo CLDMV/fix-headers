@@ -12,33 +12,13 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
 
 /**
  * @fileoverview JSON-family detector implementation.
  * @module fix-headers/detectors/json
  */
 
-const markers = ["package.json"];
 const extensions = [".jsonv", ".jsonc", ".json5"];
-
-/**
- * Parses project name from package marker content.
- * @param {string} markerContent - Marker file content.
- * @param {string} rootDirName - Fallback root directory name.
- * @returns {string} Project name.
- */
-function parseJsonProjectName(markerContent, rootDirName) {
-	try {
-		const parsed = JSON.parse(markerContent);
-		if (typeof parsed.name === "string" && parsed.name.trim().length > 0) {
-			return parsed.name.trim();
-		}
-		return rootDirName;
-	} catch {
-		return rootDirName;
-	}
-}
 
 /**
  * Resolves comment syntax for JSON-family file extensions.
@@ -60,16 +40,8 @@ function resolveJsonCommentSyntax(filePath) {
 
 export const detector = {
 	id: "json",
-	priority: 95,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	parseProjectName(_marker, markerContent, rootDirName) {
-		return parseJsonProjectName(markerContent, rootDirName);
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveJsonCommentSyntax(filePath);
 	}

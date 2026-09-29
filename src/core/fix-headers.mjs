@@ -74,10 +74,13 @@ import { toDatePayload } from "../utils/time.mjs";
  *   against what is actually written, so they only appear when they really change. Because an
  *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
  *   changed file that already had a header.
- * - `detectedValues` - the metadata resolved for the file.
+ * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
+ *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
+ *   `{ from: "folder", dir }` or `{ from: "option" }`.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
+ *   projectNameSource: import("../detect/project.mjs").ProjectNameSource,
  *   language: string,
  *   projectRoot: string,
  *   marker: string | null,
@@ -95,6 +98,7 @@ import { toDatePayload } from "../utils/time.mjs";
  *  dateAdvisories?: number,
  *  changes: Array<{file: string, changed: boolean, dateIssues?: import("../header/dates.mjs").DateCheckIssue[], sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
  *   projectName: string,
+ *   projectNameSource: import("../detect/project.mjs").ProjectNameSource,
  *   language: string,
  *   projectRoot: string,
  *   marker: string | null,
@@ -441,6 +445,7 @@ export async function fixHeaders(options = {}) {
 				issues: compareHeaderFields(previousValue, header),
 				detectedValues: {
 					projectName: fileMetadata.projectName,
+					projectNameSource: fileMetadata.projectNameSource,
 					language: fileMetadata.language,
 					projectRoot: fileMetadata.projectRoot,
 					marker: fileMetadata.marker,

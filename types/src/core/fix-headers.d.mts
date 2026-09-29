@@ -53,6 +53,7 @@ export type HeaderFieldIssue = import("../header/fields.mjs").HeaderFieldIssue;
 export type FixHeadersResult = {
     metadata: {
         projectName: string;
+        projectNameSource: import("../detect/project.mjs").ProjectNameSource;
         language: string;
         projectRoot: string;
         marker: string | null;
@@ -79,6 +80,7 @@ export type FixHeadersResult = {
             issues: HeaderFieldIssue[];
             detectedValues?: {
                 projectName: string;
+                projectNameSource: import("../detect/project.mjs").ProjectNameSource;
                 language: string;
                 projectRoot: string;
                 marker: string | null;

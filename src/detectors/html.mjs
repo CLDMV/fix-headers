@@ -12,16 +12,12 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker, parsePackageJsonName } from "./shared.mjs";
 
 /**
  * @fileoverview HTML detector implementation.
  * @module fix-headers/detectors/html
  */
 
-// package.json first: within one folder the first marker found wins, so a project's manifest
-// takes precedence over an index.html or bundler config sitting next to it.
-const markers = ["package.json", "index.html", "vite.config.js", "vite.config.mjs", "next.config.js", "next.config.mjs"];
 const extensions = [".html", ".htm"];
 
 /**
@@ -44,18 +40,8 @@ function resolveHtmlCommentSyntax(filePath) {
 
 export const detector = {
 	id: "html",
-	priority: 70,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	// Take the name from the project's package.json when there is one; other markers carry no
-	// name, so the folder name is used then.
-	parseProjectName(marker, markerContent, rootDirName) {
-		return marker === "package.json" ? parsePackageJsonName(markerContent, rootDirName) : rootDirName;
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveHtmlCommentSyntax(filePath);
 	}

@@ -10,12 +10,12 @@ Multi-language source header normalizer for Node.js projects.
 
 ## Features
 
-- Auto-detects project type by marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`) and YAML files (`.yaml`, `.yml`)
-- `@Project` is the name from the project's own config file: `package.json` `name` for JS/TS, JSON, YAML, CSS and HTML files; `pyproject.toml` for Python; `Cargo.toml` for Rust; the `go.mod` module for Go; `composer.json` for PHP. The project folder name is used only when there is no such file or it has no name. Override it with `projectName`
+- Finds the project each file belongs to from its manifest (`package.json`, `pyproject.toml` / `setup.cfg` / `setup.py`, `composer.json`, `Cargo.toml`, `go.mod`), whatever the file's type
+- `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSON file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#project-name-and-root)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
-- Supports detector-based monorepo scanning with nearest config resolution per file
+- Supports monorepos: every file resolves its own project from the nearest manifest in its parent tree
 - Supports per-detector syntax overrides for line and block comment tokens
 - Supports both ESM and CJS consumers
 
@@ -108,10 +108,10 @@ Important options:
 - `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
 - `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude
 - `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#which-files-are-processed)). `false`: no ignore files, every file is processed. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
-- `projectName?: string`
-- `language?: string`
-- `projectRoot?: string`
-- `marker?: string | null`
+- `projectName?: string` - the `@Project` value for every file, instead of the manifest name
+- `language?: string` - the reported `language` for every file (does not change comment syntax or project resolution)
+- `projectRoot?: string` - the project root for every file (the base of `@Filename` and of git history lookups) and the scan root
+- `marker?: string | null` - the reported `marker` for every file
 - `authorName?: string`
 - `authorEmail?: string`
 - `company?: string` - appends to `@Author` as `Name <Company>`
@@ -146,6 +146,53 @@ const result = await fixHeaders({
 	copyrightStartYear: 2013
 });
 ```
+
+## Project name and root
+
+Which project a file belongs to depends on the manifests around it, not on the file's type. Comment syntax is the only thing the file's type decides.
+
+Each ecosystem has a manifest driver in `src/drivers/`:
+
+| Driver   | Claims a folder holding                     | Name                                                                                                                      | Native files                  |
+| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `node`   | `package.json`                              | `name`                                                                                                                    | `.js .mjs .cjs .ts .tsx .jsx` |
+| `python` | `pyproject.toml`, `setup.cfg` or `setup.py` | `pyproject.toml` `[project].name`, then `[tool.poetry].name`; `setup.cfg` `[metadata] name`; `setup.py` `setup(name=...)` | `.py`                         |
+| `php`    | `composer.json`                             | `name`                                                                                                                    | `.php`                        |
+| `rust`   | `Cargo.toml`                                | `[package].name`                                                                                                          | `.rs`                         |
+| `go`     | `go.mod`                                    | the `module` path                                                                                                         | `.go`                         |
+
+A manifest claims its folder as soon as it exists and can be read, even when it is malformed or has no name. `requirements.txt` does not claim a folder: it carries no name and often sits in folders that are not projects of their own (`docs/requirements.txt`).
+
+For each file:
+
+1. **Project root.** Walk up from the file's folder. The nearest folder that at least one driver claims is the project root. `@Filename` is the file's path relative to it, and git history (`@Date`, `@Last modified time`) is looked up from it.
+2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSON, …) use the fixed order.
+3. **Per-field fallback.** Each value is taken from the first driver in that order whose manifest provides it. In a folder with a nameless `package.json` and a named `pyproject.toml`, every file gets the `pyproject.toml` name.
+4. **Climbing.** A value no driver at the project root provides is looked up the same way in each ancestor folder a driver claims, up to and including the scan root (`projectRoot`, else `cwd`), never above it. A nameless sub-package therefore takes the name of the repository around it. Only values climb: the project root, and with it `@Filename` and the git lookups, stays the nearest claimed folder.
+5. **Folder name.** When nothing up to the scan root provides a name, `@Project` is the project root's folder name.
+
+A folder holding `.git` is a repository boundary: neither the root search nor the climb goes past it, so a nested repository without a manifest is a project of its own. With no manifest up to the repository root, that repository root is the project root and its folder name is the name. With neither a manifest nor a repository anywhere above the file, the file's own folder is the project root: `@Project` is that folder's name and `@Filename` is `/<file name>`.
+
+`projectName`, `projectRoot`, `language` and `marker` override the detected values for every file.
+
+For example, scanning `repo/`:
+
+```text
+repo/
+├── package.json            { "name": "@scope/repo" }
+├── pyproject.toml          [project] name = "repo-py"
+├── scripts/build.py        → @Project: repo-py        @Filename: /scripts/build.py
+├── site/main.css           → @Project: @scope/repo    @Filename: /site/main.css
+└── packages/
+    ├── a/
+    │   ├── package.json    { "private": true }
+    │   └── src/x.mjs       → @Project: @scope/repo    @Filename: /src/x.mjs
+    └── b/
+        ├── Cargo.toml      [package] name = "b-crate"
+        └── src/lib.rs      → @Project: b-crate        @Filename: /src/lib.rs
+```
+
+To support another ecosystem, add a module to `src/drivers/` that exports a `driver` with `id`, `languages` (the file-type detector ids native to it), `manifests` (filenames that claim a folder, in reading order), `detect(dirPath)` (returns `detectManifests(dirPath, manifests)` from `src/drivers/shared.mjs`) and `read(detection)` (returns `{ name }`, `undefined` when the manifest has none), then add it to `MANIFEST_DRIVERS` in `src/drivers/index.mjs` at its place in the fixed order.
 
 ## Creation date
 
@@ -213,7 +260,7 @@ The one exception is `.git`, git's own storage, which is never walked.
 - `excludeFolders` supports both folder-name and nested path matching.
 - `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters because `excludeFolders` excludes it (for example `node_modules/pkg` listed explicitly while `node_modules` is excluded), which keeps being walked on its own because it was named explicitly. An `includeFolders` entry does not override the ignore files: a folder they ignore contributes no files.
 - File discovery is described in [Which files are processed](#which-files-are-processed).
-- For monorepos, each file resolves metadata from the closest detector config in its parent tree.
+- For monorepos, each file resolves its project from the nearest manifest in its parent tree (see [Project name and root](#project-name-and-root)).
 - With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, `diff`, `issues`, and `detectedValues` in results.
 
 ## Sample output
@@ -224,7 +271,7 @@ With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed en
 - `newValue` - the header block this run writes.
 - `diff` - a ready-to-print unified diff of the header block. The `---`/`+++` lines name the file (`a/<file>` / `b/<file>`, or `/dev/null` when there was no previous header, in which case the whole new header shows as added), and hunk line numbers are file line numbers.
 - `issues` - one `{ field, previous, detected }` entry per header field whose written value differs from the existing header, in header order. Fields: `projectName`, `filename`, `createdAt`, `authorName`, `authorEmail`, `lastModifiedByName`, `lastModifiedByEmail`, `lastModifiedAt`, `copyrightStartYear`, `copyrightEndYear`, `companyName`. Values are the field text as written in the header (dates keep their `date (timestamp)` form); `previous` is `null` when the field was missing.
-- `detectedValues` - the metadata resolved for the file.
+- `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`).
 
 `issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` and `@Last modified by` identity unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set, so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
 

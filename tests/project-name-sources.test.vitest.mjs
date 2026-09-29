@@ -14,9 +14,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fixHeaders } from "../src/fix-header.mjs";
-import { detector as cssDetector } from "../src/detectors/css.mjs";
-import { detector as htmlDetector } from "../src/detectors/html.mjs";
-import { parsePackageJsonName } from "../src/detectors/shared.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 /**
@@ -69,22 +66,24 @@ describe("@Project comes from the project's config file for every file type", ()
 	});
 });
 
-describe("CSS and HTML project-name fallbacks", () => {
-	for (const [id, detector] of [
-		["css", cssDetector],
-		["html", htmlDetector]
-	]) {
-		it(`${id}: package.json name, else the folder name`, () => {
-			expect(detector.parseProjectName("package.json", '{ "name": " @scope/pkg " }', "folder")).toBe("@scope/pkg");
-			expect(detector.parseProjectName("package.json", '{ "version": "1.0.0" }', "folder")).toBe("folder");
-			expect(detector.parseProjectName("package.json", '{ "name": "   " }', "folder")).toBe("folder");
-			expect(detector.parseProjectName("package.json", "{ not json", "folder")).toBe("folder");
-			expect(detector.parseProjectName(id === "css" ? "postcss.config.mjs" : "index.html", "", "folder")).toBe("folder");
-		});
-	}
+describe("only manifests mark a project root", () => {
+	it("a nested index.html, bundler or postcss config does not start a project of its own", async () => {
+		const workspace = await createWorkspace("project-name-nested-markers");
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "@scope/site" }));
+			await writeWorkspaceFile(join(workspace, "src", "public", "index.html"), "<p>home</p>\n");
+			await writeWorkspaceFile(join(workspace, "src", "public", "about.html"), "<p>about</p>\n");
+			await writeWorkspaceFile(join(workspace, "src", "styles", "postcss.config.mjs"), "export default {};\n");
+			await writeWorkspaceFile(join(workspace, "src", "styles", "main.css"), "a { color: red; }\n");
 
-	it("parsePackageJsonName ignores a non-object or non-string name", () => {
-		expect(parsePackageJsonName("null", "folder")).toBe("folder");
-		expect(parsePackageJsonName('{ "name": 42 }', "folder")).toBe("folder");
-	});
+			expect(await projectNames(workspace)).toEqual({
+				"src/public/index.html": "@scope/site",
+				"src/public/about.html": "@scope/site",
+				"src/styles/postcss.config.mjs": "@scope/site",
+				"src/styles/main.css": "@scope/site"
+			});
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	}, 30000);
 });

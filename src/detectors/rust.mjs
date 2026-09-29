@@ -12,14 +12,12 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
 
 /**
  * @fileoverview Rust detector implementation.
  * @module fix-headers/detectors/rust
  */
 
-const markers = ["Cargo.toml"];
 const extensions = [".rs"];
 
 /**
@@ -42,20 +40,8 @@ function resolveRustCommentSyntax(filePath) {
 
 export const detector = {
 	id: "rust",
-	priority: 80,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	parseProjectName(_marker, markerContent, rootDirName) {
-		const cargoNameMatch = markerContent.match(/^name\s*=\s*["']([^"']+)["']/m);
-		if (cargoNameMatch?.[1]) {
-			return cargoNameMatch[1];
-		}
-		return rootDirName;
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveRustCommentSyntax(filePath);
 	}

@@ -11,66 +11,30 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, resolve } from "node:path";
 import { DEFAULT_COMPANY_NAME } from "../constants.mjs";
 import { getEnabledDetectors } from "../detectors/index.mjs";
-import { readTextIfExists } from "../utils/fs.mjs";
+import { resolveManifestProject } from "../drivers/index.mjs";
 import { detectGitAuthor } from "../utils/git.mjs";
 
 /**
- * @fileoverview Auto-detects project metadata from known language markers and git config.
+ * @fileoverview Auto-detects project metadata from the project's manifests and git config.
  * @module fix-headers/detect/project
  */
 
-async function findClosestDetectorMatch(startPath, detectors, preferredExtension = "") {
-	const extension = typeof preferredExtension === "string" ? preferredExtension.trim().toLowerCase() : "";
-	const extensionMatched =
-		extension.length > 0
-			? detectors.filter((detector) => Array.isArray(detector.extensions) && detector.extensions.includes(extension))
-			: [];
-	const detectorsToSearch = extensionMatched.length > 0 ? extensionMatched : detectors;
+/**
+ * @typedef {{ from: "manifest", driver: string, manifest: string, dir: string } | { from: "folder", dir: string } | { from: "option" }} ProjectNameSource
+ * Where `projectName` came from: a manifest (the driver, its manifest and the folder it sits
+ * in), the project root's folder name, or the `projectName` option.
+ */
 
-	const matches = await Promise.all(
-		detectorsToSearch.map(async (detector) => {
-			if (typeof detector.findNearestConfig !== "function") {
-				return null;
-			}
-
-			const located = await detector.findNearestConfig(startPath);
-			if (!located) {
-				return null;
-			}
-
-			return {
-				detector,
-				root: located.root,
-				marker: located.marker
-			};
-		})
-	);
-
-	const validMatches = matches.filter((item) => item !== null);
-	if (validMatches.length === 0) {
-		return null;
-	}
-
-	let closest = validMatches[0];
-	for (const candidate of validMatches.slice(1)) {
-		if (candidate.root.length > closest.root.length) {
-			closest = candidate;
-			continue;
-		}
-
-		if (candidate.root.length === closest.root.length) {
-			const candidatePriority = Number.isFinite(candidate.detector.priority) ? candidate.detector.priority : 0;
-			const closestPriority = Number.isFinite(closest.detector.priority) ? closest.detector.priority : 0;
-			if (candidatePriority > closestPriority) {
-				closest = candidate;
-			}
-		}
-	}
-
-	return closest;
+/**
+ * Gets a folder's name, or `project` for the filesystem root.
+ * @param {string} dirPath - Folder.
+ * @returns {string} Folder name.
+ */
+function folderName(dirPath) {
+	return basename(dirPath) || "project";
 }
 
 /**
@@ -97,41 +61,44 @@ function formatAuthorNameWithCompany(authorName, company) {
 }
 
 /**
- * Detects project root and language by scanning known marker files.
- * @param {string} cwd - Starting working directory.
- * @param {{ detectors?: { id: string, extensions: string[], priority?: number, findNearestConfig: (path: string) => Promise<{ root: string, marker: string } | null>, parseProjectName: (marker: string, content: string, rootDirName: string) => string }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string }} [options={}] - Detection options.
+ * Detects the project a path belongs to from the manifests of the project it sits in (see
+ * {@link resolveManifestProject}), independent of the file's type.
+ *
+ * `language` is the id of the file-type detector for `preferredExtension` when one handles
+ * it; otherwise the first driver claiming the project root, or `unknown` without one. With
+ * no manifest up to the repository root (a folder holding `.git`), that repository root is
+ * the project root; with neither, the start folder is. The project name is then that
+ * folder's name.
+ * @param {string} cwd - Starting directory (a file's folder, or the scan root).
+ * @param {{ detectors?: { id: string, extensions: string[] }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string, drivers?: import("../drivers/index.mjs").ManifestDriver[], scanRoot?: string }} [options={}] - Detection options. `scanRoot` bounds how far values missing from the nearest manifests are looked up in ancestor folders; without it they aren't.
  * @returns {Promise<{
  *  language: string,
  *  rootDir: string,
  *  marker: string | null,
- *  projectName: string
+ *  projectName: string,
+ *  projectNameSource: ProjectNameSource,
+ *  drivers: string[]
  * }>} Detection result.
  */
 export async function detectProjectFromMarkers(cwd, options = {}) {
 	const detectors = Array.isArray(options.detectors) ? options.detectors : getEnabledDetectors(options);
-	const located = await findClosestDetectorMatch(cwd, detectors, options.preferredExtension);
+	const extension = typeof options.preferredExtension === "string" ? options.preferredExtension.trim().toLowerCase() : "";
+	const fileDetector = extension.length > 0 ? detectors.find((detector) => detector.extensions.includes(extension)) : undefined;
+	const located = await resolveManifestProject(cwd, {
+		drivers: options.drivers,
+		language: fileDetector?.id,
+		scanRoot: options.scanRoot
+	});
+	const rootDir = located ? located.root : resolve(cwd);
+	const nameSource = located?.sources.name;
 
-	if (located) {
-		const markerPath = join(located.root, located.marker);
-		const markerContent = (await readTextIfExists(markerPath)) || "";
-		const rootDirName = located.root.split("/").filter(Boolean).at(-1) || "project";
-		const projectName = located.detector.parseProjectName(located.marker, markerContent, rootDirName);
-
-		return {
-			language: located.detector.id,
-			rootDir: located.root,
-			marker: located.marker,
-			projectName
-		};
-	}
-
-	const fallbackRoot = resolve(cwd);
-	const fallbackName = fallbackRoot.split("/").filter(Boolean).at(-1) || "project";
 	return {
-		language: "unknown",
-		rootDir: fallbackRoot,
-		marker: null,
-		projectName: fallbackName
+		language: fileDetector?.id ?? located?.drivers[0] ?? "unknown",
+		rootDir,
+		marker: located ? located.marker : null,
+		projectName: located?.fields.name ?? folderName(rootDir),
+		projectNameSource: nameSource ? { from: "manifest", ...nameSource } : { from: "folder", dir: rootDir },
+		drivers: located ? located.drivers : []
 	};
 }
 
@@ -155,6 +122,7 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
  * }} [options={}] - Detection options and overrides.
  * @returns {Promise<{
  *  projectName: string,
+ *  projectNameSource: ProjectNameSource,
  *  language: string,
  *  projectRoot: string,
  *  marker: string | null,
@@ -170,7 +138,8 @@ export async function resolveProjectMetadata(options = {}) {
 	const detectors = getEnabledDetectors(options);
 	const detectFrom = options.targetFilePath ? dirname(cwd) : cwd;
 	const preferredExtension = options.targetFilePath ? extname(cwd).toLowerCase() : "";
-	const detected = await detectProjectFromMarkers(detectFrom, { detectors, preferredExtension });
+	const scanRoot = resolve(options.projectRoot || options.cwd || process.cwd());
+	const detected = await detectProjectFromMarkers(detectFrom, { detectors, preferredExtension, scanRoot });
 	const gitAuthor = await detectGitAuthor(detected.rootDir, {
 		useGpgSignerAuthor: options.useGpgSignerAuthor === true
 	});
@@ -179,6 +148,7 @@ export async function resolveProjectMetadata(options = {}) {
 
 	return {
 		projectName: options.projectName || detected.projectName,
+		projectNameSource: options.projectName ? { from: "option" } : detected.projectNameSource,
 		language: options.language || detected.language,
 		projectRoot: options.projectRoot || detected.rootDir,
 		marker: options.marker === undefined ? detected.marker : options.marker,

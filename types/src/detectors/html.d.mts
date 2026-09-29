@@ -12,15 +12,8 @@
  */
 export declare const detector: {
     id: string;
-    priority: number;
-    markers: string[];
     extensions: string[];
     enabledByDefault: boolean;
-    findNearestConfig(startPath: any): Promise<{
-        root: string;
-        marker: string;
-    }>;
-    parseProjectName(marker: any, markerContent: any, rootDirName: any): any;
     resolveCommentSyntax(filePath: any): {
         kind: "html";
         blockStart: string;

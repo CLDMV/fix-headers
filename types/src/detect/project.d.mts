@@ -10,36 +10,54 @@
  *	-----
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
+export type ProjectNameSource = {
+    from: "manifest";
+    driver: string;
+    manifest: string;
+    dir: string;
+} | {
+    from: "folder";
+    dir: string;
+} | {
+    from: "option";
+};
 /**
- * Detects project root and language by scanning known marker files.
- * @param {string} cwd - Starting working directory.
- * @param {{ detectors?: { id: string, extensions: string[], priority?: number, findNearestConfig: (path: string) => Promise<{ root: string, marker: string } | null>, parseProjectName: (marker: string, content: string, rootDirName: string) => string }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string }} [options={}] - Detection options.
+ * Detects the project a path belongs to from the manifests of the project it sits in (see
+ * {@link resolveManifestProject}), independent of the file's type.
+ *
+ * `language` is the id of the file-type detector for `preferredExtension` when one handles
+ * it; otherwise the first driver claiming the project root, or `unknown` without one. With
+ * no manifest up to the repository root (a folder holding `.git`), that repository root is
+ * the project root; with neither, the start folder is. The project name is then that
+ * folder's name.
+ * @param {string} cwd - Starting directory (a file's folder, or the scan root).
+ * @param {{ detectors?: { id: string, extensions: string[] }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string, drivers?: import("../drivers/index.mjs").ManifestDriver[], scanRoot?: string }} [options={}] - Detection options. `scanRoot` bounds how far values missing from the nearest manifests are looked up in ancestor folders; without it they aren't.
  * @returns {Promise<{
  *  language: string,
  *  rootDir: string,
  *  marker: string | null,
- *  projectName: string
+ *  projectName: string,
+ *  projectNameSource: ProjectNameSource,
+ *  drivers: string[]
  * }>} Detection result.
  */
 export declare function detectProjectFromMarkers(cwd: string, options?: {
     detectors?: {
         id: string;
         extensions: string[];
-        priority?: number;
-        findNearestConfig: (path: string) => Promise<{
-            root: string;
-            marker: string;
-        } | null>;
-        parseProjectName: (marker: string, content: string, rootDirName: string) => string;
     }[];
     enabledDetectors?: string[];
     disabledDetectors?: string[];
     preferredExtension?: string;
+    drivers?: import("../drivers/index.mjs").ManifestDriver[];
+    scanRoot?: string;
 }): Promise<{
     language: string;
     rootDir: string;
     marker: string | null;
     projectName: string;
+    projectNameSource: ProjectNameSource;
+    drivers: string[];
 }>;
 /**
  * Resolves project metadata with override support for every auto-detected field.
@@ -61,6 +79,7 @@ export declare function detectProjectFromMarkers(cwd: string, options?: {
  * }} [options={}] - Detection options and overrides.
  * @returns {Promise<{
  *  projectName: string,
+ *  projectNameSource: ProjectNameSource,
  *  language: string,
  *  projectRoot: string,
  *  marker: string | null,
@@ -87,6 +106,7 @@ export declare function resolveProjectMetadata(options?: {
     copyrightStartYear?: number;
 }): Promise<{
     projectName: string;
+    projectNameSource: ProjectNameSource;
     language: string;
     projectRoot: string;
     marker: string | null;
