@@ -18,6 +18,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { run } from "@cldmv/vitest-runner";
+import { ensureSigningKeyUid } from "./helpers/signing-key.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -37,6 +38,10 @@ const passthrough = forwarded.filter((a) => a !== "--coverage" && a !== "--cover
 // VITEST_WORKERS overrides the worker count; ignore an unset / invalid / non-positive value.
 const parsedWorkers = parseInt(process.env.VITEST_WORKERS ?? "", 10);
 const workers = Number.isInteger(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : 4;
+
+// Derive the machine's signing-key user ID once for the whole run; every per-file vitest
+// process inherits it through the environment (see tests/helpers/signing-key.mjs).
+ensureSigningKeyUid();
 
 const code = await run({
 	cwd: root,
