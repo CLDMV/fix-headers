@@ -11,10 +11,11 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { detectManifests, readJsonName } from "./shared.mjs";
+import { cleanName, detectManifests, parseJsonManifest } from "./shared.mjs";
 
 /**
- * @fileoverview PHP manifest driver: `composer.json`.
+ * @fileoverview PHP manifest driver: `composer.json`. The name is `name`; the copyright holder
+ * is `authors[0].name`.
  * @module fix-headers/drivers/php
  */
 
@@ -29,6 +30,8 @@ export const driver = {
 		return detectManifests(dirPath, manifests);
 	},
 	read(detection) {
-		return { name: readJsonName(detection.files[0].content) };
+		const manifest = parseJsonManifest(detection.files[0].content);
+		const authors = manifest?.authors;
+		return { name: cleanName(manifest?.name), company: Array.isArray(authors) ? cleanName(authors[0]?.name) : undefined };
 	}
 };

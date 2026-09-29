@@ -15,7 +15,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { claimFolder, getDriverById, MANIFEST_DRIVERS, resolveManifestProject } from "../src/drivers/index.mjs";
-import { cleanName, detectManifests, readIniValue, readJsonName, readTomlString } from "../src/drivers/shared.mjs";
+import { cleanName, detectManifests, parseJsonManifest, readIniValue, readTomlString } from "../src/drivers/shared.mjs";
 import { cleanupWorkspace, createIsolatedWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 /**
@@ -144,12 +144,12 @@ describe("manifest drivers", () => {
 });
 
 describe("shared manifest readers", () => {
-	it("cleanName, readJsonName, readTomlString and readIniValue", () => {
+	it("cleanName, parseJsonManifest, readTomlString and readIniValue", () => {
 		expect(cleanName("  a ")).toBe("a");
 		expect(cleanName(" ")).toBeUndefined();
 		expect(cleanName(1)).toBeUndefined();
-		expect(readJsonName('{"name":"x"}')).toBe("x");
-		expect(readJsonName("[")).toBeUndefined();
+		expect(parseJsonManifest('{"name":"x"}')).toEqual({ name: "x" });
+		expect(parseJsonManifest("[")).toBeUndefined();
 		expect(readTomlString('title = "top"\n[a]\nkey = "v"\n', "a", "key")).toBe("v");
 		expect(readTomlString('key = "top-level"\n', "a", "key")).toBeUndefined();
 		expect(readTomlString("[a]\nkey = 1\n", "a", "key")).toBeUndefined();

@@ -84,7 +84,10 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   changed file that already had a header.
  * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
  *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
- *   `{ from: "folder", dir }` or `{ from: "option" }`.
+ *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
+ *   (null when nothing provides one, and the line then carries none), and `companyNameSource`
+ *   says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }`
+ *   or `{ from: "none" }`.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
@@ -94,7 +97,8 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   marker: string | null,
  *   authorName: string,
  *   authorEmail: string,
- *   companyName: string,
+ *   companyName: string | null,
+ *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
  *   copyrightStartYear: number
  *  },
  *  detectedProjects: string[],
@@ -112,7 +116,8 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   marker: string | null,
  *   authorName: string,
  *   authorEmail: string,
- *   companyName: string,
+ *   companyName: string | null,
+ *   companyNameSource: import("../detect/project.mjs").CompanyNameSource,
  *   copyrightStartYear: number,
  *   createdAtSource: string,
  *   lastModifiedAtSource: string,
@@ -457,6 +462,7 @@ export async function fixHeaders(options = {}) {
 					authorName: fileMetadata.authorName,
 					authorEmail: fileMetadata.authorEmail,
 					companyName: fileMetadata.companyName,
+					companyNameSource: fileMetadata.companyNameSource,
 					copyrightStartYear: fileMetadata.copyrightStartYear,
 					createdAtSource,
 					lastModifiedAtSource,

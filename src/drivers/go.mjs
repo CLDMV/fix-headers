@@ -14,7 +14,8 @@
 import { cleanName, detectManifests } from "./shared.mjs";
 
 /**
- * @fileoverview Go manifest driver: `go.mod` (the `module` path).
+ * @fileoverview Go manifest driver: `go.mod` (the `module` path). `go.mod` has no author, so
+ * the driver provides no copyright holder.
  * @module fix-headers/drivers/go
  */
 

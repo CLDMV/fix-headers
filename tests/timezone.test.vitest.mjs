@@ -91,6 +91,9 @@ function fileWithHeader(fileName, createdValue, modifiedValue) {
 	return `/**\n *\t@Project: tz-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) ${year}-${year} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
 }
 
+/** The fixtures' `package.json`: its author supplies the `@Copyright` holder {@link fileWithHeader} writes. */
+const TZ_MANIFEST = { name: "tz-check", author: { name: "Someone Else", company: "Catalyzed Motivation Inc." } };
+
 /** Options that make {@link fileWithHeader} headers render unchanged. */
 const MATCHING_IDENTITY = { authorName: "Someone Else", authorEmail: "else@example.com" };
 
@@ -116,7 +119,7 @@ async function readDates(workspace, fileName) {
  */
 async function createNewHeaderFixture(name) {
 	const workspace = await createWorkspace(name);
-	await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "tz-check" }, null, 2));
+	await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify(TZ_MANIFEST, null, 2));
 	await writeWorkspaceFile(join(workspace, "src", "bare.mjs"), "export const bare = true;\n");
 	await writeWorkspaceFile(join(workspace, "src", "bareold.mjs"), "export const bareOld = true;\n");
 	await writeWorkspaceFile(
@@ -146,7 +149,7 @@ async function createSweepFixture(name) {
 	const workspace = await createWorkspace(name);
 	const write = (file, created, modified) =>
 		writeWorkspaceFile(join(workspace, "src", file), fileWithHeader(`src/${file}`, created, modified));
-	await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "tz-check" }, null, 2));
+	await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify(TZ_MANIFEST, null, 2));
 	await write("space.mjs", `2026-01-19 04:39:48 +00:00 (${WINTER})`, `2026-01-19 04:39:48 +00:00 (${WINTER})`);
 	await write("iso.mjs", `2026-07-19T04:39:48+00:00 (${SUMMER})`, `2026-07-19T04:39:48+00:00 (${SUMMER})`);
 	await write("bad.mjs", `last tuesday (${WINTER})`, "sometime (123)");

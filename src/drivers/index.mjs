@@ -35,8 +35,10 @@ import { driver as rustDriver } from "./rust.mjs";
  */
 
 /**
- * @typedef {{ name?: string }} ManifestData
+ * @typedef {{ name?: string, company?: string }} ManifestData
  * Values a manifest provides. A field is left undefined when the manifest doesn't carry it.
+ * - `name` - the project name (`@Project`).
+ * - `company` - the copyright holder (`@Copyright`), taken from the manifest's author.
  */
 
 /**
@@ -88,7 +90,7 @@ export const MANIFEST_DRIVERS = [nodeDriver, pythonDriver, phpDriver, rustDriver
  * Fields resolved from manifests. Resolution climbs until each of them is found.
  * @type {Array<keyof ManifestData>}
  */
-export const MANIFEST_FIELDS = ["name"];
+export const MANIFEST_FIELDS = ["name", "company"];
 
 /**
  * Gets a driver by id.

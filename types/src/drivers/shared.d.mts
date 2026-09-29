@@ -42,12 +42,19 @@ export declare function manifestContent(detection: DriverDetection, file: string
  */
 export declare function cleanName(value: unknown): string | undefined;
 /**
- * Reads the top-level `name` of a JSON manifest (`package.json`, `composer.json`).
- * @param {string} content - Manifest content.
- * @returns {string | undefined} Name, or undefined when the content isn't valid JSON or has no
- * non-empty string `name`.
+ * Reads the name part of a person string in the `Name <email> (url)` form used by
+ * `package.json` string authors, Poetry and Cargo authors: the text before the first `<` or `(`.
+ * @param {unknown} value - Candidate value.
+ * @returns {string | undefined} Name, or undefined when the value isn't a string or has no name
+ * before its email or url.
  */
-export declare function readJsonName(content: string): string | undefined;
+export declare function personName(value: unknown): string | undefined;
+/**
+ * Parses a JSON manifest (`package.json`, `composer.json`).
+ * @param {string} content - Manifest content.
+ * @returns {any} Parsed value, or undefined when the content isn't valid JSON.
+ */
+export declare function parseJsonManifest(content: string): any;
 /**
  * Reads a string value from a TOML table: `key = "value"` or `key = 'value'` on its own line.
  * @param {string} content - TOML content.
@@ -64,3 +71,13 @@ export declare function readTomlString(content: string, table: string, key: stri
  * @returns {string | undefined} Value, or undefined when the section or key is missing.
  */
 export declare function readIniValue(content: string, section: string, key: string): string | undefined;
+/**
+ * Reads the name of the first author in a TOML `authors` array: the name part of a string
+ * entry (`authors = ["Name <email>"]`, as in Poetry and Cargo) or the `name` of an inline-table
+ * entry (`authors = [{ name = "Name", email = "..." }]`, as in PEP 621).
+ * @param {string} content - TOML content.
+ * @param {string} table - Table name, dotted for nested tables (`tool.poetry`).
+ * @returns {string | undefined} Name, or undefined when the table has no `authors` array or its
+ * first entry carries no name.
+ */
+export declare function readTomlAuthor(content: string, table: string): string | undefined;

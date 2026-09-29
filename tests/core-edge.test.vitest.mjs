@@ -220,6 +220,7 @@ describe("core edge coverage", () => {
 				input: "src/one.mjs",
 				authorName: "New Updater",
 				authorEmail: "new@example.com",
+				companyName: "Catalyzed Motivation Inc.",
 				dryRun: false
 			});
 

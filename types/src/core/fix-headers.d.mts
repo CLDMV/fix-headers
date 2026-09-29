@@ -68,7 +68,8 @@ export type FixHeadersResult = {
         marker: string | null;
         authorName: string;
         authorEmail: string;
-        companyName: string;
+        companyName: string | null;
+        companyNameSource: import("../detect/project.mjs").CompanyNameSource;
         copyrightStartYear: number;
     };
     detectedProjects: string[];
@@ -95,7 +96,8 @@ export type FixHeadersResult = {
                 marker: string | null;
                 authorName: string;
                 authorEmail: string;
-                companyName: string;
+                companyName: string | null;
+                companyNameSource: import("../detect/project.mjs").CompanyNameSource;
                 copyrightStartYear: number;
                 createdAtSource: string;
                 lastModifiedAtSource: string;

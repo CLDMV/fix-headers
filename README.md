@@ -92,7 +92,7 @@ Common CLI options:
 - `--enable-detector <id>` / `--disable-detector <id>` (repeatable)
 - `--project-name <name>`
 - `--author-name <name>` / `--author-email <email>`
-- `--company-name <name>`
+- `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
 - `--copyright-start-year <year>`
 - `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
 
@@ -140,7 +140,7 @@ Important options:
 - `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
 - `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
-- `companyName?: string` (default: `Catalyzed Motivation Inc.`)
+- `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#copyright-holder))
 - `copyrightStartYear?: number` (default: current year)
 
 Example:
@@ -214,13 +214,13 @@ Which project a file belongs to depends on the manifests around it, not on the f
 
 Each ecosystem has a manifest driver in `src/drivers/`:
 
-| Driver   | Claims a folder holding                     | Name                                                                                                                      | Native files                  |
-| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `node`   | `package.json`                              | `name`                                                                                                                    | `.js .mjs .cjs .ts .tsx .jsx` |
-| `python` | `pyproject.toml`, `setup.cfg` or `setup.py` | `pyproject.toml` `[project].name`, then `[tool.poetry].name`; `setup.cfg` `[metadata] name`; `setup.py` `setup(name=...)` | `.py`                         |
-| `php`    | `composer.json`                             | `name`                                                                                                                    | `.php`                        |
-| `rust`   | `Cargo.toml`                                | `[package].name`                                                                                                          | `.rs`                         |
-| `go`     | `go.mod`                                    | the `module` path                                                                                                         | `.go`                         |
+| Driver   | Claims a folder holding                     | Name                                                                                                                      | Copyright holder                                                                                                                                                | Native files                  |
+| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `node`   | `package.json`                              | `name`                                                                                                                    | `author.company`, else `author.name`, else the name part of a string `author` (`"Name <email> (url)"`)                                                          | `.js .mjs .cjs .ts .tsx .jsx` |
+| `python` | `pyproject.toml`, `setup.cfg` or `setup.py` | `pyproject.toml` `[project].name`, then `[tool.poetry].name`; `setup.cfg` `[metadata] name`; `setup.py` `setup(name=...)` | `pyproject.toml` `[project].authors[0].name`, then the name part of `[tool.poetry].authors[0]`; `setup.cfg` `[metadata] author`; `setup.py` `setup(author=...)` | `.py`                         |
+| `php`    | `composer.json`                             | `name`                                                                                                                    | `authors[0].name`                                                                                                                                               | `.php`                        |
+| `rust`   | `Cargo.toml`                                | `[package].name`                                                                                                          | the name part of `[package].authors[0]`                                                                                                                         | `.rs`                         |
+| `go`     | `go.mod`                                    | the `module` path                                                                                                         | none (`go.mod` has no author)                                                                                                                                   | `.go`                         |
 
 A manifest claims its folder as soon as it exists and can be read, even when it is malformed or has no name. `requirements.txt` does not claim a folder: it carries no name and often sits in folders that are not projects of their own (`docs/requirements.txt`).
 
@@ -234,7 +234,7 @@ For each file:
 
 A folder holding `.git` is a repository boundary: neither the root search nor the climb goes past it, so a nested repository without a manifest is a project of its own. With no manifest up to the repository root, that repository root is the project root and its folder name is the name. With neither a manifest nor a repository anywhere above the file, the file's own folder is the project root: `@Project` is that folder's name and `@Filename` is `/<file name>`.
 
-`projectName`, `projectRoot`, `language` and `marker` override the detected values for every file.
+`projectName`, `projectRoot`, `language` and `marker` override the detected values for every file. The copyright holder is resolved from the same manifests by the same rules, see [Copyright holder](#copyright-holder).
 
 For example, scanning `repo/`:
 
@@ -253,7 +253,33 @@ repo/
         └── src/lib.rs      → @Project: b-crate        @Filename: /src/lib.rs
 ```
 
-To support another ecosystem, add a module to `src/drivers/` that exports a `driver` with `id`, `languages` (the file-type detector ids native to it), `manifests` (filenames that claim a folder, in reading order), `detect(dirPath)` (returns `detectManifests(dirPath, manifests)` from `src/drivers/shared.mjs`) and `read(detection)` (returns `{ name }`, `undefined` when the manifest has none), then add it to `MANIFEST_DRIVERS` in `src/drivers/index.mjs` at its place in the fixed order.
+To support another ecosystem, add a module to `src/drivers/` that exports a `driver` with `id`, `languages` (the file-type detector ids native to it), `manifests` (filenames that claim a folder, in reading order), `detect(dirPath)` (returns `detectManifests(dirPath, manifests)` from `src/drivers/shared.mjs`) and `read(detection)` (returns `{ name, company }`, each `undefined` when the manifest has none), then add it to `MANIFEST_DRIVERS` in `src/drivers/index.mjs` at its place in the fixed order.
+
+## Copyright holder
+
+The holder on the `@Copyright` line (`companyName`) comes from the manifest of the project the file belongs to, read by the same drivers and with the same rules as the project name: the nearest claimed folder, the file's native driver first, the per-field fallback, and climbing up to the scan root (never past a `.git` folder). The holder climbs on its own, so a sub-package whose `package.json` has a name but no author takes the repository's author while keeping its own `@Project`. The field each driver reads is in the table above.
+
+- **`companyName`** (CLI `--company-name`) overrides the manifests for every file.
+- **No holder** anywhere up to the scan root: the holder is left out of the line, which reads `Copyright (c) 2019-2026 All rights reserved.`
+
+For example, scanning `repo/`:
+
+```text
+repo/
+├── package.json            { "name": "@scope/repo", "author": { "name": "Jane Doe", "company": "ACME Inc." } }
+├── src/main.mjs            → @Copyright: Copyright (c) 2026-2026 ACME Inc. All rights reserved.
+└── packages/
+    ├── a/
+    │   ├── package.json    { "name": "@scope/a" }
+    │   └── src/x.mjs       → @Copyright: Copyright (c) 2026-2026 ACME Inc. All rights reserved.
+    └── b/
+        ├── Cargo.toml      [package] authors = ["Rust Dev <dev@example.com>"]
+        └── src/lib.rs      → @Copyright: Copyright (c) 2026-2026 Rust Dev All rights reserved.
+```
+
+With `companyName: "Example Co"` every file gets `Copyright (c) 2026-2026 Example Co All rights reserved.`; with no author in any manifest every file gets `Copyright (c) 2026-2026 All rights reserved.`
+
+With `sampleOutput`, `detectedValues.companyName` is the resolved holder (`null` when there is none) and `detectedValues.companyNameSource` says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }` (`companyName`) or `{ from: "none" }`. `result.metadata` carries the same two values for the scan root. The `@Author` suffix set by `company` (`Name <Company>`) is a separate option and does not affect the holder.
 
 ## Creation date
 

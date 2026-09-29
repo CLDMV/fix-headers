@@ -11,11 +11,12 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { detectManifests, readTomlString } from "./shared.mjs";
+import { detectManifests, readTomlAuthor, readTomlString } from "./shared.mjs";
 
 /**
- * @fileoverview Rust manifest driver: `Cargo.toml` (`[package].name`). A workspace-only
- * `Cargo.toml` has no `[package]` table and so provides no name.
+ * @fileoverview Rust manifest driver: `Cargo.toml` (`[package].name`, and the name part of
+ * `[package].authors[0]` as the copyright holder). A workspace-only `Cargo.toml` has no
+ * `[package]` table and so provides neither.
  * @module fix-headers/drivers/rust
  */
 
@@ -30,6 +31,7 @@ export const driver = {
 		return detectManifests(dirPath, manifests);
 	},
 	read(detection) {
-		return { name: readTomlString(detection.files[0].content, "package", "name") };
+		const content = detection.files[0].content;
+		return { name: readTomlString(content, "package", "name"), company: readTomlAuthor(content, "package") };
 	}
 };

@@ -12,7 +12,6 @@
  */
 
 import { basename, dirname, extname, resolve } from "node:path";
-import { DEFAULT_COMPANY_NAME } from "../constants.mjs";
 import { getEnabledDetectors } from "../detectors/index.mjs";
 import { resolveManifestProject } from "../drivers/index.mjs";
 import { detectGitAuthor } from "../utils/git.mjs";
@@ -26,6 +25,13 @@ import { detectGitAuthor } from "../utils/git.mjs";
  * @typedef {{ from: "manifest", driver: string, manifest: string, dir: string } | { from: "folder", dir: string } | { from: "option" }} ProjectNameSource
  * Where `projectName` came from: a manifest (the driver, its manifest and the folder it sits
  * in), the project root's folder name, or the `projectName` option.
+ */
+
+/**
+ * @typedef {{ from: "manifest", driver: string, manifest: string, dir: string } | { from: "option" } | { from: "none" }} CompanyNameSource
+ * Where `companyName` (the `@Copyright` holder) came from: a manifest's author (the driver, its
+ * manifest and the folder it sits in), the `companyName` option, or nothing (`companyName` is
+ * null and the `@Copyright` line carries no holder).
  */
 
 /**
@@ -68,7 +74,8 @@ function formatAuthorNameWithCompany(authorName, company) {
  * it; otherwise the first driver claiming the project root, or `unknown` without one. With
  * no manifest up to the repository root (a folder holding `.git`), that repository root is
  * the project root; with neither, the start folder is. The project name is then that
- * folder's name.
+ * folder's name. The copyright holder (`companyName`) comes from the manifests' authors the same
+ * way, and is null when none of them provides one.
  * @param {string} cwd - Starting directory (a file's folder, or the scan root).
  * @param {{ detectors?: { id: string, extensions: string[] }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string, drivers?: import("../drivers/index.mjs").ManifestDriver[], scanRoot?: string }} [options={}] - Detection options. `scanRoot` bounds how far values missing from the nearest manifests are looked up in ancestor folders; without it they aren't.
  * @returns {Promise<{
@@ -77,6 +84,8 @@ function formatAuthorNameWithCompany(authorName, company) {
  *  marker: string | null,
  *  projectName: string,
  *  projectNameSource: ProjectNameSource,
+ *  companyName: string | null,
+ *  companyNameSource: CompanyNameSource,
  *  drivers: string[]
  * }>} Detection result.
  */
@@ -91,6 +100,7 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
 	});
 	const rootDir = located ? located.root : resolve(cwd);
 	const nameSource = located?.sources.name;
+	const companySource = located?.sources.company;
 
 	return {
 		language: fileDetector?.id ?? located?.drivers[0] ?? "unknown",
@@ -98,6 +108,8 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
 		marker: located ? located.marker : null,
 		projectName: located?.fields.name ?? folderName(rootDir),
 		projectNameSource: nameSource ? { from: "manifest", ...nameSource } : { from: "folder", dir: rootDir },
+		companyName: located?.fields.company ?? null,
+		companyNameSource: companySource ? { from: "manifest", ...companySource } : { from: "none" },
 		drivers: located ? located.drivers : []
 	};
 }
@@ -128,9 +140,11 @@ export async function detectProjectFromMarkers(cwd, options = {}) {
  *  marker: string | null,
  *  authorName: string,
  *  authorEmail: string,
- *  companyName: string,
+ *  companyName: string | null,
+ *  companyNameSource: CompanyNameSource,
  *  copyrightStartYear: number
- * }>} Final metadata.
+ * }>} Final metadata. `companyName` is the `companyName` option when it is set, else the
+ * holder the project's manifests provide, else null (no holder on the `@Copyright` line).
  */
 export async function resolveProjectMetadata(options = {}) {
 	const basePath = options.targetFilePath || options.cwd || process.cwd();
@@ -145,6 +159,7 @@ export async function resolveProjectMetadata(options = {}) {
 	});
 	const currentYear = new Date().getFullYear();
 	const baseAuthorName = options.authorName || gitAuthor.authorName || "Unknown Author";
+	const companyOption = typeof options.companyName === "string" ? options.companyName.trim() : "";
 
 	return {
 		projectName: options.projectName || detected.projectName,
@@ -154,7 +169,8 @@ export async function resolveProjectMetadata(options = {}) {
 		marker: options.marker === undefined ? detected.marker : options.marker,
 		authorName: formatAuthorNameWithCompany(baseAuthorName, options.company),
 		authorEmail: options.authorEmail || gitAuthor.authorEmail || "unknown@example.com",
-		companyName: options.companyName || DEFAULT_COMPANY_NAME,
+		companyName: companyOption || detected.companyName,
+		companyNameSource: companyOption ? { from: "option" } : detected.companyNameSource,
 		copyrightStartYear: Number.isInteger(options.copyrightStartYear) ? Number(options.copyrightStartYear) : currentYear
 	};
 }
