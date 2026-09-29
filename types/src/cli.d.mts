@@ -28,7 +28,8 @@ export declare function parseCliArgs(argv: string[]): {
     diff: boolean;
 };
 /**
- * Loads extra options from a JSON config file.
+ * Loads extra options from the JSON config file named by `--config` (and everything it
+ * `extends`); options given on the command line win over the file.
  * @param {Record<string, unknown>} options - Current options object.
  * @returns {Promise<Record<string, unknown>>} Merged options object.
  */

@@ -34,6 +34,7 @@ Multi-language source header normalizer for Node.js projects.
 - Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
 - Supports monorepos: every file resolves its own project from the nearest manifest in its parent tree
 - Supports per-detector syntax overrides for line and block comment tokens
+- Config files can use `extends` to build on a shared config (an https URL, an npm package path or a file path), so one organisation-wide config serves every repository. See [Shared configs](#shared-configs)
 - Supports both ESM and CJS consumers
 
 ## Install
@@ -93,7 +94,7 @@ Common CLI options:
 - `--author-name <name>` / `--author-email <email>`
 - `--company-name <name>`
 - `--copyright-start-year <year>`
-- `--config <json-file>`
+- `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
 
 ### CommonJS
 
@@ -121,7 +122,7 @@ Important options:
 - `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#time-zone)
 - `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#time-zone)
 - `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
-- `configFile?: string` - load JSON options from file (resolved from `cwd`)
+- `configFile?: string` - load JSON options from file (resolved from `cwd`). The file may use `extends` to build on shared configs by URL, npm package path or file path (see [Shared configs](#shared-configs)); options passed in the call win over everything from files
 - `includeExtensions?: string[]` - file extensions to process
 - `enabledDetectors?: string[]` - detector ids to enable (defaults to all)
 - `disabledDetectors?: string[]` - detector ids to disable
@@ -166,6 +167,45 @@ const result = await fixHeaders({
 	companyName: "Catalyzed Motivation Inc.",
 	copyrightStartYear: 2013
 });
+```
+
+## Shared configs
+
+A config file (`--config <path>` on the CLI, `configFile` in the API) can extend other configs with `extends`, so an organisation keeps its header settings in one place instead of copying them into every repository. `extends` is a string or an array of strings, and each entry is one of:
+
+- **An https URL**, fetched on every run. There is no local cache, so every run uses the current shared config. A failed request, a non-2xx response or a body that is not a JSON object fails the run with an error naming the URL. Plain `http://` is accepted only for the local machine (`localhost`, `127.0.0.1`, `[::1]`).
+- **An npm package path**, such as `@cldmv/configs/fix-headers.json`, resolved from the config file's own folder the way Node resolves packages (`require.resolve`), so the package's `exports` map is honoured. Install the package as a dev dependency.
+- **A relative or absolute file path**, resolved from the config file's folder. Relative paths start with `./` or `../`; anything else that is not a URL or an absolute path is treated as a package path.
+
+Merge rules:
+
+- Extended configs apply in order, then the file's own settings on top, so the repository's file overrides what it extends, and a later `extends` entry overrides an earlier one.
+- Plain objects (such as `detectorSyntaxOverrides`) merge key by key; arrays (such as `includeFolders`) and scalars replace.
+- Extended configs can extend others in turn. A cycle (`a` → `b` → `a`) is an error. Inside a fetched config, relative references (`./base.json`, `../base.json`, `/base.json`) resolve against that config's URL; a fetched config cannot reference an npm package.
+- Options passed directly on the command line or in the `fixHeaders()` call win over everything from files.
+
+The CLDMV repositories share one config published as `@cldmv/configs`. A repository's `.configs/fix-headers.json` extends it and adds its own settings:
+
+```json
+{
+	"extends": "@cldmv/configs/fix-headers.json",
+	"includeFolders": ["src", "tests", { "path": ".", "recursive": false }],
+	"excludeFolders": ["tests/fixtures"]
+}
+```
+
+```bash
+npm install --save-dev @cldmv/configs
+fix-headers --config .configs/fix-headers.json
+```
+
+A shared config can also be served from a URL, and mixed with local files:
+
+```json
+{
+	"extends": ["https://example.com/configs/fix-headers.json", "./fix-headers.local.json"],
+	"projectName": "@scope/my-package"
+}
 ```
 
 ## Project name and root
