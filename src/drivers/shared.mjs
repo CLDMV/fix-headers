@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 /**
  * @fileoverview Helpers shared by the manifest drivers: reading a folder's manifests and
- * pulling a name out of JSON, TOML and INI manifests without a full parser.
+ * pulling a name or an author out of JSON, TOML and INI manifests without a full parser.
  * @module fix-headers/drivers/shared
  */
 
@@ -85,14 +85,28 @@ export function cleanName(value) {
 }
 
 /**
- * Reads the top-level `name` of a JSON manifest (`package.json`, `composer.json`).
- * @param {string} content - Manifest content.
- * @returns {string | undefined} Name, or undefined when the content isn't valid JSON or has no
- * non-empty string `name`.
+ * Reads the name part of a person string in the `Name <email> (url)` form used by
+ * `package.json` string authors, Poetry and Cargo authors: the text before the first `<` or `(`.
+ * @param {unknown} value - Candidate value.
+ * @returns {string | undefined} Name, or undefined when the value isn't a string or has no name
+ * before its email or url.
  */
-export function readJsonName(content) {
+export function personName(value) {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+	const end = value.search(/[<(]/);
+	return cleanName(end === -1 ? value : value.slice(0, end));
+}
+
+/**
+ * Parses a JSON manifest (`package.json`, `composer.json`).
+ * @param {string} content - Manifest content.
+ * @returns {any} Parsed value, or undefined when the content isn't valid JSON.
+ */
+export function parseJsonManifest(content) {
 	try {
-		return cleanName(JSON.parse(content)?.name);
+		return JSON.parse(content);
 	} catch {
 		return undefined;
 	}
@@ -159,4 +173,74 @@ export function readIniValue(content, section, key) {
 		}
 	}
 	return undefined;
+}
+
+/**
+ * Collects the text of a TOML array value, from just after its opening `[` to the end of the
+ * table, so an array spread over several lines is read whole.
+ * @param {string} content - TOML content.
+ * @param {string} table - Table name, dotted for nested tables (`tool.poetry`).
+ * @param {string} key - Bare key.
+ * @returns {string | null} Array text, or null when the table has no `key = [` line.
+ */
+function tomlArrayText(content, table, key) {
+	const pattern = new RegExp(`^${key}\\s*=\\s*\\[`);
+	/** @type {string[] | null} */
+	let lines = null;
+	for (const line of sectionLines(content, table)) {
+		if (lines !== null) {
+			lines.push(line);
+			continue;
+		}
+		const match = line.match(pattern);
+		if (match) {
+			lines = [line.slice(match[0].length)];
+		}
+	}
+	return lines === null ? null : lines.join("\n");
+}
+
+/**
+ * Skips whitespace, newlines and `#` comments.
+ * @param {string} text - Text.
+ * @param {number} index - Start index.
+ * @returns {number} Index of the next significant character.
+ */
+function skipTomlSpace(text, index) {
+	let position = index;
+	while (position < text.length) {
+		if (text[position] === "#") {
+			const newline = text.indexOf("\n", position);
+			position = newline === -1 ? text.length : newline + 1;
+		} else if (/\s/.test(text[position])) {
+			position += 1;
+		} else {
+			break;
+		}
+	}
+	return position;
+}
+
+/**
+ * Reads the name of the first author in a TOML `authors` array: the name part of a string
+ * entry (`authors = ["Name <email>"]`, as in Poetry and Cargo) or the `name` of an inline-table
+ * entry (`authors = [{ name = "Name", email = "..." }]`, as in PEP 621).
+ * @param {string} content - TOML content.
+ * @param {string} table - Table name, dotted for nested tables (`tool.poetry`).
+ * @returns {string | undefined} Name, or undefined when the table has no `authors` array or its
+ * first entry carries no name.
+ */
+export function readTomlAuthor(content, table) {
+	const text = tomlArrayText(content, table, "authors");
+	if (text === null) {
+		return undefined;
+	}
+	const rest = text.slice(skipTomlSpace(text, 0));
+	const string = rest.match(/^(?:"([^"\\\n]*)"|'([^'\n]*)')/);
+	if (string) {
+		return personName(string[1] ?? string[2]);
+	}
+	const inlineTable = rest.match(/^\{([^}\n]*)\}/);
+	const name = inlineTable?.[1].match(/(?:^|,)\s*name\s*=\s*(?:"([^"\\\n]*)"|'([^'\n]*)')/);
+	return name ? cleanName(name[1] ?? name[2]) : undefined;
 }

@@ -13,6 +13,7 @@
 export type DriverDetection = import("./shared.mjs").DriverDetection;
 export type ManifestData = {
     name?: string;
+    company?: string;
 };
 export type ManifestDriver = {
     id: string;
@@ -47,8 +48,10 @@ export type ManifestProject = {
  * @typedef {import("./shared.mjs").DriverDetection} DriverDetection
  */
 /**
- * @typedef {{ name?: string }} ManifestData
+ * @typedef {{ name?: string, company?: string }} ManifestData
  * Values a manifest provides. A field is left undefined when the manifest doesn't carry it.
+ * - `name` - the project name (`@Project`).
+ * - `company` - the copyright holder (`@Copyright`), taken from the manifest's author.
  */
 /**
  * @typedef {{

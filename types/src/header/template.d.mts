@@ -31,9 +31,10 @@
  *  createdAt: {date: string, timestamp: number},
  *  lastModifiedAt: {date: string, timestamp: number},
  *  copyrightStartYear: number,
- *  companyName: string,
+ *  companyName?: string | null,
  *  currentYear: number
- * }} data - Header data.
+ * }} data - Header data. Without a `companyName` (null, undefined or blank), the `@Copyright`
+ * line carries no holder: `Copyright (c) 2019-2026 All rights reserved.`
  * @returns {string} Header block text.
  */
 export declare function buildHeader(data: {
@@ -68,6 +69,6 @@ export declare function buildHeader(data: {
         timestamp: number;
     };
     copyrightStartYear: number;
-    companyName: string;
+    companyName?: string | null;
     currentYear: number;
 }): string;

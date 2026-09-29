@@ -11,14 +11,29 @@
  *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { detectManifests, readJsonName } from "./shared.mjs";
+import { cleanName, detectManifests, parseJsonManifest, personName } from "./shared.mjs";
 
 /**
- * @fileoverview Node.js manifest driver: `package.json`.
+ * @fileoverview Node.js manifest driver: `package.json`. The name is `name`; the copyright
+ * holder is `author.company`, else `author.name`, else the name part of a string `author`
+ * (`"Name <email> (url)"`).
  * @module fix-headers/drivers/node
  */
 
 const manifests = ["package.json"];
+
+/**
+ * Reads the copyright holder from a parsed `package.json` `author`.
+ * @param {unknown} author - The `author` value.
+ * @returns {string | undefined} Holder.
+ */
+function readAuthorCompany(author) {
+	if (author !== null && typeof author === "object") {
+		const person = /** @type {{ company?: unknown, name?: unknown }} */ (author);
+		return cleanName(person.company) ?? cleanName(person.name);
+	}
+	return personName(author);
+}
 
 /** @type {import("./index.mjs").ManifestDriver} */
 export const driver = {
@@ -29,6 +44,7 @@ export const driver = {
 		return detectManifests(dirPath, manifests);
 	},
 	read(detection) {
-		return { name: readJsonName(detection.files[0].content) };
+		const manifest = parseJsonManifest(detection.files[0].content);
+		return { name: cleanName(manifest?.name), company: readAuthorCompany(manifest?.author) };
 	}
 };

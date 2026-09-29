@@ -36,9 +36,10 @@ import { getHeaderSyntaxForFile, renderHeaderLines } from "./syntax.mjs";
  *  createdAt: {date: string, timestamp: number},
  *  lastModifiedAt: {date: string, timestamp: number},
  *  copyrightStartYear: number,
- *  companyName: string,
+ *  companyName?: string | null,
  *  currentYear: number
- * }} data - Header data.
+ * }} data - Header data. Without a `companyName` (null, undefined or blank), the `@Copyright`
+ * line carries no holder: `Copyright (c) 2019-2026 All rights reserved.`
  * @returns {string} Header block text.
  */
 export function buildHeader(data) {
@@ -48,6 +49,8 @@ export function buildHeader(data) {
 	const createdByEmail = data.createdByEmail || data.authorEmail;
 	const lastModifiedByName = data.lastModifiedByName || data.authorName;
 	const lastModifiedByEmail = data.lastModifiedByEmail || data.authorEmail;
+	const companyName = typeof data.companyName === "string" ? data.companyName.trim() : "";
+	const holder = companyName.length > 0 ? `${companyName} ` : "";
 	const headerLines = [
 		`@Project: ${data.projectName}`,
 		`@Filename: ${relativePath}`,
@@ -58,7 +61,7 @@ export function buildHeader(data) {
 		`@Last modified by: ${lastModifiedByName} (${lastModifiedByEmail})`,
 		`@Last modified time: ${data.lastModifiedAt.date} (${data.lastModifiedAt.timestamp})`,
 		"-----",
-		`@Copyright: Copyright (c) ${data.copyrightStartYear}-${data.currentYear} ${data.companyName} All rights reserved.`
+		`@Copyright: Copyright (c) ${data.copyrightStartYear}-${data.currentYear} ${holder}All rights reserved.`
 	];
 
 	return renderHeaderLines(syntax, headerLines);
