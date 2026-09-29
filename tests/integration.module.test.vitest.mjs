@@ -104,6 +104,26 @@ describe("module integration and coverage", () => {
 			await build({ ...config, outDir: join(outRoot, config.outDir), silent: true, config: false });
 		}
 
+		// Every entry point package.json names must exist: dist/ and bin/ in the build output,
+		// types/ in the repository (a stale field such as "module" pointing at a deleted file
+		// would otherwise ship unnoticed).
+		const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+		const { import: importPath, require: requirePath, types: exportTypes } = manifest.exports["."];
+		const entryPoints = [
+			manifest.main,
+			manifest.module,
+			manifest.types,
+			importPath,
+			requirePath,
+			exportTypes,
+			...Object.values(manifest.bin)
+		];
+		for (const entry of entryPoints) {
+			const relativePath = entry.replace(/^\.\//, "");
+			const onDisk = /^(dist|bin)\//.test(relativePath) ? join(outRoot, relativePath) : new URL(`../${relativePath}`, import.meta.url);
+			await expect(readFile(onDisk), `${entry} should exist`).resolves.toBeDefined();
+		}
+
 		const esmModule = await import(pathToFileURL(join(outRoot, "dist", "index.mjs")).href);
 		expect(typeof esmModule.default).toBe("function");
 		expect(esmModule.fixHeaders).toBe(esmModule.default);
