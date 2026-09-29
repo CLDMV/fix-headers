@@ -52,6 +52,25 @@ describe("manifest drivers", () => {
 		expect(getDriverById("unknown")).toBeUndefined();
 	});
 
+	it("node: a VS Code extension's name is its Marketplace identifier <publisher>.<name>", async () => {
+		const extension = { name: "jsonv-vscode", publisher: " cldmv ", engines: { vscode: "^1.88.0" } };
+		expect((await detectAndRead("node", { "package.json": JSON.stringify(extension) })).data).toEqual({ name: "cldmv.jsonv-vscode" });
+		// A publisher field alone doesn't make a VS Code extension, and an extension needs a publisher.
+		expect((await detectAndRead("node", { "package.json": JSON.stringify({ ...extension, engines: { node: ">=22" } }) })).data).toEqual({
+			name: "jsonv-vscode"
+		});
+		expect((await detectAndRead("node", { "package.json": JSON.stringify({ ...extension, engines: undefined }) })).data).toEqual({
+			name: "jsonv-vscode"
+		});
+		expect((await detectAndRead("node", { "package.json": JSON.stringify({ ...extension, publisher: " " }) })).data).toEqual({
+			name: "jsonv-vscode"
+		});
+		// Without a name there is nothing to qualify.
+		expect((await detectAndRead("node", { "package.json": JSON.stringify({ ...extension, name: undefined }) })).data).toEqual({
+			name: undefined
+		});
+	});
+
 	it("node: package.json name, trimmed; none when missing, blank, not a string or malformed", async () => {
 		expect((await detectAndRead("node", { "package.json": '{ "name": " @scope/pkg " }' })).data).toEqual({ name: "@scope/pkg" });
 		expect((await detectAndRead("node", { "package.json": '{ "version": "1.0.0" }' })).data).toEqual({ name: undefined });

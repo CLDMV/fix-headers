@@ -14,13 +14,29 @@
 import { cleanName, detectManifests, parseJsonManifest, personName } from "./shared.mjs";
 
 /**
- * @fileoverview Node.js manifest driver: `package.json`. The name is `name`; the copyright
- * holder is `author.company`, else `author.name`, else the name part of a string `author`
- * (`"Name <email> (url)"`).
+ * @fileoverview Node.js manifest driver: `package.json`. The name is the name the package is
+ * published under (see readPublishedName); the copyright holder is `author.company`, else
+ * `author.name`, else the name part of a string `author` (`"Name <email> (url)"`).
  * @module fix-headers/drivers/node
  */
 
 const manifests = ["package.json"];
+
+/**
+ * Reads the name a package is published under: the npm package name, or, for a VS Code
+ * extension (`engines.vscode` plus a `publisher`), its Marketplace identifier
+ * `<publisher>.<name>` — extensions can't use an npm scope, so the publisher is what
+ * identifies whose they are (`cldmv.jsonv-vscode`).
+ * @param {any} manifest - Parsed `package.json`.
+ * @returns {string | undefined} Published name, or undefined when there is no non-empty
+ * string `name`.
+ */
+function readPublishedName(manifest) {
+	const name = cleanName(manifest?.name);
+	const publisher = cleanName(manifest?.publisher);
+	const isVscodeExtension = typeof manifest?.engines?.vscode === "string";
+	return name && publisher && isVscodeExtension ? `${publisher}.${name}` : name;
+}
 
 /**
  * Reads the copyright holder from a parsed `package.json` `author`.
@@ -45,6 +61,6 @@ export const driver = {
 	},
 	read(detection) {
 		const manifest = parseJsonManifest(detection.files[0].content);
-		return { name: cleanName(manifest?.name), company: readAuthorCompany(manifest?.author) };
+		return { name: readPublishedName(manifest), company: readAuthorCompany(manifest?.author) };
 	}
 };
