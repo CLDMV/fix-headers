@@ -13,6 +13,7 @@
 
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { applyConfigOption } from "../config/load.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import { checkHeaderDates, convertDatePayload, normalizeDatePayload, repairDateEpoch, resolveCreatedDate } from "../header/dates.mjs";
@@ -122,35 +123,13 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  */
 
 /**
- * Resolves runtime options including optional JSON config file loading.
+ * Resolves runtime options including optional JSON config file loading (with `extends`).
+ * Options passed directly win over everything from the config file.
  * @param {FixHeadersOptions} options - Runtime options.
  * @returns {Promise<FixHeadersOptions>} Effective runtime options.
  */
-async function resolveRuntimeOptions(options) {
-	const configFile = typeof options.configFile === "string" && options.configFile.trim().length > 0 ? options.configFile.trim() : null;
-
-	if (!configFile) {
-		return options;
-	}
-
-	const baseCwd = typeof options.cwd === "string" && options.cwd.length > 0 ? options.cwd : process.cwd();
-	const absoluteConfigPath = resolve(baseCwd, configFile);
-	const raw = await readFile(absoluteConfigPath, "utf8");
-	const parsed = JSON.parse(raw);
-
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new Error(`Config file must contain a JSON object: ${configFile}`);
-	}
-
-	const merged = {
-		...parsed,
-		...options
-	};
-
-	delete merged.configFile;
-	/** @type {FixHeadersOptions} */
-	const output = merged;
-	return output;
+function resolveRuntimeOptions(options) {
+	return applyConfigOption(options, "configFile");
 }
 
 /**
