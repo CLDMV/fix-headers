@@ -24,3 +24,11 @@ export declare function findNearestMarker(startPath: string, markers: string[]):
     root: string;
     marker: string;
 } | null>;
+/**
+ * Reads the project name from a `package.json` marker: its trimmed `name`, or the fallback
+ * when the content isn't valid JSON or has no non-empty string `name`.
+ * @param {string} markerContent - `package.json` content.
+ * @param {string} fallbackName - Name to use without a usable `name` (the project folder name).
+ * @returns {string} Project name.
+ */
+export declare function parsePackageJsonName(markerContent: string, fallbackName: string): string;

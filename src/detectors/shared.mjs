@@ -43,3 +43,19 @@ export async function findNearestMarker(startPath, markers) {
 		currentDir = parent;
 	}
 }
+
+/**
+ * Reads the project name from a `package.json` marker: its trimmed `name`, or the fallback
+ * when the content isn't valid JSON or has no non-empty string `name`.
+ * @param {string} markerContent - `package.json` content.
+ * @param {string} fallbackName - Name to use without a usable `name` (the project folder name).
+ * @returns {string} Project name.
+ */
+export function parsePackageJsonName(markerContent, fallbackName) {
+	try {
+		const parsed = JSON.parse(markerContent);
+		return typeof parsed?.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : fallbackName;
+	} catch {
+		return fallbackName;
+	}
+}

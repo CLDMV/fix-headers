@@ -12,24 +12,17 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
+import { findNearestMarker, parsePackageJsonName } from "./shared.mjs";
 
 /**
  * @fileoverview HTML detector implementation.
  * @module fix-headers/detectors/html
  */
 
-const markers = ["index.html", "vite.config.js", "vite.config.mjs", "next.config.js", "next.config.mjs"];
+// package.json first: within one folder the first marker found wins, so a project's manifest
+// takes precedence over an index.html or bundler config sitting next to it.
+const markers = ["package.json", "index.html", "vite.config.js", "vite.config.mjs", "next.config.js", "next.config.mjs"];
 const extensions = [".html", ".htm"];
-
-/**
- * Parses HTML project name from marker context.
- * @param {string} rootDirName - Fallback directory name.
- * @returns {string} Project name.
- */
-function parseHtmlProjectName(rootDirName) {
-	return rootDirName;
-}
 
 /**
  * Resolves HTML comment syntax for HTML-like files.
@@ -58,8 +51,10 @@ export const detector = {
 	findNearestConfig(startPath) {
 		return findNearestMarker(startPath, markers);
 	},
-	parseProjectName(_marker, _markerContent, rootDirName) {
-		return parseHtmlProjectName(rootDirName);
+	// Take the name from the project's package.json when there is one; other markers carry no
+	// name, so the folder name is used then.
+	parseProjectName(marker, markerContent, rootDirName) {
+		return marker === "package.json" ? parsePackageJsonName(markerContent, rootDirName) : rootDirName;
 	},
 	resolveCommentSyntax(filePath) {
 		return resolveHtmlCommentSyntax(filePath);
