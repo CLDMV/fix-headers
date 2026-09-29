@@ -187,6 +187,7 @@ async function loadSource(source, chain) {
 	}
 
 	const { extends: references, ...own } = parsed;
+	/** @type {Record<string, unknown>} */
 	let merged = {};
 	for (const reference of readExtends(references, label)) {
 		merged = mergeConfig(merged, await loadSource(resolveReference(reference, base), [...chain, label]));

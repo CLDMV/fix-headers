@@ -41,7 +41,7 @@ export function resolveCreatedDate({ existing, gitCreated, filesystemCreated, fi
  * @param {string | null} [timeZone=null] - IANA zone name, already validated.
  * @returns {number} Calendar year.
  */
-export declare function dateYear(payload: DatePayload, timeZone?: string | null): number;
+export function dateYear(payload: DatePayload, timeZone?: string | null): number;
 /**
  * Validates the `@Date` and `@Last modified time` values of an existing header.
  *
