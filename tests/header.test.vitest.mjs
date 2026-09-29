@@ -209,7 +209,7 @@ describe("header/template + parser", () => {
 			currentYear: 2026
 		});
 
-		expect(header.startsWith("#\t@Project:")).toBe(true);
+		expect(header.startsWith("#\n#\t@Project:")).toBe(true);
 		const found = findProjectHeader(`${header}\n\nprint('x')\n`, "/repo/src/app.py");
 		expect(found).not.toBeNull();
 	});
@@ -228,7 +228,7 @@ describe("header/template + parser", () => {
 			currentYear: 2026
 		});
 
-		expect(header.startsWith("#\t@Project:")).toBe(true);
+		expect(header.startsWith("#\n#\t@Project:")).toBe(true);
 		expect(findProjectHeader(`${header}\n\nservice:\n  name: app\n`, "/repo/config/app.yaml")).not.toBeNull();
 	});
 
@@ -287,7 +287,7 @@ describe("header/template + parser", () => {
 			currentYear: 2026
 		});
 
-		expect(header.startsWith(";; @Project:")).toBe(true);
+		expect(header.startsWith(";;\n;; @Project:")).toBe(true);
 		expect(findProjectHeader(`${header}\n\nprint('x')\n`, "/repo/src/app.py", syntaxOptions)).not.toBeNull();
 	});
 
@@ -314,7 +314,7 @@ describe("header/template + parser", () => {
 			currentYear: 2026
 		});
 
-		expect(header.startsWith("#@Project:")).toBe(true);
+		expect(header.startsWith("#\n#@Project:")).toBe(true);
 		expect(findProjectHeader(`${header}\n\nprint('x')\n`, "/repo/src/app.py", syntaxOptions)).not.toBeNull();
 	});
 });

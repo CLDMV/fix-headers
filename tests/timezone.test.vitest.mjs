@@ -89,7 +89,7 @@ function expectZonedValue(value, timeZone, form) {
  */
 function fileWithHeader(fileName, createdValue, modifiedValue) {
 	const year = new Date().getFullYear();
-	return `/**\n *\t@Project: tz-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${year} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
+	return `/**\n *\n *\t@Project: tz-check\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${modifiedValue}\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${year} Catalyzed Motivation Inc. All rights reserved.\n *\n */\n\n\nexport const value = 1;\n`;
 }
 
 /** The fixtures' `package.json`: its author supplies the `@Copyright` holder {@link fileWithHeader} writes. */

@@ -26,7 +26,7 @@ export function getDetectorById(id: string): (typeof DETECTOR_PROFILES)[number] 
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectors?: DetectorProfile[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }> }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectors?: DetectorProfile[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
  * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
 export function getCommentSyntaxForFile(filePath: string, options?: {
@@ -41,6 +41,8 @@ export function getCommentSyntaxForFile(filePath: string, options?: {
         blockLinePrefix?: string;
         blockEnd?: string;
     }>;
+    spacing?: number;
+    margin?: number;
 }): {
     kind: "block" | "line" | "html";
     linePrefix?: string;

@@ -48,6 +48,8 @@ export type FixHeadersOptions = {
     company?: string;
     companyName?: string;
     copyrightStartYear?: number;
+    spacing?: number;
+    margin?: number;
 };
 export type HeaderFieldIssue = import("../header/fields.mjs").HeaderFieldIssue;
 /**

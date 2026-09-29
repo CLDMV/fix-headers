@@ -45,7 +45,7 @@ const CURRENT_YEAR = new Date().getFullYear();
  * @returns {string} File content with header.
  */
 function fileWithHeader(fileName, createdValue, copyrightYears) {
-	return `/**\n *\t@Project: copyright-year\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${createdValue}\n *\t-----\n *\t@Copyright: Copyright (c) ${copyrightYears} Catalyzed Motivation Inc. All rights reserved.\n */\n\nexport const value = 1;\n`;
+	return `/**\n *\n *\t@Project: copyright-year\n *\t@Filename: /${fileName}\n *\t@Date: ${createdValue}\n *\t@Author: Someone Else\n *\t@Email: <else@example.com>\n *\t-----\n *\t@Last modified by: Someone Else (else@example.com)\n *\t@Last modified time: ${createdValue}\n *\t-----\n *\t@Copyright: Copyright (c) ${copyrightYears} Catalyzed Motivation Inc. All rights reserved.\n *\n */\n\n\nexport const value = 1;\n`;
 }
 
 /**

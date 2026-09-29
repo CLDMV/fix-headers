@@ -14,6 +14,7 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { applyConfigOption } from "../config/load.mjs";
+import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
@@ -63,7 +64,9 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  authorEmail?: string,
  *  company?: string,
  *  companyName?: string,
- *  copyrightStartYear?: number
+ *  copyrightStartYear?: number,
+ *  spacing?: number,
+ *  margin?: number
  * }} FixHeadersOptions
  */
 
@@ -247,6 +250,8 @@ export async function fixHeaders(options = {}) {
 		...effectiveOptions,
 		cwd: scanRoot
 	});
+	resolveLayoutCount(effectiveOptions.spacing, "spacing", DEFAULT_HEADER_SPACING);
+	resolveLayoutCount(effectiveOptions.margin, "margin", DEFAULT_HEADER_MARGIN);
 	const check = effectiveOptions.check === true;
 	const dryRun = check || effectiveOptions.dryRun === true;
 	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
@@ -320,7 +325,9 @@ export async function fixHeaders(options = {}) {
 			language: fileMetadata.language,
 			enabledDetectors: effectiveOptions.enabledDetectors,
 			disabledDetectors: effectiveOptions.disabledDetectors,
-			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
+			spacing: effectiveOptions.spacing,
+			margin: effectiveOptions.margin
 		});
 		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
 		const existingIdentity = existingHeaderText.length > 0 ? extractHeaderAuthorIdentity(existingHeaderText) : {};
@@ -369,7 +376,9 @@ export async function fixHeaders(options = {}) {
 				language: fileMetadata.language,
 				enabledDetectors: effectiveOptions.enabledDetectors,
 				disabledDetectors: effectiveOptions.disabledDetectors,
-				detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+				detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
+				spacing: effectiveOptions.spacing,
+				margin: effectiveOptions.margin
 			},
 			projectRoot: fileMetadata.projectRoot,
 			projectName: fileMetadata.projectName,
@@ -394,7 +403,9 @@ export async function fixHeaders(options = {}) {
 			language: fileMetadata.language,
 			enabledDetectors: effectiveOptions.enabledDetectors,
 			disabledDetectors: effectiveOptions.disabledDetectors,
-			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
+			spacing: effectiveOptions.spacing,
+			margin: effectiveOptions.margin
 		});
 		const needsUpdate = comparisonReplacement.changed;
 		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
@@ -408,7 +419,9 @@ export async function fixHeaders(options = {}) {
 						language: fileMetadata.language,
 						enabledDetectors: effectiveOptions.enabledDetectors,
 						disabledDetectors: effectiveOptions.disabledDetectors,
-						detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+						detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
+						spacing: effectiveOptions.spacing,
+						margin: effectiveOptions.margin
 					},
 					projectRoot: fileMetadata.projectRoot,
 					projectName: fileMetadata.projectName,
@@ -435,7 +448,9 @@ export async function fixHeaders(options = {}) {
 					language: fileMetadata.language,
 					enabledDetectors: effectiveOptions.enabledDetectors,
 					disabledDetectors: effectiveOptions.disabledDetectors,
-					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
+					spacing: effectiveOptions.spacing,
+					margin: effectiveOptions.margin
 				})
 			: comparisonReplacement;
 		/** @type {FixHeadersResult["changes"][number]} */
