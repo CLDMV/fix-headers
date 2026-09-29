@@ -8,6 +8,23 @@ Multi-language source header normalizer for Node.js projects.
 
 [![Contributors]][contributors_url] [![Sponsor shinrai]][sponsor_url]
 
+## ✨ What's New
+
+### Latest: v1.4.0 (September 2026)
+
+- **Built package, date checks and header diffs** — npm now ships a tsup-built `dist/` and `bin/` instead of `src/`, with a 1.2 kB CommonJS wrapper, so `require()` still returns `fixHeaders` ([#56](https://github.com/CLDMV/fix-headers/pull/56), [#65](https://github.com/CLDMV/fix-headers/pull/65)). `--check` validates header dates without writing and exits `1` on drift, `@Date` follows "oldest wins" across the header, git and the filesystem, and mismatched epochs are repaired ([#67](https://github.com/CLDMV/fix-headers/pull/67)). `--diff` prints a unified header diff and `sampleOutput` lists per-field issues ([#66](https://github.com/CLDMV/fix-headers/pull/66)); `includeFolders` takes non-recursive entries and never processes a file twice ([#60](https://github.com/CLDMV/fix-headers/pull/60)).
+- **Default changes: discovery and `@Project`** — nothing is skipped by name any more: `node_modules`, `dist`, `build`, `coverage`, `tmp`, `.next` and `.turbo` are processed unless an ignore file (everything git honours) or `excludeFolders` excludes them ([#73](https://github.com/CLDMV/fix-headers/pull/73)). `@Project` comes from the project's manifest (`package.json`, `pyproject.toml`, `Cargo.toml`, …) whatever the file's type, so CSS, HTML, YAML and JSON files get the project's name instead of a folder name ([#72](https://github.com/CLDMV/fix-headers/pull/72), [#75](https://github.com/CLDMV/fix-headers/pull/75)). Preview the first run with `--dry-run --diff`; see the upgrade notes.
+- [View full v1.4.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v1/v1.4.0.md)
+
+### Recent Releases
+
+- **v1.3.12** (September 2026) — `engines.node` raised to `>=22.12.0` with the move to vitest 5; `ignore` bumped to 7.0.8 ([#38](https://github.com/CLDMV/fix-headers/pull/38), [#40](https://github.com/CLDMV/fix-headers/pull/40), [#43](https://github.com/CLDMV/fix-headers/pull/43)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.12))
+- **v1.3.11** (September 2026) — CI and release automation only, no runtime change: bot identity and GPG secrets passed to the v4 release and hotfix-redirect workflows ([#32](https://github.com/CLDMV/fix-headers/pull/32), [#36](https://github.com/CLDMV/fix-headers/pull/36)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.11))
+- **v1.3.10** (August 2026) — tests only, no runtime change: fallback-path tests run in a workspace with no project ancestry ([#28](https://github.com/CLDMV/fix-headers/pull/28)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.10))
+- **v1.3.9** (August 2026) — an existing header's `@Last modified by` identity is preserved unless `forceLastModifiedAuthorUpdate` / `--force-last-modified-author-update` is set, so a different local git identity no longer rewrites headers tree-wide ([#25](https://github.com/CLDMV/fix-headers/pull/25)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.9))
+
+📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder and the [GitHub Releases](https://github.com/CLDMV/fix-headers/releases).
+
 ## Features
 
 - Finds the project each file belongs to from its manifest (`package.json`, `pyproject.toml` / `setup.cfg` / `setup.py`, `composer.json`, `Cargo.toml`, `go.mod`), whatever the file's type
