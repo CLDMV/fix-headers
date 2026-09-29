@@ -78,7 +78,11 @@ export type DateRewrite = (payload: {
  *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
  *   (null when nothing provides one, and the line then carries none), and `companyNameSource`
  *   says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }`
- *   or `{ from: "none" }`.
+ *   or `{ from: "none" }`. `copyrightStartYear` is the start year written for the file, and
+ *   `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or
+ *   `"created-date"` (the year of the file's `@Date`).
+ *
+ * `metadata.copyrightStartYear` is the `copyrightStartYear` option, or null when it is not set.
  */
 export type FixHeadersResult = {
     metadata: {
