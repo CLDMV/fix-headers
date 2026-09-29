@@ -12,14 +12,12 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
 
 /**
  * @fileoverview PHP detector implementation.
  * @module fix-headers/detectors/php
  */
 
-const markers = ["composer.json"];
 const extensions = [".php"];
 
 /**
@@ -42,24 +40,8 @@ function resolvePhpCommentSyntax(filePath) {
 
 export const detector = {
 	id: "php",
-	priority: 80,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	parseProjectName(_marker, markerContent, rootDirName) {
-		try {
-			const parsed = JSON.parse(markerContent);
-			if (typeof parsed.name === "string" && parsed.name.trim().length > 0) {
-				return parsed.name.trim();
-			}
-			return rootDirName;
-		} catch {
-			return rootDirName;
-		}
-	},
 	resolveCommentSyntax(filePath) {
 		return resolvePhpCommentSyntax(filePath);
 	}

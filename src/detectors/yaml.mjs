@@ -12,38 +12,13 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker } from "./shared.mjs";
 
 /**
  * @fileoverview YAML detector implementation.
  * @module fix-headers/detectors/yaml
  */
 
-const markers = ["package.json", ".git"];
 const extensions = [".yaml", ".yml"];
-
-/**
- * Parses YAML project name from nearest marker content when available.
- * @param {string} marker - Marker filename.
- * @param {string} markerContent - Marker content.
- * @param {string} rootDirName - Fallback root directory name.
- * @returns {string} Project name.
- */
-function parseYamlProjectName(marker, markerContent, rootDirName) {
-	if (marker !== "package.json") {
-		return rootDirName;
-	}
-
-	try {
-		const parsed = JSON.parse(markerContent);
-		if (typeof parsed.name === "string" && parsed.name.trim().length > 0) {
-			return parsed.name.trim();
-		}
-		return rootDirName;
-	} catch {
-		return rootDirName;
-	}
-}
 
 /**
  * Resolves comment syntax for YAML file extensions.
@@ -63,16 +38,8 @@ function resolveYamlCommentSyntax(filePath) {
 
 export const detector = {
 	id: "yaml",
-	priority: 60,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	parseProjectName(marker, markerContent, rootDirName) {
-		return parseYamlProjectName(marker, markerContent, rootDirName);
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveYamlCommentSyntax(filePath);
 	}

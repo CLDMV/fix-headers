@@ -12,14 +12,12 @@
  */
 
 import { extname } from "node:path";
-import { findNearestMarker, parsePackageJsonName } from "./shared.mjs";
 
 /**
  * @fileoverview CSS detector implementation.
  * @module fix-headers/detectors/css
  */
 
-const markers = ["package.json", "postcss.config.js", "postcss.config.cjs", "postcss.config.mjs"];
 const extensions = [".css"];
 
 /**
@@ -42,18 +40,8 @@ function resolveCssCommentSyntax(filePath) {
 
 export const detector = {
 	id: "css",
-	priority: 70,
-	markers,
 	extensions,
 	enabledByDefault: true,
-	findNearestConfig(startPath) {
-		return findNearestMarker(startPath, markers);
-	},
-	// CSS lives in the project it belongs to: take the name from its package.json, like the
-	// Node detector; a postcss config alone carries no name, so the folder name is used then.
-	parseProjectName(marker, markerContent, rootDirName) {
-		return marker === "package.json" ? parsePackageJsonName(markerContent, rootDirName) : rootDirName;
-	},
 	resolveCommentSyntax(filePath) {
 		return resolveCssCommentSyntax(filePath);
 	}
