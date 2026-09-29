@@ -4,7 +4,7 @@
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
-	"module": "./index.mjs",
+	"module": "./dist/index.mjs",
 	"types": "./types/index.d.mts",
 	"files": [
 		"dist/",
