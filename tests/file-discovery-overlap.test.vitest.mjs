@@ -249,7 +249,9 @@ describe("discoverFiles with overlapping includeFolders (issue #59)", () => {
 		}
 	});
 
-	it("reports the de-duplicated count as filesScanned through fixHeaders", async () => {
+	// A full fixHeaders pass runs git history lookups for every discovered file: well past
+	// vitest's 5s default on a loaded machine (the same fix as the tsup test in #58).
+	it("reports the de-duplicated count as filesScanned through fixHeaders", { timeout: 30_000 }, async () => {
 		const root = await slothletShapedFixture();
 
 		const result = await fixHeaders({
