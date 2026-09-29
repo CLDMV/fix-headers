@@ -56,6 +56,8 @@ Common CLI options:
 - `--fix-created-date`
 - `--strict-created-date`
 - `--normalize-date-format`
+- `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#time-zone))
+- `--convert-timezone` - with `--timezone`, also rewrite existing header dates into that zone
 - `--json`
 - `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
 - `--sample-output` - print the previous/new header and detected values for each changed file
@@ -99,6 +101,8 @@ Important options:
 - `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
 - `strictCreatedDate?: boolean` - with `check`, count a `@Date` later than the file's git first commit or filesystem creation time as drift (fails the run). Off by default, where it is an advisory
 - `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
+- `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#time-zone)
+- `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#time-zone)
 - `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
 - `configFile?: string` - load JSON options from file (resolved from `cwd`)
 - `includeExtensions?: string[]` - file extensions to process
@@ -236,6 +240,35 @@ To make the created-date check fail CI, set `"strictCreatedDate": true` in the c
 Advisories are counted in the summary and listed with `--verbose`; `--json` prints the full result and uses the same exit code. `--dry-run` still always exits `0`.
 
 In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-newer-than-source` is corrected only with `fixCreatedDate` / `--fix-created-date`.
+
+## Time zone
+
+A header date is correct in any zone: the offset is only how the instant is shown, and the epoch in parentheses is the instant. So nothing is converted by default. `timezone` / `--timezone <name>` is for projects that want every date shown in one zone:
+
+- **Dates fix-headers writes** are expressed in the zone: a new header's `@Date` (from the git first commit or the filesystem, see [Creation date](#creation-date)), an `@Date` moved by `fixCreatedDate`, and the `@Last modified time` stamped on every changed file.
+- **Dates already in a header** are kept as written, unless `convertTimezone` / `--convert-timezone` is also set. That sweep rewrites existing `@Date` and `@Last modified time` values into the zone. A value whose datetime is not recognised is left alone, and so is one already in the zone's offset at that instant.
+
+Only the wall-clock time and the offset change; the instant and the epoch stay the same. The offset is the zone's offset at that instant, from the time zone data built into Node (`Intl`), so daylight saving time is applied per date: with `America/Los_Angeles`, a January date is written at `-08:00` and a July date at `-07:00`. Half-hour and other zones work the same way (`Asia/Kolkata` is `+05:30`, `Pacific/Kiritimati` is `+14:00`). The zone name is validated with `Intl`, and an unknown name fails the run.
+
+A converted value keeps its shape: the space form (`2026-01-18 20:39:48 -08:00`) stays in the space form, and the T-form (`2026-01-18T20:39:48-08:00`, as git dates are written) stays in the T-form. With `normalizeDateFormat` every date is then written in the T-form, in the zone.
+
+Rewriting a date is a header change like any other, so a file the sweep rewrites also gets a fresh `@Last modified time`, the same as a file whose epoch is repaired or whose dates `normalizeDateFormat` rewrites. The first `--convert-timezone` run therefore restamps every managed file with a date outside the zone. A file whose dates are all in the zone already (or unrecognised) and whose header is otherwise current is not touched.
+
+`--check` compares instants, so a date shown in another zone than `timezone` is not drift, and the check has no time zone rule.
+
+```bash
+$ fix-headers --timezone America/Los_Angeles --convert-timezone
+```
+
+```diff
+- *	@Date: 2026-01-19 04:39:48 +00:00 (1768797588)
++ *	@Date: 2026-01-18 20:39:48 -08:00 (1768797588)
+  ...
+- *	@Last modified time: 2026-07-19T04:39:48+00:00 (1784435988)
++ *	@Last modified time: 2026-09-28 10:15:02 -07:00 (1790615702)
+```
+
+The `@Date` instant is unchanged; `@Last modified time` is restamped with the time of the run, in the zone.
 
 ## Which files are processed
 

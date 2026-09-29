@@ -18,6 +18,8 @@ export type FixHeadersOptions = {
     fixCreatedDate?: boolean;
     strictCreatedDate?: boolean;
     normalizeDateFormat?: boolean;
+    timezone?: string;
+    convertTimezone?: boolean;
     configFile?: string;
     sampleOutput?: boolean;
     forceAuthorUpdate?: boolean;
@@ -50,6 +52,13 @@ export type FixHeadersOptions = {
     copyrightStartYear?: number;
 };
 export type HeaderFieldIssue = import("../header/fields.mjs").HeaderFieldIssue;
+export type DateRewrite = (payload: {
+    date: string;
+    timestamp: number;
+}) => {
+    date: string;
+    timestamp: number;
+};
 export type FixHeadersResult = {
     metadata: {
         projectName: string;
