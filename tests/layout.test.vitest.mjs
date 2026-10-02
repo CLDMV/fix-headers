@@ -1,4 +1,5 @@
 /**
+ *
  *	@Project: @cldmv/fix-headers
  *	@Filename: /tests/layout.test.vitest.mjs
  *	@Date: 2026-09-29T01:20:00-07:00 (1790670000)
@@ -6,9 +7,10 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-09-29T01:20:00-07:00 (1790670000)
+ *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
  *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
  */
 
 import { join } from "node:path";

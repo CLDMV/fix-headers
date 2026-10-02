@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /.configs/vitest.globalSetup.mjs
+ *	@Date: 2026-08-18T16:39:18-07:00 (1787096358)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:28:06-07:00 (1790969286)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * @fileoverview Vitest global setup for the fix-headers test suite.
  *
  * Reaps ONLY stale fixture directories (see reapStaleWorkspaces in

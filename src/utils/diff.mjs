@@ -1,4 +1,5 @@
 /**
+ *
  *	@Project: @cldmv/fix-headers
  *	@Filename: /src/utils/diff.mjs
  *	@Date: 2026-09-28T09:14:18-07:00 (1790612058)
@@ -6,9 +7,10 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-09-28T09:14:18-07:00 (1790612058)
+ *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
  *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
  */
 
 /**

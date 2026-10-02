@@ -1,5 +1,20 @@
 #!/usr/bin/env node
 /**
+ *
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /.githooks/install.mjs
+ *	@Date: 2026-09-29T06:58:53+00:00 (1790665133)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:28:06-07:00 (1790969286)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * @fileoverview Installs the committed pre-commit hook into `.git/hooks/pre-commit`.
  *
  * Wire it into package.json so it runs on `npm install`. Use the guarded form

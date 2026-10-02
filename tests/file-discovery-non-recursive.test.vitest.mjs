@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/file-discovery-non-recursive.test.vitest.mjs
+ *	@Date: 2026-09-29T06:58:53+00:00 (1790665133)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * @fileoverview Non-recursive `includeFolders` entries (`{ path, recursive: false }`): root-files-only
  * discovery, mixing with recursive entries for the same or a containing folder, input validation,
  * walkFiles' `recursive` option, and the `--include-folder-non-recursive` CLI flag.
