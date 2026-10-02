@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/run-vitest.mjs
+ *	@Date: 2026-09-29T06:58:53+00:00 (1790665133)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:28:19-07:00 (1790969299)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * @fileoverview OOM-safe Vitest runner for fix-headers — delegates to
  * @cldmv/vitest-runner, which spawns each test file in its own child process and
  * (under coverage) uses a blob-per-file + `--mergeReports` strategy so a single

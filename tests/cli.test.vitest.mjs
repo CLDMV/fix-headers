@@ -1,14 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/fix-headers
  *	@Filename: /tests/cli.test.vitest.mjs
- *	@Date: 2026-03-01 15:14:34 -08:00 (1772406874)
+ *	@Date: 2026-03-01T15:14:34-08:00 (1772406874)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-03-01T17:59:32-08:00 (1772416772)
+ *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
  *	-----
- *	@Copyright: Copyright (c) 2026-2026 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
  */
 
 import { symlink } from "node:fs/promises";

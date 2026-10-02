@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.1.1",
+	"version": "2.1.2",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -43,7 +43,8 @@
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
-		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\""
+		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"",
+		"fix:headers": "node ./src/cli.mjs --config .configs/fix-headers.json"
 	},
 	"keywords": [
 		"headers",
@@ -84,6 +85,7 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
+		"@cldmv/configs": "^1.2.0",
 		"@cldmv/eslint-plugin-jsonv": "^1.0.10",
 		"@cldmv/jsonv": "^1.0.9",
 		"@cldmv/prettier-plugin-jsonv": "^1.0.6",
