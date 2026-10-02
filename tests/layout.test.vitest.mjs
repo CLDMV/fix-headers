@@ -82,6 +82,17 @@ describe("header layout: spacing and margin", () => {
 		);
 	});
 
+	it("ends a header-only file with the header and one newline, whatever the margin", () => {
+		const header = "/**\n *\t@Project: x\n */";
+		for (const margin of [0, 1, 2, 4]) {
+			const inserted = replaceOrInsertHeader("", header, "/r/a.mjs", { margin });
+			expect(inserted.nextContent).toBe(`${header}\n`);
+			expect(replaceOrInsertHeader(inserted.nextContent, header, "/r/a.mjs", { margin }).changed).toBe(false);
+			expect(replaceOrInsertHeader(`${header}\n\n\n\n`, header, "/r/a.mjs", { margin }).nextContent).toBe(`${header}\n`);
+		}
+		expect(replaceOrInsertHeader("", "#\n#\t@Project: x\n#", "/r/a.py").nextContent).toBe("#\n#\t@Project: x\n#\n");
+	});
+
 	it("restyles an existing header in place, whatever layout it had", () => {
 		const header = "/**\n *\n *\t@Project: new\n *\n */";
 		const oldStyle = "/**\n *\t@Project: old\n */\n\nexport const a = 1;\n";
