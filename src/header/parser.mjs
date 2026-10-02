@@ -136,14 +136,16 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 	const configuredMargin = resolveLayoutCount(syntaxOptions.margin, "margin", DEFAULT_HEADER_MARGIN);
 	const margin = getHeaderSyntaxForFile(filePath, syntaxOptions).kind === "line" ? Math.max(1, configuredMargin) : configuredMargin;
 	const gap = "\n".repeat(margin + 1);
+	// With nothing after the header there is no next content to separate from, so the file just ends with the header.
+	const join = (rest) => (rest.trim() === "" ? `${newHeader}\n` : `${newHeader}${gap}${rest}`);
 	if (!existing) {
 		const { prefix, body } = splitPreservedPrefix(filePath, content, syntaxOptions);
-		const nextContent = `${prefix}${newHeader}${gap}${body.replace(/^\n+/, "")}`;
+		const nextContent = `${prefix}${join(body.replace(/^\n+/, ""))}`;
 		return { nextContent, changed: nextContent !== content };
 	}
 
 	const before = content.slice(0, existing.start);
 	const after = content.slice(existing.end).replace(/^\n+/, "");
-	const nextContent = `${before}${newHeader}${gap}${after}`;
+	const nextContent = `${before}${join(after)}`;
 	return { nextContent, changed: nextContent !== content };
 }
