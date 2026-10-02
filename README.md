@@ -10,17 +10,17 @@ Multi-language source header normalizer for Node.js projects.
 
 ## ✨ What's New
 
-### Latest: v2.1.0 (September 2026)
+### Latest: v2.1.3 (October 2026)
 
-- **Header layout: `spacing` and `margin`** — every header is now framed with empty comment lines (`/**`, ` *`, fields, ` *`, ` */` for block headers; a bare `#` above and below for line-comment headers) and followed by two blank lines, set by the new `spacing` (default `1`) and `margin` (default `2`) options in a config file, the API and the CLI (`--spacing`, `--margin`) ([#101](https://github.com/CLDMV/fix-headers/pull/101)). This fixes YAML and Python headers losing their padded `#` lines on the first run. Existing headers are restyled on the next run; use `spacing: 0` and `margin: 1` to keep the compact layout.
-- [View full v2.1.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md)
+- **CI and development-dependency maintenance, no runtime change** — the `✅ Required PR Check` mirror job in `ci.yml` no longer carries the required name while it is skipped, so a skipped `pull_request` run can no longer satisfy the branch ruleset and let an in-repo PR merge before the push run's tests have finished ([#111](https://github.com/CLDMV/fix-headers/pull/111)). Four development dependencies move to their current releases in the lockfile: `@cldmv/jsonv` 1.1.1, `@cldmv/eslint-plugin-jsonv` 1.0.13, `@cldmv/prettier-plugin-jsonv` 1.1.0 and `@cldmv/vitest-runner` 1.5.1 ([#109](https://github.com/CLDMV/fix-headers/pull/109), [#114](https://github.com/CLDMV/fix-headers/pull/114)). `ignore`, the only runtime dependency, is unchanged, and `dist/`, `bin/` and the API are the same as in v2.1.2.
+- [View full v2.1.3 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md)
 
 ### Recent Releases
 
+- **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config (`.configs/fix-headers.json` extending `@cldmv/configs/fix-headers.json`, run with `npm run fix:headers`) and stamps uniform file headers across its own sources ([#107](https://github.com/CLDMV/fix-headers/pull/107)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v2.1.2))
+- **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines ([#105](https://github.com/CLDMV/fix-headers/pull/105), fixes [#104](https://github.com/CLDMV/fix-headers/issues/104)); `esbuild` bumped to 0.28.2 to clear GHSA-g7r4-m6w7-qqqr ([#103](https://github.com/CLDMV/fix-headers/pull/103)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v2.1.1))
+- **v2.1.0** (September 2026) — `spacing` and `margin` header layout options: every header is framed with empty comment lines and followed by two blank lines, and YAML and Python headers keep their padded `#` lines on the first run ([#101](https://github.com/CLDMV/fix-headers/pull/101)) ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md))
 - **v2.0.0** (September 2026) — built package (`dist/` and `bin/` instead of `src/`), discovery without name-based skips, `@Project` and the copyright holder from the project manifest, `--check` date validation, `--diff`, `--timezone` and config `extends` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.0.0.md))
-- **v1.3.12** (September 2026) — `engines.node` raised to `>=22.12.0` with the move to vitest 5; `ignore` bumped to 7.0.8 ([#38](https://github.com/CLDMV/fix-headers/pull/38), [#40](https://github.com/CLDMV/fix-headers/pull/40), [#43](https://github.com/CLDMV/fix-headers/pull/43)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.12))
-- **v1.3.11** (September 2026) — CI and release automation only, no runtime change: bot identity and GPG secrets passed to the v4 release and hotfix-redirect workflows ([#32](https://github.com/CLDMV/fix-headers/pull/32), [#36](https://github.com/CLDMV/fix-headers/pull/36)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.11))
-- **v1.3.10** (August 2026) — tests only, no runtime change: fallback-path tests run in a workspace with no project ancestry ([#28](https://github.com/CLDMV/fix-headers/pull/28)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v1.3.10))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder and the [GitHub Releases](https://github.com/CLDMV/fix-headers/releases).
 
