@@ -1,9 +1,14 @@
 #
-# @Project: @cldmv/fix-headers
-# @Filename: /.github/workflows/release-merge.yml
-# @Author: Nate Corcoran <CLDMV>
-# @Email: <Shinrai@users.noreply.github.com>
-# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#	@Project: @cldmv/fix-headers
+#	@Filename: /.github/workflows/release-merge.yml
+#	@Date: 2026-09-29T06:58:53+00:00 (1790665133)
+#	@Author: Nate Corcoran <CLDMV>
+#	@Email: <Shinrai@users.noreply.github.com>
+#	-----
+#	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+#	@Last modified time: 2026-10-02T12:28:10-07:00 (1790969290)
+#	-----
+#	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
 # Individual repo: .github/workflows/release-merge.yml
