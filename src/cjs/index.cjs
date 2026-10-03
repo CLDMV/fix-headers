@@ -21,10 +21,22 @@
  * returns the default export, keeping the historical `module.exports = fixHeaders`
  * shape, instead of tsup bundling a second full copy of the library for CJS.
  *
+ * Node.js versions without require(esm) (before 20.19 / 22.12) would fail with a bare
+ * ERR_REQUIRE_ESM, so the check below fails early with a message that says what to do
+ * instead.
+ *
  * tsup copies this folder verbatim into dist/ (`publicDir` in tsup.config.mjs); it
  * never passes through esbuild, so it stays this small however much the library grows.
  * @module fix-headers/cjs-entry
  */
 "use strict";
+
+if (!process.features?.require_module) {
+	const error = new Error(
+		`@cldmv/fix-headers: require() needs Node.js ^20.19.0 or >=22.12.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
+	);
+	error.code = "ERR_REQUIRE_ESM";
+	throw error;
+}
 
 module.exports = require("./index.mjs").default;
