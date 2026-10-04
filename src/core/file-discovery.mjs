@@ -29,7 +29,8 @@ import { createIgnoreFilter } from "./ignore-rules.mjs";
  * @param {{
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
- *  disabledDetectors?: string[]
+ *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[]
  * }} options - Extension options.
  * @returns {Set<string>} Effective extension set.
  */
@@ -154,6 +155,7 @@ function buildExclusionMatcher(projectRoot, excludeFolders) {
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[],
  *  includeFolders?: IncludeFolderEntry[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]

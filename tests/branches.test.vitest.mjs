@@ -28,7 +28,7 @@ import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers
 describe("branch coverage helpers", () => {
 	it("supports detector enable/disable option paths", () => {
 		const enabledDefault = getEnabledDetectors();
-		expect(enabledDefault.length).toBe(DETECTOR_PROFILES.length);
+		expect(enabledDefault.length).toBe(DETECTOR_PROFILES.filter((detector) => detector.requiresForce !== true).length);
 
 		const enabledOnly = getEnabledDetectors({ enabledDetectors: ["node"] });
 		expect(enabledOnly.map((item) => item.id)).toEqual(["node"]);

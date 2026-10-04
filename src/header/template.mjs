@@ -26,7 +26,7 @@ import { getHeaderSyntaxForFile, renderHeaderLines } from "./syntax.mjs";
  * @param {{
  *  absoluteFilePath: string,
  *  language?: string,
- *  syntaxOptions?: { language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number },
+ *  syntaxOptions?: { language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number },
  *  projectRoot: string,
  *  createdByName?: string,
  *  createdByEmail?: string,

@@ -9,7 +9,7 @@
  * folder's name. The copyright holder (`companyName`) comes from the manifests' authors the same
  * way, and is null when none of them provides one.
  * @param {string} cwd - Starting directory (a file's folder, or the scan root).
- * @param {{ detectors?: { id: string, extensions: string[] }[], enabledDetectors?: string[], disabledDetectors?: string[], preferredExtension?: string, drivers?: import("../drivers/index.mjs").ManifestDriver[], scanRoot?: string }} [options={}] - Detection options. `scanRoot` bounds how far values missing from the nearest manifests are looked up in ancestor folders; without it they aren't.
+ * @param {{ detectors?: { id: string, extensions: string[] }[], enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], preferredExtension?: string, drivers?: import("../drivers/index.mjs").ManifestDriver[], scanRoot?: string }} [options={}] - Detection options. `scanRoot` bounds how far values missing from the nearest manifests are looked up in ancestor folders; without it they aren't.
  * @returns {Promise<{
  *  language: string,
  *  rootDir: string,
@@ -28,6 +28,7 @@ export function detectProjectFromMarkers(cwd: string, options?: {
     }[];
     enabledDetectors?: string[];
     disabledDetectors?: string[];
+    forcedDetectors?: string[];
     preferredExtension?: string;
     drivers?: import("../drivers/index.mjs").ManifestDriver[];
     scanRoot?: string;
@@ -48,6 +49,7 @@ export function detectProjectFromMarkers(cwd: string, options?: {
  *  targetFilePath?: string,
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[],
  *  projectName?: string,
  *  language?: string,
  *  projectRoot?: string,
@@ -80,6 +82,7 @@ export function resolveProjectMetadata(options?: {
     targetFilePath?: string;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
+    forcedDetectors?: string[];
     projectName?: string;
     language?: string;
     projectRoot?: string;
