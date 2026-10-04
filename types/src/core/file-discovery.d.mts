@@ -30,6 +30,14 @@ export function discoverFiles(options: {
     gitignore?: boolean | string | string[];
 }): Promise<string[]>;
 /**
+ * Package-manager dependency folders. They hold installed third-party code, never the project's
+ * own source, so discovery skips them at any depth whatever the ignore files say (a project with
+ * no `.gitignore`, a sub-package's own `node_modules`, a tracked dependency folder). A folder
+ * named explicitly through `includeFolders` / `input` is still processed.
+ * @type {readonly string[]}
+ */
+export const DEPENDENCY_FOLDERS: readonly string[];
+/**
  * An `includeFolders` entry: a project-relative folder path (walked recursively), or an object
  * form that can switch recursion off so only the folder's own files are included.
  */

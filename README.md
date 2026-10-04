@@ -85,7 +85,7 @@ Common CLI options:
 - `--use-gpg-signer-author` (the signing key's UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
 - `--input <path>` (repeatable) - process these files and folders instead of the whole project: the union of every value, each file once (`--input src/a.mjs --input src/b.mjs --input scripts`). A named file whose type cannot carry a header (see [Supported file types](#supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
-- `--include-folder <path>` (repeatable)
+- `--include-folder <path>` (repeatable) - naming a folder inside a dependency folder (`--include-folder node_modules/pkg`) processes it, although discovery otherwise skips dependency folders (see [Which files are processed](#which-files-are-processed))
 - `--include-folder-non-recursive <path>` (repeatable) - include only that folder's own files, not its subfolders
 - `--exclude-folder <path>` (repeatable)
 - `--include-extension <ext>` (repeatable)
@@ -131,8 +131,8 @@ Important options:
 - `forcedDetectors?: string[]` - force-only detector ids to turn on (currently only `"markdown"`). A forced detector is used for `input` and for discovery alike, even when `enabledDetectors` does not list it; `disabledDetectors` still turns it off. An id that is unknown or does not need forcing throws. See [Supported file types](#supported-file-types)
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
-- `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude
-- `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#which-files-are-processed)). `false`: no ignore files, every file is processed. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
+- `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude. Dependency folders are always excluded: `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` at any depth, and a `vendor` folder holding Composer's `autoload.php` or Go's `modules.txt` (see [Which files are processed](#which-files-are-processed)); list a path inside one in `includeFolders` (or pass it as `input`) to process it anyway
+- `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#which-files-are-processed)). `false`: no ignore files, every file is processed except those in dependency folders. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
 - `projectName?: string` - the `@Project` value for every file, instead of the manifest name
 - `language?: string` - the reported `language` for every file (does not change comment syntax or project resolution)
 - `projectRoot?: string` - the project root for every file (the base of `@Filename` and of git history lookups) and the scan root
@@ -439,12 +439,18 @@ skipped: package.json (no enabled detector handles .json files)
 
 ## Which files are processed
 
-By default every file with a supported extension (see [Supported file types](#supported-file-types)) is processed. Nothing is skipped because of its name: `node_modules`, `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
+By default every file with a supported extension (see [Supported file types](#supported-file-types)) is processed. Build output is not skipped by name: `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
 
+- they are inside a dependency folder (below),
 - the project's ignore files ignore them, or
 - you exclude them with `excludeFolders` / `--exclude-folder`.
 
-The one exception is `.git`, git's own storage, which is never walked.
+`.git`, git's own storage, is never walked. Neither are dependency folders, which hold installed third-party code and never the project's own source. They are skipped at any depth (a sub-package's own `node_modules` included) and whatever the ignore files say, so a project with no `.gitignore`, a tracked dependency folder or `gitignore: false` does not stamp headers into them:
+
+- `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn`
+- `vendor`, but only when it holds Composer's `vendor/autoload.php` or Go's `vendor/modules.txt`. Any other `vendor` folder is processed, because the name is also used for code the project maintains itself (front-end `vendor/` scripts, Laravel's published `resources/views/vendor`). Exclude such a folder with `excludeFolders` if it holds third-party code.
+
+A path inside a dependency folder that you name explicitly is still processed: an `includeFolders` / `--include-folder` entry such as `node_modules/pkg`, or an `input` / `--input` file or folder.
 
 "Ignore files" means everything git itself honours: the root `.gitignore`, `.gitignore` files in subfolders (each applying to its own folder), `.git/info/exclude`, and the global excludes file (`core.excludesFile`), including negation patterns.
 
@@ -458,7 +464,7 @@ The one exception is `.git`, git's own storage, which is never walked.
 ## Notes
 
 - `excludeFolders` supports both folder-name and nested path matching.
-- `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters because `excludeFolders` excludes it (for example `node_modules/pkg` listed explicitly while `node_modules` is excluded), which keeps being walked on its own because it was named explicitly. An `includeFolders` entry does not override the ignore files: a folder they ignore contributes no files.
+- `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters because it is a dependency folder or `excludeFolders` excludes it (for example `node_modules/pkg` listed explicitly), which keeps being walked on its own because it was named explicitly. An `includeFolders` entry does not override the ignore files: a folder they ignore contributes no files.
 - File discovery is described in [Which files are processed](#which-files-are-processed).
 - For monorepos, each file resolves its project from the nearest manifest in its parent tree (see [Project name and root](#project-name-and-root)).
 - With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, `diff`, `issues`, and `detectedValues` in results.
