@@ -27,11 +27,12 @@ Multi-language source header normalizer for Node.js projects.
 ## Features
 
 - Finds the project each file belongs to from its manifest (`package.json`, `pyproject.toml` / `setup.cfg` / `setup.py`, `composer.json`, `Cargo.toml`, `go.mod`), whatever the file's type
-- `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSON file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#project-name-and-root)
+- `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSONC file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#project-name-and-root)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
 - Supports monorepos: every file resolves its own project from the nearest manifest in its parent tree
+- Writes each header in the file's own comment syntax, and skips files that cannot carry one (strict JSON, plain text); Markdown gets a header only when you force it. See [Supported file types](#supported-file-types)
 - Supports per-detector syntax overrides for line and block comment tokens
 - Config files can use `extends` to build on a shared config (an https URL, an npm package path or a file path), so one organisation-wide config serves every repository. See [Shared configs](#shared-configs)
 - Supports both ESM and CJS consumers
@@ -83,12 +84,13 @@ Common CLI options:
 - `--force-last-modified-author-update`
 - `--use-gpg-signer-author` (the signing key's UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
-- `--input <path>`
+- `--input <path>` - process one file or folder instead of the whole project. A named file whose type cannot carry a header (see [Supported file types](#supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
 - `--include-folder <path>` (repeatable)
 - `--include-folder-non-recursive <path>` (repeatable) - include only that folder's own files, not its subfolders
 - `--exclude-folder <path>` (repeatable)
 - `--include-extension <ext>` (repeatable)
 - `--enable-detector <id>` / `--disable-detector <id>` (repeatable)
+- `--force-detector <id>` (repeatable) - turn on a force-only detector; `--force-detector markdown` gives `.md` / `.markdown` files an HTML-comment header (see [Supported file types](#supported-file-types))
 - `--project-name <name>`
 - `--author-name <name>` / `--author-email <email>`
 - `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
@@ -113,7 +115,7 @@ Runs header normalization. Project/language/author/email metadata is auto-detect
 Important options:
 
 - `cwd?: string` - start directory for project detection
-- `input?: string` - explicit single file or folder path to process
+- `input?: string` - explicit single file or folder path to process. A file whose type cannot carry a header is listed in the result's `skipped` instead of being changed (see [Supported file types](#supported-file-types))
 - `dryRun?: boolean` - compute changes without writing files
 - `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#date-checks)
 - `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
@@ -124,8 +126,9 @@ Important options:
 - `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
 - `configFile?: string` - load JSON options from file (resolved from `cwd`). The file may use `extends` to build on shared configs by URL, npm package path or file path (see [Shared configs](#shared-configs)); options passed in the call win over everything from files
 - `includeExtensions?: string[]` - file extensions to process
-- `enabledDetectors?: string[]` - detector ids to enable (defaults to all)
+- `enabledDetectors?: string[]` - detector ids to enable (defaults to every detector that is not force-only)
 - `disabledDetectors?: string[]` - detector ids to disable
+- `forcedDetectors?: string[]` - force-only detector ids to turn on (currently only `"markdown"`). A forced detector is used for `input` and for discovery alike, even when `enabledDetectors` does not list it; `disabledDetectors` still turns it off. An id that is unknown or does not need forcing throws. See [Supported file types](#supported-file-types)
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
 - `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude
@@ -229,7 +232,7 @@ A manifest claims its folder as soon as it exists and can be read, even when it 
 For each file:
 
 1. **Project root.** Walk up from the file's folder. The nearest folder that at least one driver claims is the project root. `@Filename` is the file's path relative to it, and git history (`@Date`, `@Last modified time`) is looked up from it.
-2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSON, …) use the fixed order.
+2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSONC, …) use the fixed order.
 3. **Per-field fallback.** Each value is taken from the first driver in that order whose manifest provides it. In a folder with a nameless `package.json` and a named `pyproject.toml`, every file gets the `pyproject.toml` name.
 4. **Climbing.** A value no driver at the project root provides is looked up the same way in each ancestor folder a driver claims, up to and including the scan root (`projectRoot`, else `cwd`), never above it. A nameless sub-package therefore takes the name of the repository around it. Only values climb: the project root, and with it `@Filename` and the git lookups, stays the nearest claimed folder.
 5. **Folder name.** When nothing up to the scan root provides a name, `@Project` is the project root's folder name.
@@ -403,9 +406,40 @@ $ fix-headers --timezone America/Los_Angeles --convert-timezone
 
 The `@Date` instant is unchanged; `@Last modified time` is restamped with the time of the run, in the zone.
 
+## Supported file types
+
+Each file type is handled by a detector, which decides the header's comment syntax. A file is given a header only when an enabled detector handles its extension:
+
+| Detector   | Extensions                    | Header comment | Default                                    |
+| ---------- | ----------------------------- | -------------- | ------------------------------------------ |
+| `node`     | `.js .mjs .cjs .ts .tsx .jsx` | `/** … */`     | on                                         |
+| `json`     | `.jsonc .json5 .jsonv`        | `/** … */`     | on                                         |
+| `css`      | `.css`                        | `/* … */`      | on                                         |
+| `html`     | `.html .htm`                  | `<!-- … -->`   | on                                         |
+| `yaml`     | `.yaml .yml`                  | `# …`          | on                                         |
+| `python`   | `.py`                         | `# …`          | on                                         |
+| `php`      | `.php`                        | `/** … */`     | on                                         |
+| `rust`     | `.rs`                         | `/** … */`     | on                                         |
+| `go`       | `.go`                         | `/** … */`     | on                                         |
+| `markdown` | `.md .markdown`               | `<!-- … -->`   | off; only with `--force-detector markdown` |
+
+Every other file is skipped and left byte-for-byte unchanged, including when you name it with `--input` or add its extension with `includeExtensions`:
+
+- **Strict JSON (`.json`)** has no comment syntax, so it never gets a header. A comment would make `package.json` and every other JSON file invalid.
+- **Files with no extension, or an extension no enabled detector handles** (`.txt`, `.toml`, a disabled detector's extensions, …) are skipped instead of being given a guessed comment.
+- **Markdown** is skipped unless the `markdown` detector is forced with `--force-detector markdown` (`forcedDetectors: ["markdown"]` in the API or a config file). Naming a `.md` file with `--input` does not force it. A forced header is an HTML comment, which Markdown renderers do not display; it goes below any YAML front matter (`---` … `---`), and later runs update it in place. Forcing applies to discovery too, so a repo-wide run with the option also stamps `README.md` and changelogs; to stamp one file, pass the option together with `--input <file>`. `.mdx` is not covered, because MDX does not accept HTML comments.
+
+A skipped file is listed in the result's `skipped` array as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or `changes`. The CLI adds `skipped=<n>` to its summary and prints one `skipped: <file> (<reason>)` line per file:
+
+```sh
+$ fix-headers --input package.json
+fix-headers complete: scanned=0, updated=0, skipped=1, dryRun=false
+skipped: package.json (no enabled detector handles .json files)
+```
+
 ## Which files are processed
 
-By default every file with a supported extension is processed. Nothing is skipped because of its name: `node_modules`, `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
+By default every file with a supported extension (see [Supported file types](#supported-file-types)) is processed. Nothing is skipped because of its name: `node_modules`, `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
 
 - the project's ignore files ignore them, or
 - you exclude them with `excludeFolders` / `--exclude-folder`.

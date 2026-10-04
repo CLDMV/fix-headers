@@ -18,6 +18,7 @@ import { detector as cssDetector } from "./css.mjs";
 import { detector as goDetector } from "./go.mjs";
 import { detector as htmlDetector } from "./html.mjs";
 import { detector as jsonDetector } from "./json.mjs";
+import { detector as markdownDetector } from "./markdown.mjs";
 import { detector as nodeDetector } from "./node.mjs";
 import { detector as phpDetector } from "./php.mjs";
 import { detector as pythonDetector } from "./python.mjs";
@@ -34,12 +35,14 @@ import { detector as yamlDetector } from "./yaml.mjs";
  *  id: string,
  *  extensions: string[],
  *  enabledByDefault: boolean,
+ *  requiresForce?: boolean,
  *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
  *  resolvePreservedPrefix?: (filePath: string, content: string) => string
  * }} DetectorProfile
  * A file-type detector: which extensions it handles and the comment syntax (and preserved
  * leading prefix) of those files. Which project a file belongs to is resolved separately,
- * from the manifest drivers in `src/drivers/`.
+ * from the manifest drivers in `src/drivers/`. A detector with `requiresForce: true` is used only
+ * when its id is listed in the `forcedDetectors` option (see {@link getEnabledDetectors}).
  */
 
 /**
@@ -54,6 +57,7 @@ export const DETECTOR_PROFILES = /** @type {DetectorProfile[]} */ ([
 	goDetector,
 	htmlDetector,
 	jsonDetector,
+	markdownDetector,
 	nodeDetector,
 	phpDetector,
 	pythonDetector,
@@ -95,15 +99,49 @@ function applySyntaxOverride(syntax, override) {
 }
 
 /**
- * Gets enabled detector profiles based on include/exclude options.
- * @param {{ enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
+ * Validates the `forcedDetectors` option: each id must name a force-only detector
+ * (`requiresForce: true`). Forcing a detector that is used without forcing, or one that does
+ * not exist, is reported instead of silently doing nothing.
+ * @param {unknown} value - Option value.
+ * @returns {string[]} De-duplicated detector ids (empty when unset).
+ */
+export function resolveForcedDetectors(value) {
+	if (value === undefined || value === null) {
+		return [];
+	}
+	if (!Array.isArray(value) || value.some((id) => typeof id !== "string")) {
+		throw new Error(`forcedDetectors must be an array of detector ids, got ${JSON.stringify(value)}`);
+	}
+	const forceOnly = DETECTOR_PROFILES.filter((detector) => detector.requiresForce === true).map((detector) => detector.id);
+	for (const id of value) {
+		if (!detectorMap.has(id)) {
+			throw new Error(`forcedDetectors: unknown detector "${id}" (force-only detectors: ${forceOnly.join(", ")})`);
+		}
+		if (!forceOnly.includes(id)) {
+			throw new Error(`forcedDetectors: "${id}" does not need forcing (force-only detectors: ${forceOnly.join(", ")})`);
+		}
+	}
+	return Array.from(new Set(value));
+}
+
+/**
+ * Gets enabled detector profiles based on include/exclude options. A force-only detector
+ * (`requiresForce: true`) is enabled only when `forcedDetectors` names it, and then even when
+ * `enabledDetectors` does not; `disabledDetectors` still turns it off. Listing it in
+ * `enabledDetectors` alone does not force it.
+ * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
  * @returns {typeof DETECTOR_PROFILES} Enabled detector list.
  */
 export function getEnabledDetectors(options = {}) {
 	const explicitEnabled = new Set(Array.isArray(options.enabledDetectors) ? options.enabledDetectors : []);
 	const explicitDisabled = new Set(Array.isArray(options.disabledDetectors) ? options.disabledDetectors : []);
+	const forced = new Set(Array.isArray(options.forcedDetectors) ? options.forcedDetectors : []);
 
 	return DETECTOR_PROFILES.filter((detector) => {
+		if (detector.requiresForce === true) {
+			return forced.has(detector.id) && !explicitDisabled.has(detector.id);
+		}
+
 		if (explicitEnabled.size > 0) {
 			return explicitEnabled.has(detector.id);
 		}
@@ -118,7 +156,7 @@ export function getEnabledDetectors(options = {}) {
 
 /**
  * Gets allowed file extensions for enabled detectors.
- * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], includeExtensions?: string[] }} [options={}] - Runtime options.
+ * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], includeExtensions?: string[] }} [options={}] - Runtime options.
  * @returns {Set<string>} Allowed extensions.
  */
 export function getAllowedExtensions(options = {}) {
@@ -128,6 +166,36 @@ export function getAllowedExtensions(options = {}) {
 
 	const detectors = getEnabledDetectors(options);
 	return new Set(detectors.flatMap((detector) => detector.extensions));
+}
+
+/**
+ * Says why a file cannot be given a header, or returns null when it can. A file gets a header
+ * only when an enabled detector handles its extension and supplies a comment syntax; anything
+ * else (strict `.json`, `.txt`, extensionless files, a disabled detector's extensions, Markdown
+ * that is not forced) is skipped rather than given a comment its format cannot carry.
+ * @param {string} filePath - File path.
+ * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
+ * @returns {string | null} Skip reason, or null when the file can carry a header.
+ */
+export function getHeaderSkipReason(filePath, options = {}) {
+	const extension = extname(filePath).toLowerCase();
+	const handled = getEnabledDetectors(options).some(
+		(detector) => detector.extensions.includes(extension) && detector.resolveCommentSyntax(filePath) !== null
+	);
+	if (handled) {
+		return null;
+	}
+	if (extension.length === 0) {
+		return "the file has no extension, so its comment syntax is unknown";
+	}
+	const forced = new Set(Array.isArray(options.forcedDetectors) ? options.forcedDetectors : []);
+	const forceOnly = DETECTOR_PROFILES.find(
+		(detector) => detector.requiresForce === true && detector.extensions.includes(extension) && !forced.has(detector.id)
+	);
+	if (forceOnly) {
+		return `${extension} files get a header only when forced (--force-detector ${forceOnly.id} / forcedDetectors: ["${forceOnly.id}"])`;
+	}
+	return `no enabled detector handles ${extension} files`;
 }
 
 /**
@@ -142,7 +210,7 @@ export function getDetectorById(id) {
 /**
  * Resolves comment syntax for a file path using detector-specific templates.
  * @param {string} filePath - File path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectors?: DetectorProfile[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectors?: DetectorProfile[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [options={}] - Runtime options. `detectors` overrides the enabled-detector set (matching {@link detectProjectFromMarkers}).
  * @returns {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} Syntax descriptor.
  */
 export function getCommentSyntaxForFile(filePath, options = {}) {
@@ -167,7 +235,7 @@ export function getCommentSyntaxForFile(filePath, options = {}) {
  * Resolves detector-specific leading content that must be preserved above inserted headers.
  * @param {string} filePath - File path.
  * @param {string} content - Full file content.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[] }} [options={}] - Runtime options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
  * @returns {string} Preserved prefix (possibly empty).
  */
 export function getPreservedPrefixForFile(filePath, content, options = {}) {

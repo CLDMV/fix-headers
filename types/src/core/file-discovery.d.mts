@@ -6,6 +6,7 @@
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[],
  *  includeFolders?: IncludeFolderEntry[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]
@@ -23,6 +24,7 @@ export function discoverFiles(options: {
     includeExtensions?: string[];
     enabledDetectors?: string[];
     disabledDetectors?: string[];
+    forcedDetectors?: string[];
     includeFolders?: IncludeFolderEntry[];
     excludeFolders?: string[];
     gitignore?: boolean | string | string[];
