@@ -50,7 +50,7 @@ describe("cli", () => {
 		expect(parsed.json).toBe(true);
 		expect(parsed.options.dryRun).toBe(true);
 		expect(parsed.options.company).toBe("CLDMV");
-		expect(parsed.options.input).toBe("src/main.mjs");
+		expect(parsed.options.input).toEqual(["src/main.mjs"]);
 		expect(parsed.options.includeFolders).toEqual(["src", "scripts"]);
 		expect(parsed.options.excludeFolders).toEqual(["dist"]);
 		expect(parsed.options.enabledDetectors).toEqual(["node"]);

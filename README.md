@@ -84,7 +84,7 @@ Common CLI options:
 - `--force-last-modified-author-update`
 - `--use-gpg-signer-author` (the signing key's UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
-- `--input <path>` - process one file or folder instead of the whole project. A named file whose type cannot carry a header (see [Supported file types](#supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
+- `--input <path>` (repeatable) - process these files and folders instead of the whole project: the union of every value, each file once (`--input src/a.mjs --input src/b.mjs --input scripts`). A named file whose type cannot carry a header (see [Supported file types](#supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
 - `--include-folder <path>` (repeatable)
 - `--include-folder-non-recursive <path>` (repeatable) - include only that folder's own files, not its subfolders
 - `--exclude-folder <path>` (repeatable)
@@ -115,7 +115,7 @@ Runs header normalization. Project/language/author/email metadata is auto-detect
 Important options:
 
 - `cwd?: string` - start directory for project detection
-- `input?: string` - explicit single file or folder path to process. A file whose type cannot carry a header is listed in the result's `skipped` instead of being changed (see [Supported file types](#supported-file-types))
+- `input?: string | string[]` - file or folder paths to process instead of the whole project. Every path is processed: the files named plus the files discovered under the folders named, each file once, in the order given. A path that does not exist throws; an empty list means no input. A file whose type cannot carry a header is listed in the result's `skipped` instead of being changed (see [Supported file types](#supported-file-types))
 - `dryRun?: boolean` - compute changes without writing files
 - `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#date-checks)
 - `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
