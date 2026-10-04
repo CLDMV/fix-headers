@@ -242,7 +242,7 @@ describe("discoverFiles with overlapping includeFolders (issue #59)", () => {
 		expect(rel(root, walked)).toEqual(["", "node_modules/pkg"]);
 	});
 
-	it("walks node_modules and root build folders from '.' when nothing ignores them (issue #71)", async () => {
+	it("walks root build folders from '.' when nothing ignores them (issue #71), and an explicit node_modules folder on its own (issue #123)", async () => {
 		const root = await fixture(["src/a.mjs", "node_modules/pkg/dep.mjs", "build/out.mjs", "build/sub/deep.mjs"]);
 		const { discover, walked } = await loadWithWalkSpy();
 
@@ -253,7 +253,8 @@ describe("discoverFiles with overlapping includeFolders (issue #59)", () => {
 		});
 
 		expect(rel(root, files).sort()).toEqual(["build/out.mjs", "build/sub/deep.mjs", "node_modules/pkg/dep.mjs", "src/a.mjs"]);
-		expect(rel(root, walked)).toEqual([""]);
+		// "." never enters node_modules, so the explicitly listed node_modules/pkg is walked separately
+		expect(rel(root, walked)).toEqual(["", "node_modules/pkg"]);
 	});
 
 	it("collapses a symlinked root onto the real folder it points at", async () => {
