@@ -7,13 +7,14 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
+ *	@Last modified time: 2026-10-03T22:50:30-07:00 (1791093030)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
 import { execFile } from "node:child_process";
+import { basename, dirname } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -259,4 +260,34 @@ export async function getGitLastModifiedDate(cwd, filePath) {
 	}
 
 	return { date: canonicalGitDate(date), timestamp };
+}
+
+/**
+ * Largest committed file `readGitHeadFile` reads (git show's stdout buffer).
+ * @type {number}
+ */
+const HEAD_FILE_MAX_BUFFER = 256 * 1024 * 1024;
+
+/**
+ * Reads a file as it is at git `HEAD`, from the repository that contains it.
+ * @param {string} filePath - Absolute file path.
+ * @returns {Promise<{state: "no-git", content: null} | {state: "untracked", content: null} | {state: "tracked", content: string}>}
+ *   `no-git` when the file is not inside a git work tree, `untracked` when `HEAD` has no such
+ *   file (a new or ignored file, or a repository with no commits yet), otherwise the content at `HEAD`.
+ */
+export async function readGitHeadFile(filePath) {
+	const cwd = dirname(filePath);
+	if ((await runGit(cwd, ["rev-parse", "--is-inside-work-tree"])) !== "true") {
+		return { state: "no-git", content: null };
+	}
+	try {
+		const { stdout } = await execFileAsync("git", ["show", `HEAD:./${basename(filePath)}`], {
+			cwd,
+			encoding: "utf8",
+			maxBuffer: HEAD_FILE_MAX_BUFFER
+		});
+		return { state: "tracked", content: stdout };
+	} catch {
+		return { state: "untracked", content: null };
+	}
 }

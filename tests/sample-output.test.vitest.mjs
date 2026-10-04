@@ -7,18 +7,22 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:19-07:00 (1790969299)
+ *	@Last modified time: 2026-10-03T22:50:31-07:00 (1791093031)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
+import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { parseCliArgs, runCli } from "../src/cli.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
 import { HEADER_FIELDS } from "../src/header/fields.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Builds a stale header for `src/one.mjs` whose project, filename and copyright no longer match.
@@ -30,7 +34,8 @@ function staleFile(prefix = "") {
 }
 
 /**
- * Runs the core in dry-run sample mode against `src/one.mjs` of a fresh workspace.
+ * Runs the core in dry-run sample mode against `src/one.mjs` of a fresh workspace. The file is
+ * committed first, so its content counts as unedited and only the header is rewritten.
  * @param {string} name - Workspace/project name.
  * @param {string} content - Content for `src/one.mjs`.
  * @param {Record<string, unknown>} [options={}] - Extra fixHeaders options.
@@ -41,6 +46,15 @@ async function sampleFor(name, content, options = {}) {
 	try {
 		await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name }, null, 2));
 		await writeWorkspaceFile(join(workspace, "src", "one.mjs"), content);
+		for (const args of [
+			["init"],
+			["config", "user.name", "Sample Tester"],
+			["config", "user.email", "sample@example.com"],
+			["add", "."],
+			["commit", "-m", "initial"]
+		]) {
+			await execFileAsync("git", args, { cwd: workspace });
+		}
 		const result = await coreFixHeaders({
 			cwd: workspace,
 			input: "src/one.mjs",
