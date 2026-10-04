@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:13-07:00 (1790969293)
+ *	@Last modified time: 2026-10-03T22:50:30-07:00 (1791093030)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -30,10 +30,10 @@ import {
 } from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
 import { compareHeaderFields } from "../header/fields.mjs";
-import { findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
+import { extractHeaderlessBody, findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
 import { createUnifiedDiff } from "../utils/diff.mjs";
 import { readFileDates } from "../utils/fs.mjs";
-import { getGitCreationDate, getGitLastModifiedDate } from "../utils/git.mjs";
+import { getGitCreationDate, getGitLastModifiedDate, readGitHeadFile } from "../utils/git.mjs";
 import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
 
 /**
@@ -91,11 +91,11 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  * - `issues` - one `{ field, previous, detected }` entry per header field whose written value
  *   differs from the existing header. Values are the field text as written in the header
  *   (dates keep their `date (timestamp)` form; `previous` is null when the field was missing).
- *   Fields fix-headers preserves - the original `@Author`/`@Email` and `@Last modified by`
- *   identity, unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set - are compared
- *   against what is actually written, so they only appear when they really change. Because an
- *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
- *   changed file that already had a header.
+ *   Fields fix-headers preserves - the original `@Author`/`@Email` (unless `forceAuthorUpdate`)
+ *   and the `@Last modified by` identity (unless the file's content was edited, or
+ *   `forceLastModifiedAuthorUpdate` is set) - are compared against what is actually written, so
+ *   they only appear when they really change. Because an updated file gets a fresh
+ *   `@Last modified time`, `lastModifiedAt` is listed for every changed file that already had a header.
  * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
  *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
  *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder
@@ -252,6 +252,29 @@ function extractHeaderLastModifiedAt(headerText) {
 		date: modifiedMatch[1].trim(),
 		timestamp
 	};
+}
+
+/**
+ * Decides whether a file's content (everything outside its header) was edited, by comparing
+ * it with the file at git `HEAD`. The header is taken out of both sides first, so a run that
+ * only rewrites the header (dates, framing, spacing, margin, other fields, or adding one) does
+ * not count as an edit.
+ * - `tracked`: edited when the body differs from the body at `HEAD`.
+ * - `untracked`: a file `HEAD` does not have (new, ignored, or no commits yet) counts as edited.
+ * - `no-git`: outside a git work tree there is nothing to compare with, so it is not an edit
+ *   and the recorded `@Last modified by` is kept.
+ * @param {string} content - Current file content.
+ * @param {string} filePath - Absolute file path.
+ * @param {Parameters<typeof extractHeaderlessBody>[2]} syntaxOptions - Syntax resolution options.
+ * @returns {Promise<{edited: boolean, state: "tracked" | "untracked" | "no-git"}>} Edit verdict and git state.
+ */
+async function detectContentEdit(content, filePath, syntaxOptions) {
+	const head = await readGitHeadFile(filePath);
+	if (head.state !== "tracked") {
+		return { edited: head.state === "untracked", state: head.state };
+	}
+	const edited = extractHeaderlessBody(head.content, filePath, syntaxOptions) !== extractHeaderlessBody(content, filePath, syntaxOptions);
+	return { edited, state: "tracked" };
 }
 
 /**
@@ -416,59 +439,56 @@ export async function fixHeaders(options = {}) {
 		);
 		const shouldForceAuthorUpdate = effectiveOptions.forceAuthorUpdate === true;
 		const shouldForceLastModifiedAuthorUpdate = effectiveOptions.forceLastModifiedAuthorUpdate === true;
+		// @Last modified by names whoever last edited the file's content. It becomes the run's
+		// identity only when the content outside the header was edited (see detectContentEdit);
+		// a run that only rewrites header values keeps the recorded editor.
+		const contentEdit = await detectContentEdit(original, filePath, syntaxOptions);
+		const lastModifiedByRun = shouldForceLastModifiedAuthorUpdate || contentEdit.edited;
 
-		const comparisonHeader = buildHeader({
-			absoluteFilePath: filePath,
-			language: fileMetadata.language,
-			syntaxOptions,
-			projectRoot: fileMetadata.projectRoot,
-			projectName: fileMetadata.projectName,
-			createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
-			createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
-			lastModifiedByName: shouldForceLastModifiedAuthorUpdate
-				? fileMetadata.authorName
-				: existingLastModifiedIdentity.authorName || fileMetadata.authorName,
-			lastModifiedByEmail: shouldForceLastModifiedAuthorUpdate
-				? fileMetadata.authorEmail
-				: existingLastModifiedIdentity.authorEmail || fileMetadata.authorEmail,
-			authorName: fileMetadata.authorName,
-			authorEmail: fileMetadata.authorEmail,
-			createdAt,
-			lastModifiedAt: comparisonLastModifiedAt,
-			copyrightStartYear,
-			companyName: fileMetadata.companyName,
-			currentYear
-		});
+		/**
+		 * Renders this file's header with the given @Last modified time.
+		 * @param {{date: string, timestamp: number}} lastModifiedAt - Last-modified payload.
+		 * @returns {string} Header block.
+		 */
+		const renderHeader = (lastModifiedAt) =>
+			buildHeader({
+				absoluteFilePath: filePath,
+				language: fileMetadata.language,
+				syntaxOptions,
+				projectRoot: fileMetadata.projectRoot,
+				projectName: fileMetadata.projectName,
+				createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
+				createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
+				lastModifiedByName: lastModifiedByRun
+					? fileMetadata.authorName
+					: existingLastModifiedIdentity.authorName || fileMetadata.authorName,
+				lastModifiedByEmail: lastModifiedByRun
+					? fileMetadata.authorEmail
+					: existingLastModifiedIdentity.authorEmail || fileMetadata.authorEmail,
+				authorName: fileMetadata.authorName,
+				authorEmail: fileMetadata.authorEmail,
+				createdAt,
+				lastModifiedAt,
+				copyrightStartYear,
+				companyName: fileMetadata.companyName,
+				currentYear
+			});
 
+		const comparisonHeader = renderHeader(comparisonLastModifiedAt);
 		const comparisonReplacement = replaceOrInsertHeader(original, comparisonHeader, filePath, syntaxOptions);
-		const needsUpdate = comparisonReplacement.changed;
+		// A content edit made since the file's last commit, under a stamp older than that commit,
+		// has not been stamped yet: restamp it even when the editor is already the one recorded.
+		// Once stamped, the stamp is newer than the last commit, so re-running is a no-op.
+		const unstampedEdit =
+			contentEdit.edited &&
+			repairedLastModifiedAt !== null &&
+			gitLastUpdated !== null &&
+			repairedLastModifiedAt.timestamp < gitLastUpdated.timestamp;
+		const needsUpdate = comparisonReplacement.changed || unstampedEdit;
 		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
 
-		const header = needsUpdate
-			? buildHeader({
-					absoluteFilePath: filePath,
-					language: fileMetadata.language,
-					syntaxOptions,
-					projectRoot: fileMetadata.projectRoot,
-					projectName: fileMetadata.projectName,
-					createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
-					createdByEmail: shouldForceAuthorUpdate ? fileMetadata.authorEmail : existingIdentity.authorEmail || fileMetadata.authorEmail,
-					lastModifiedByName: shouldForceLastModifiedAuthorUpdate
-						? fileMetadata.authorName
-						: existingLastModifiedIdentity.authorName || fileMetadata.authorName,
-					lastModifiedByEmail: shouldForceLastModifiedAuthorUpdate
-						? fileMetadata.authorEmail
-						: existingLastModifiedIdentity.authorEmail || fileMetadata.authorEmail,
-					authorName: fileMetadata.authorName,
-					authorEmail: fileMetadata.authorEmail,
-					createdAt,
-					lastModifiedAt: finalLastModifiedAt,
-					copyrightStartYear,
-					companyName: fileMetadata.companyName,
-					currentYear
-				})
-			: comparisonHeader;
+		const header = needsUpdate ? renderHeader(finalLastModifiedAt) : comparisonHeader;
 
 		const replacement = needsUpdate ? replaceOrInsertHeader(original, header, filePath, syntaxOptions) : comparisonReplacement;
 		/** @type {FixHeadersResult["changes"][number]} */

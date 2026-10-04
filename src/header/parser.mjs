@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
+ *	@Last modified time: 2026-10-03T22:50:30-07:00 (1791093030)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -150,4 +150,23 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 	const after = content.slice(existing.end).replace(/^\n+/, "");
 	const nextContent = `${before}${join(after)}`;
 	return { nextContent, changed: nextContent !== content };
+}
+
+/**
+ * Returns a file's content with its project header taken out: the file as it would read
+ * with no header at all. Blank lines between the header and the next content, and a body
+ * that is only whitespace, are dropped, so two versions of a file that differ only in their
+ * header (its fields, framing, spacing or margin, or whether it has one) give the same body.
+ * @param {string} content - File content.
+ * @param {string} [filePath=""] - File path used for syntax selection.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
+ * @returns {string} The content outside the header.
+ */
+export function extractHeaderlessBody(content, filePath = "", syntaxOptions = {}) {
+	const existing = findProjectHeader(content, filePath, syntaxOptions);
+	const { prefix, body } = existing
+		? { prefix: content.slice(0, existing.start), body: content.slice(existing.end) }
+		: splitPreservedPrefix(filePath, content, syntaxOptions);
+	const rest = body.replace(/^\n+/, "");
+	return `${prefix}${rest.trim() === "" ? "" : rest}`;
 }

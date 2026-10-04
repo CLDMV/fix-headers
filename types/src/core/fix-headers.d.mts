@@ -71,11 +71,11 @@ export type DateRewrite = (payload: {
  * - `issues` - one `{ field, previous, detected }` entry per header field whose written value
  *   differs from the existing header. Values are the field text as written in the header
  *   (dates keep their `date (timestamp)` form; `previous` is null when the field was missing).
- *   Fields fix-headers preserves - the original `@Author`/`@Email` and `@Last modified by`
- *   identity, unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set - are compared
- *   against what is actually written, so they only appear when they really change. Because an
- *   updated file gets a fresh `@Last modified time`, `lastModifiedAt` is listed for every
- *   changed file that already had a header.
+ *   Fields fix-headers preserves - the original `@Author`/`@Email` (unless `forceAuthorUpdate`)
+ *   and the `@Last modified by` identity (unless the file's content was edited, or
+ *   `forceLastModifiedAuthorUpdate` is set) - are compared against what is actually written, so
+ *   they only appear when they really change. Because an updated file gets a fresh
+ *   `@Last modified time`, `lastModifiedAt` is listed for every changed file that already had a header.
  * - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where
  *   `projectName` came from: `{ from: "manifest", driver, manifest, dir }`,
  *   `{ from: "folder", dir }` or `{ from: "option" }`. `companyName` is the `@Copyright` holder

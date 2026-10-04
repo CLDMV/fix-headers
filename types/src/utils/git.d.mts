@@ -68,3 +68,20 @@ export function getGitLastModifiedDate(cwd: string, filePath: string): Promise<{
     date: string;
     timestamp: number;
 } | null>;
+/**
+ * Reads a file as it is at git `HEAD`, from the repository that contains it.
+ * @param {string} filePath - Absolute file path.
+ * @returns {Promise<{state: "no-git", content: null} | {state: "untracked", content: null} | {state: "tracked", content: string}>}
+ *   `no-git` when the file is not inside a git work tree, `untracked` when `HEAD` has no such
+ *   file (a new or ignored file, or a repository with no commits yet), otherwise the content at `HEAD`.
+ */
+export function readGitHeadFile(filePath: string): Promise<{
+    state: "no-git";
+    content: null;
+} | {
+    state: "untracked";
+    content: null;
+} | {
+    state: "tracked";
+    content: string;
+}>;
