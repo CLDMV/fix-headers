@@ -1,51 +1,83 @@
 # @cldmv/fix-headers
 
-Multi-language source header normalizer for Node.js projects.
+**@cldmv/fix-headers** is a multi-language source header normalizer for Node.js projects. It scans a project's files, works out which project each file belongs to from the manifests around it (`package.json`, `pyproject.toml`, `composer.json`, `Cargo.toml`, `go.mod`, …), detects the author from git, and inserts or updates a standard header at the top of every file in that file's own comment syntax.
 
-`@cldmv/fix-headers` scans project files, auto-detects project metadata (language, root, project name, git author/email), and inserts or updates standard file headers.
+Headers stay correct without hand-editing: `@Date` follows the file's real creation time, `@Last modified time` only moves when the header changes, the `@Copyright` holder and years come from the manifest and the file's history, and `--check` validates existing headers in CI without writing anything. It runs as a `fix-headers` command line tool or as a library from ESM and CommonJS, and one shared config can serve every repository in an organisation.
+
+> _One header format for every file in every repository, detected from the project itself and kept current by a single command._
 
 [![npm version]][npm_version_url] [![npm downloads]][npm_downloads_url] <!-- [![GitHub release]][github_release_url] -->[![GitHub downloads]][github_downloads_url] [![Last commit]][last_commit_url] <!-- [![Release date]][release_date_url] -->[![npm last update]][npm_last_update_url] [![Coverage]][coverage_url]
 
 [![Contributors]][contributors_url] [![Sponsor shinrai]][sponsor_url]
 
+---
+
 ## ✨ What's New
 
-### Latest: v2.1.3 (October 2026)
+### Latest: v2.1.4 (October 2026)
 
-- **CI and development-dependency maintenance, no runtime change** — the `✅ Required PR Check` mirror job in `ci.yml` no longer carries the required name while it is skipped, so a skipped `pull_request` run can no longer satisfy the branch ruleset and let an in-repo PR merge before the push run's tests have finished ([#111](https://github.com/CLDMV/fix-headers/pull/111)). Four development dependencies move to their current releases in the lockfile: `@cldmv/jsonv` 1.1.1, `@cldmv/eslint-plugin-jsonv` 1.0.13, `@cldmv/prettier-plugin-jsonv` 1.1.0 and `@cldmv/vitest-runner` 1.5.1 ([#109](https://github.com/CLDMV/fix-headers/pull/109), [#114](https://github.com/CLDMV/fix-headers/pull/114)). `ignore`, the only runtime dependency, is unchanged, and `dist/`, `bin/` and the API are the same as in v2.1.2.
-- [View full v2.1.3 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md)
+- **`require()` fails clearly where Node.js cannot load ES modules synchronously** — the CommonJS entry point (`dist/index.cjs`, a small wrapper around the ES module build) now checks `process.features.require_module` first. On a Node.js version without `require(esm)` it throws an `ERR_REQUIRE_ESM` error that names the package, the versions `require()` needs (^20.19.0 or >=22.12.0) and the running version, and points at `import()`, instead of Node's bare error from inside the package ([#117](https://github.com/CLDMV/fix-headers/pull/117)). New `node:test` checks run the built CommonJS entry point on every `npm test` and coverage run. On supported Node.js versions (`engines.node` is `>=22.12.0`) nothing changes.
+- **Never breaks files it can't stamp** — strict JSON (`package.json` included), Markdown named with `--input`, and files with no or an unhandled extension are now skipped and reported instead of getting a JavaScript comment that broke them. Markdown gets a header only when forced with `--force-detector markdown`, as an HTML comment ([#124](https://github.com/CLDMV/fix-headers/pull/124)).
+- **Repeatable `--input` and no more dependency folders** — every `--input` value is processed, not just the last ([#125](https://github.com/CLDMV/fix-headers/pull/125)), and `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` are never walked, at any depth, even without a `.gitignore` ([#126](https://github.com/CLDMV/fix-headers/pull/126)).
+- [View full v2.1.4 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md)
 
 ### Recent Releases
 
-- **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config (`.configs/fix-headers.json` extending `@cldmv/configs/fix-headers.json`, run with `npm run fix:headers`) and stamps uniform file headers across its own sources ([#107](https://github.com/CLDMV/fix-headers/pull/107)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v2.1.2))
-- **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines ([#105](https://github.com/CLDMV/fix-headers/pull/105), fixes [#104](https://github.com/CLDMV/fix-headers/issues/104)); `esbuild` bumped to 0.28.2 to clear GHSA-g7r4-m6w7-qqqr ([#103](https://github.com/CLDMV/fix-headers/pull/103)) ([Release](https://github.com/CLDMV/fix-headers/releases/tag/v2.1.1))
-- **v2.1.0** (September 2026) — `spacing` and `margin` header layout options: every header is framed with empty comment lines and followed by two blank lines, and YAML and Python headers keep their padded `#` lines on the first run ([#101](https://github.com/CLDMV/fix-headers/pull/101)) ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md))
-- **v2.0.0** (September 2026) — built package (`dist/` and `bin/` instead of `src/`), discovery without name-based skips, `@Project` and the copyright holder from the project manifest, `--check` date validation, `--diff`, `--timezone` and config `extends` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.0.0.md))
+- **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
+- **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config from `@cldmv/configs` and stamps uniform file headers across its own sources ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.2.md))
+- **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines; `esbuild` 0.28.2 clears GHSA-g7r4-m6w7-qqqr ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.1.md))
+- **v2.1.0** (September 2026) — `spacing` and `margin` header layout options: every header is framed with empty comment lines and followed by two blank lines ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md))
 
-📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder and the [GitHub Releases](https://github.com/CLDMV/fix-headers/releases).
+📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
-## Features
+---
+
+## 🚀 Key Features
 
 - Finds the project each file belongs to from its manifest (`package.json`, `pyproject.toml` / `setup.cfg` / `setup.py`, `composer.json`, `Cargo.toml`, `go.mod`), whatever the file's type
-- `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSONC file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#project-name-and-root)
+- `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSONC file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#-project-name-and-root)
 - Auto-detects author and email from git config/commit history
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
 - Supports monorepos: every file resolves its own project from the nearest manifest in its parent tree
-- Writes each header in the file's own comment syntax, and skips files that cannot carry one (strict JSON, plain text); Markdown gets a header only when you force it. See [Supported file types](#supported-file-types)
+- Writes each header in the file's own comment syntax, and skips files that cannot carry one (strict JSON, plain text); Markdown gets a header only when you force it. See [Supported file types](#-supported-file-types)
 - Supports per-detector syntax overrides for line and block comment tokens
-- Config files can use `extends` to build on a shared config (an https URL, an npm package path or a file path), so one organisation-wide config serves every repository. See [Shared configs](#shared-configs)
+- Config files can use `extends` to build on a shared config (an https URL, an npm package path or a file path), so one organisation-wide config serves every repository. See [Shared configs](#-shared-configs)
 - Supports both ESM and CJS consumers
 
-## Install
+---
+
+## 📦 Installation
+
+### Requirements
+
+- **Node.js 22.12.0 or later** (`engines.node` is `>=22.12.0`).
+- The package is an ES module and loads with `import` on every supported version. `require("@cldmv/fix-headers")` loads the ES module build synchronously, which needs Node.js ^20.19.0 or >=22.12.0; on older Node.js, use `import()` instead.
+
+### Install
 
 ```bash
 npm i @cldmv/fix-headers
 ```
 
-## Usage
+As a development dependency, for the CLI in `package.json` scripts:
 
-### ESM
+```bash
+npm i -D @cldmv/fix-headers
+```
+
+---
+
+## 🚀 Quick Start
+
+Preview what would change, then write it:
+
+```bash
+fix-headers --dry-run --verbose
+fix-headers
+```
+
+From ESM:
 
 ```js
 import fixHeaders from "@cldmv/fix-headers";
@@ -53,7 +85,19 @@ import fixHeaders from "@cldmv/fix-headers";
 const result = await fixHeaders({ dryRun: true });
 ```
 
-## CLI
+From CommonJS:
+
+```js
+const fixHeaders = require("@cldmv/fix-headers");
+
+const result = await fixHeaders({ dryRun: true });
+```
+
+`result` lists every scanned file and the changes a writing run makes; see [API](#-api) for the options and [Sample output](#-sample-output) for per-file detail.
+
+---
+
+## 💻 CLI
 
 After install, use the package binary:
 
@@ -70,11 +114,11 @@ npm run cli -- --dry-run --json
 Common CLI options:
 
 - `--dry-run`
-- `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#date-checks))
+- `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#-date-checks))
 - `--fix-created-date`
 - `--strict-created-date`
 - `--normalize-date-format`
-- `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#time-zone))
+- `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#-time-zone))
 - `--convert-timezone` - with `--timezone`, also rewrite existing header dates into that zone
 - `--json`
 - `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
@@ -84,29 +128,23 @@ Common CLI options:
 - `--force-last-modified-author-update`
 - `--use-gpg-signer-author` (the signing key's UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
-- `--input <path>` (repeatable) - process these files and folders instead of the whole project: the union of every value, each file once (`--input src/a.mjs --input src/b.mjs --input scripts`). A named file whose type cannot carry a header (see [Supported file types](#supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
-- `--include-folder <path>` (repeatable) - naming a folder inside a dependency folder (`--include-folder node_modules/pkg`) processes it, although discovery otherwise skips dependency folders (see [Which files are processed](#which-files-are-processed))
+- `--input <path>` (repeatable) - process these files and folders instead of the whole project: the union of every value, each file once (`--input src/a.mjs --input src/b.mjs --input scripts`). A named file whose type cannot carry a header (see [Supported file types](#-supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
+- `--include-folder <path>` (repeatable) - naming a folder inside a dependency folder (`--include-folder node_modules/pkg`) processes it, although discovery otherwise skips dependency folders (see [Which files are processed](#-which-files-are-processed))
 - `--include-folder-non-recursive <path>` (repeatable) - include only that folder's own files, not its subfolders
 - `--exclude-folder <path>` (repeatable)
 - `--include-extension <ext>` (repeatable)
 - `--enable-detector <id>` / `--disable-detector <id>` (repeatable)
-- `--force-detector <id>` (repeatable) - turn on a force-only detector; `--force-detector markdown` gives `.md` / `.markdown` files an HTML-comment header (see [Supported file types](#supported-file-types))
+- `--force-detector <id>` (repeatable) - turn on a force-only detector; `--force-detector markdown` gives `.md` / `.markdown` files an HTML-comment header (see [Supported file types](#-supported-file-types))
 - `--project-name <name>`
 - `--author-name <name>` / `--author-email <email>`
-- `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#copyright-holder))
+- `--company-name <name>` - the `@Copyright` holder for every file, instead of the one the manifests provide (see [Copyright holder](#-copyright-holder))
 - `--copyright-start-year <year>` - the `@Copyright` start year for every file (default: the year of each file's `@Date`)
-- `--spacing <n>` / `--margin <n>` - the header's layout: empty comment lines inside the header's edges (default `1`) and blank lines after it (default `2`), see [Header layout](#header-layout)
-- `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#shared-configs)); flags on the command line win over the file
+- `--spacing <n>` / `--margin <n>` - the header's layout: empty comment lines inside the header's edges (default `1`) and blank lines after it (default `2`), see [Header layout](#-header-layout)
+- `--config <json-file>` - load options from a JSON file, which may use `extends` to build on shared configs (see [Shared configs](#-shared-configs)); flags on the command line win over the file
 
-### CommonJS
+---
 
-```js
-const fixHeaders = require("@cldmv/fix-headers");
-
-const result = await fixHeaders({ dryRun: true });
-```
-
-## API
+## 🔧 API
 
 ### `fixHeaders(options?)`
 
@@ -115,24 +153,24 @@ Runs header normalization. Project/language/author/email metadata is auto-detect
 Important options:
 
 - `cwd?: string` - start directory for project detection
-- `input?: string | string[]` - file or folder paths to process instead of the whole project. Every path is processed: the files named plus the files discovered under the folders named, each file once, in the order given. A path that does not exist throws; an empty list means no input. A file whose type cannot carry a header is listed in the result's `skipped` instead of being changed (see [Supported file types](#supported-file-types))
+- `input?: string | string[]` - file or folder paths to process instead of the whole project. Every path is processed: the files named plus the files discovered under the folders named, each file once, in the order given. A path that does not exist throws; an empty list means no input. A file whose type cannot carry a header is listed in the result's `skipped` instead of being changed (see [Supported file types](#-supported-file-types))
 - `dryRun?: boolean` - compute changes without writing files
-- `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#date-checks)
-- `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
+- `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#-date-checks)
+- `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#-creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
 - `strictCreatedDate?: boolean` - with `check`, count a `@Date` later than the file's git first commit or filesystem creation time as drift (fails the run). Off by default, where it is an advisory
 - `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
-- `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#time-zone)
-- `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#time-zone)
-- `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#sample-output))
-- `configFile?: string` - load JSON options from file (resolved from `cwd`). The file may use `extends` to build on shared configs by URL, npm package path or file path (see [Shared configs](#shared-configs)); options passed in the call win over everything from files
+- `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#-time-zone)
+- `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#-time-zone)
+- `sampleOutput?: boolean` - include a `sample` for each changed file: previous/new header text, a unified `diff`, per-field `issues`, and `detectedValues` (see [Sample output](#-sample-output))
+- `configFile?: string` - load JSON options from file (resolved from `cwd`). The file may use `extends` to build on shared configs by URL, npm package path or file path (see [Shared configs](#-shared-configs)); options passed in the call win over everything from files
 - `includeExtensions?: string[]` - file extensions to process
 - `enabledDetectors?: string[]` - detector ids to enable (defaults to every detector that is not force-only)
 - `disabledDetectors?: string[]` - detector ids to disable
-- `forcedDetectors?: string[]` - force-only detector ids to turn on (currently only `"markdown"`). A forced detector is used for `input` and for discovery alike, even when `enabledDetectors` does not list it; `disabledDetectors` still turns it off. An id that is unknown or does not need forcing throws. See [Supported file types](#supported-file-types)
+- `forcedDetectors?: string[]` - force-only detector ids to turn on (currently only `"markdown"`). A forced detector is used for `input` and for discovery alike, even when `enabledDetectors` does not list it; `disabledDetectors` still turns it off. An id that is unknown or does not need forcing throws. See [Supported file types](#-supported-file-types)
 - `detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>` - override detector comment syntax tokens
 - `includeFolders?: Array<string | { path: string, recursive?: boolean }>` - project-relative folders to scan. A string entry is scanned recursively; `{ path, recursive: false }` includes only that folder's own files (for example `{ path: ".", recursive: false }` for the project-root files without the whole tree). Overlapping entries are collapsed, so every file is scanned once however the folders nest or are spelled (`"."` next to `"src"`, `"src"` next to `"src/core"`, `"./src"` next to `"src/"`)
-- `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude. Dependency folders are always excluded: `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` at any depth, and a `vendor` folder holding Composer's `autoload.php` or Go's `modules.txt` (see [Which files are processed](#which-files-are-processed)); list a path inside one in `includeFolders` (or pass it as `input`) to process it anyway
-- `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#which-files-are-processed)). `false`: no ignore files, every file is processed except those in dependency folders. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
+- `excludeFolders?: string[]` - folder names or relative paths to exclude, on top of what the ignore files exclude. Dependency folders are always excluded: `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` at any depth, and a `vendor` folder holding Composer's `autoload.php` or Go's `modules.txt` (see [Which files are processed](#-which-files-are-processed)); list a path inside one in `includeFolders` (or pass it as `input`) to process it anyway
+- `gitignore?: boolean | string | string[]` - which ignore files decide what discovery skips. Omitted (or `true`): every ignore file git honours (see [Which files are processed](#-which-files-are-processed)). `false`: no ignore files, every file is processed except those in dependency folders. A path or array of paths (relative to the project root): exactly those files, parsed with `.gitignore` syntax, without asking git.
 - `projectName?: string` - the `@Project` value for every file, instead of the manifest name
 - `language?: string` - the reported `language` for every file (does not change comment syntax or project resolution)
 - `projectRoot?: string` - the project root for every file (the base of `@Filename` and of git history lookups) and the scan root
@@ -143,10 +181,10 @@ Important options:
 - `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
 - `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
-- `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#copyright-holder))
-- `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#copyright-years)
-- `spacing?: number` - empty comment lines just inside the header's opening and just before its closing. Default `1`, see [Header layout](#header-layout)
-- `margin?: number` - blank lines between the header and the file's next content. Default `2`, see [Header layout](#header-layout)
+- `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#-copyright-holder))
+- `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#-copyright-years)
+- `spacing?: number` - empty comment lines just inside the header's opening and just before its closing. Default `1`, see [Header layout](#-header-layout)
+- `margin?: number` - blank lines between the header and the file's next content. Default `2`, see [Header layout](#-header-layout)
 
 Example:
 
@@ -174,7 +212,9 @@ const result = await fixHeaders({
 });
 ```
 
-## Shared configs
+---
+
+## 🧩 Shared configs
 
 A config file (`--config <path>` on the CLI, `configFile` in the API) can extend other configs with `extends`, so an organisation keeps its header settings in one place instead of copying them into every repository. `extends` is a string or an array of strings, and each entry is one of:
 
@@ -213,7 +253,9 @@ A shared config can also be served from a URL, and mixed with local files:
 }
 ```
 
-## Project name and root
+---
+
+## 🔎 Project name and root
 
 Which project a file belongs to depends on the manifests around it, not on the file's type. Comment syntax is the only thing the file's type decides.
 
@@ -239,7 +281,7 @@ For each file:
 
 A folder holding `.git` is a repository boundary: neither the root search nor the climb goes past it, so a nested repository without a manifest is a project of its own. With no manifest up to the repository root, that repository root is the project root and its folder name is the name. With neither a manifest nor a repository anywhere above the file, the file's own folder is the project root: `@Project` is that folder's name and `@Filename` is `/<file name>`.
 
-`projectName`, `projectRoot`, `language` and `marker` override the detected values for every file. The copyright holder is resolved from the same manifests by the same rules, see [Copyright holder](#copyright-holder).
+`projectName`, `projectRoot`, `language` and `marker` override the detected values for every file. The copyright holder is resolved from the same manifests by the same rules, see [Copyright holder](#-copyright-holder).
 
 For example, scanning `repo/`:
 
@@ -260,7 +302,9 @@ repo/
 
 To support another ecosystem, add a module to `src/drivers/` that exports a `driver` with `id`, `languages` (the file-type detector ids native to it), `manifests` (filenames that claim a folder, in reading order), `detect(dirPath)` (returns `detectManifests(dirPath, manifests)` from `src/drivers/shared.mjs`) and `read(detection)` (returns `{ name, company }`, each `undefined` when the manifest has none), then add it to `MANIFEST_DRIVERS` in `src/drivers/index.mjs` at its place in the fixed order.
 
-## Copyright holder
+---
+
+## 📜 Copyright holder
 
 The holder on the `@Copyright` line (`companyName`) comes from the manifest of the project the file belongs to, read by the same drivers and with the same rules as the project name: the nearest claimed folder, the file's native driver first, the per-field fallback, and climbing up to the scan root (never past a `.git` folder). The holder climbs on its own, so a sub-package whose `package.json` has a name but no author takes the repository's author while keeping its own `@Project`. The field each driver reads is in the table above.
 
@@ -286,7 +330,9 @@ With `companyName: "Example Co"` every file gets `Copyright (c) 2026-2026 Exampl
 
 With `sampleOutput`, `detectedValues.companyName` is the resolved holder (`null` when there is none) and `detectedValues.companyNameSource` says where it came from: `{ from: "manifest", driver, manifest, dir }`, `{ from: "option" }` (`companyName`) or `{ from: "none" }`. `result.metadata` carries the same two values for the scan root. The `@Author` suffix set by `company` (`Name <Company>`) is a separate option and does not affect the holder.
 
-## Creation date
+---
+
+## 📅 Creation date
 
 `@Date` is "oldest wins": a file cannot have been created later than its first commit or than the time the filesystem first saw it, and an `@Date` older than both (a file brought in from elsewhere, or dated before it was committed) is kept.
 
@@ -296,7 +342,9 @@ With `sampleOutput`, `detectedValues.companyName` is the resolved holder (`null`
 
 The filesystem creation time is the earlier of the file's birth time and its modification time. Content last written at the modification time existed by then, so it bounds creation even when the birth time is later (an extracted archive or a `cp -p` copy keeps the source's modification time). Where the platform reports no birth time, the modification time is used. A fresh clone or CI checkout gives every file a current filesystem time, so there the git first commit decides.
 
-## Copyright years
+---
+
+## 📆 Copyright years
 
 `@Copyright: Copyright (c) <start>-<end> <companyName> All rights reserved.`
 
@@ -305,7 +353,9 @@ The filesystem creation time is the earlier of the file's birth time and its mod
 
 A file created in 2019 therefore gets `2019-2026` when fix-headers runs in 2026, not `2026-2026`.
 
-## Header layout
+---
+
+## 📐 Header layout
 
 Two options set the shape of the header, and both apply to every file type.
 
@@ -344,7 +394,9 @@ With `spacing: 0, margin: 1` the header is compact, with no empty comment lines 
 
 An existing header is restyled in place to match, so changing either option rewrites the layout of every header on the next run, and a run with unchanged options finds nothing to update. A line-comment header always keeps at least one blank line after it, even with `margin: 0`, so a comment that follows the file's header is not read as part of it.
 
-## Date checks
+---
+
+## ✅ Date checks
 
 `check: true` / `--check` validates the `@Date` and `@Last modified time` values of every existing header and writes nothing. It compares instants, not strings, so the same moment written with another offset or in the space/`T` form is not drift. It is independent of the rendered-header diff: an author, identity, copyright, or other content difference never fails the check. Files without a header are skipped.
 
@@ -377,11 +429,13 @@ Advisories are counted in the summary and listed with `--verbose`; `--json` prin
 
 In a normal (writing) run, an epoch that disagrees with its datetime text is recomputed from the text; the datetime text itself is left as written. `created-newer-than-source` is corrected only with `fixCreatedDate` / `--fix-created-date`.
 
-## Time zone
+---
+
+## 🌍 Time zone
 
 A header date is correct in any zone: the offset is only how the instant is shown, and the epoch in parentheses is the instant. So nothing is converted by default. `timezone` / `--timezone <name>` is for projects that want every date shown in one zone:
 
-- **Dates fix-headers writes** are expressed in the zone: a new header's `@Date` (from the git first commit or the filesystem, see [Creation date](#creation-date)), an `@Date` moved by `fixCreatedDate`, and the `@Last modified time` stamped on every changed file.
+- **Dates fix-headers writes** are expressed in the zone: a new header's `@Date` (from the git first commit or the filesystem, see [Creation date](#-creation-date)), an `@Date` moved by `fixCreatedDate`, and the `@Last modified time` stamped on every changed file.
 - **Dates already in a header** are kept as written, unless `convertTimezone` / `--convert-timezone` is also set. That sweep rewrites existing `@Date` and `@Last modified time` values into the zone. A value whose datetime is not recognised is left alone, and so is one already in the zone's offset at that instant.
 
 Only the wall-clock time and the offset change; the instant and the epoch stay the same. The offset is the zone's offset at that instant, from the time zone data built into Node (`Intl`), so daylight saving time is applied per date: with `America/Los_Angeles`, a January date is written at `-08:00` and a July date at `-07:00`. Half-hour and other zones work the same way (`Asia/Kolkata` is `+05:30`, `Pacific/Kiritimati` is `+14:00`). The zone name is validated with `Intl`, and an unknown name fails the run.
@@ -406,7 +460,9 @@ $ fix-headers --timezone America/Los_Angeles --convert-timezone
 
 The `@Date` instant is unchanged; `@Last modified time` is restamped with the time of the run, in the zone.
 
-## Supported file types
+---
+
+## 📑 Supported file types
 
 Each file type is handled by a detector, which decides the header's comment syntax. A file is given a header only when an enabled detector handles its extension:
 
@@ -437,9 +493,11 @@ fix-headers complete: scanned=0, updated=0, skipped=1, dryRun=false
 skipped: package.json (no enabled detector handles .json files)
 ```
 
-## Which files are processed
+---
 
-By default every file with a supported extension (see [Supported file types](#supported-file-types)) is processed. Build output is not skipped by name: `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
+## 📁 Which files are processed
+
+By default every file with a supported extension (see [Supported file types](#-supported-file-types)) is processed. Build output is not skipped by name: `dist`, `build`, `coverage`, `tmp` and the like are processed unless something excludes them. Files are skipped only when:
 
 - they are inside a dependency folder (below),
 - the project's ignore files ignore them, or
@@ -461,15 +519,19 @@ A path inside a dependency folder that you name explicitly is still processed: a
 
 `gitignore: false` turns all of this off, and `gitignore: "<file>"` / `["<file>", ...]` replaces it with exactly the listed files.
 
-## Notes
+---
+
+## 📝 Notes
 
 - `excludeFolders` supports both folder-name and nested path matching.
 - `includeFolders` entries never double-count a file. A folder that lies inside another recursive include is not walked a second time; the exception is a folder the outer walk never enters because it is a dependency folder or `excludeFolders` excludes it (for example `node_modules/pkg` listed explicitly), which keeps being walked on its own because it was named explicitly. An `includeFolders` entry does not override the ignore files: a folder they ignore contributes no files.
-- File discovery is described in [Which files are processed](#which-files-are-processed).
-- For monorepos, each file resolves its project from the nearest manifest in its parent tree (see [Project name and root](#project-name-and-root)).
+- File discovery is described in [Which files are processed](#-which-files-are-processed).
+- For monorepos, each file resolves its project from the nearest manifest in its parent tree (see [Project name and root](#-project-name-and-root)).
 - With `sampleOutput` enabled, each changed file includes `previousValue`, `newValue`, `diff`, `issues`, and `detectedValues` in results.
 
-## Sample output
+---
+
+## 🔍 Sample output
 
 With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed entry in `result.changes` carries a `sample` object. It costs nothing when the option is off.
 
@@ -477,7 +539,7 @@ With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed en
 - `newValue` - the header block this run writes.
 - `diff` - a ready-to-print unified diff of the header block. The `---`/`+++` lines name the file (`a/<file>` / `b/<file>`, or `/dev/null` when there was no previous header, in which case the whole new header shows as added), and hunk line numbers are file line numbers.
 - `issues` - one `{ field, previous, detected }` entry per header field whose written value differs from the existing header, in header order. Fields: `projectName`, `filename`, `createdAt`, `authorName`, `authorEmail`, `lastModifiedByName`, `lastModifiedByEmail`, `lastModifiedAt`, `copyrightStartYear`, `copyrightEndYear`, `companyName`. Values are the field text as written in the header (dates keep their `date (timestamp)` form); `previous` is `null` when the field was missing.
-- `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`). `copyrightStartYear` is the start year written for the file, and `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or `"created-date"` (the year of the file's `@Date`, see [Copyright years](#copyright-years)). The run-level `result.metadata.copyrightStartYear` is the `copyrightStartYear` option, or `null` when it is not set.
+- `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`). `copyrightStartYear` is the start year written for the file, and `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or `"created-date"` (the year of the file's `@Date`, see [Copyright years](#-copyright-years)). The run-level `result.metadata.copyrightStartYear` is the `copyrightStartYear` option, or `null` when it is not set.
 
 `issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` and `@Last modified by` identity unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set, so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
 
@@ -512,9 +574,40 @@ issues: src/cli.mjs
   */
 ```
 
-## License
+---
 
-Apache-2.0
+## 📚 Documentation
+
+- **[Changelog](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/)** — release notes for every version (v1 and v2)
+- **[Release notes on GitHub](https://github.com/CLDMV/fix-headers/releases)** — the same notes attached to each release tag
+
+[![CodeFactor]][codefactor_url] [![OpenSSF Scorecard]][ossf_scorecard_url] [![npms.io score]][npms_url] [![npm unpacked size]][npm_size_url] [![Repo size]][repo_size_url]
+
+---
+
+## 🤝 Contributing
+
+Bug reports and pull requests are welcome on [GitHub](https://github.com/CLDMV/fix-headers/issues). Pull requests target the `next` branch; releases ship from `next` to `master`.
+
+[![Contributors]][contributors_url] [![Sponsor shinrai]][sponsor_url]
+
+---
+
+## 🔗 Links
+
+- **npm**: [@cldmv/fix-headers](https://www.npmjs.com/package/@cldmv/fix-headers)
+- **GitHub**: [CLDMV/fix-headers](https://github.com/CLDMV/fix-headers)
+- **Issues**: [GitHub Issues](https://github.com/CLDMV/fix-headers/issues)
+- **Changelog**: [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/)
+- **Releases**: [GitHub Releases](https://github.com/CLDMV/fix-headers/releases)
+
+---
+
+## 📄 License
+
+[![GitHub license]][github_license_url] [![npm license]][npm_license_url]
+
+Apache-2.0 © Shinrai / CLDMV
 
 <!-- Badge definitions -->
 <!-- [github release]: https://img.shields.io/github/v/release/CLDMV/fix-headers?style=for-the-badge&logo=github&logoColor=white&labelColor=181717 -->
@@ -538,3 +631,17 @@ Apache-2.0
 [contributors_url]: https://github.com/CLDMV/fix-headers/graphs/contributors
 [sponsor shinrai]: https://img.shields.io/github/sponsors/shinrai?style=for-the-badge&logo=githubsponsors&logoColor=white&labelColor=EA4AAA&label=Sponsor
 [sponsor_url]: https://github.com/sponsors/shinrai
+[codefactor]: https://img.shields.io/codefactor/grade/github/CLDMV/fix-headers?style=for-the-badge&logo=codefactor&logoColor=white&labelColor=F44A6A
+[codefactor_url]: https://www.codefactor.io/repository/github/cldmv/fix-headers
+[openssf scorecard]: https://img.shields.io/ossf-scorecard/github.com/CLDMV/fix-headers?style=for-the-badge&label=OpenSSF%20Scorecard
+[ossf_scorecard_url]: https://scorecard.dev/viewer/?uri=github.com/CLDMV/fix-headers
+[npms.io score]: https://img.shields.io/npms-io/final-score/%40cldmv%2Ffix-headers?style=for-the-badge&logo=npms&logoColor=white&labelColor=0B5D57
+[npms_url]: https://npms.io/search?q=%40cldmv%2Ffix-headers
+[npm unpacked size]: https://img.shields.io/npm/unpacked-size/%40cldmv%2Ffix-headers.svg?style=for-the-badge&logo=npm&logoColor=white&labelColor=CB3837
+[npm_size_url]: https://www.npmjs.com/package/@cldmv/fix-headers
+[repo size]: https://img.shields.io/github/repo-size/CLDMV/fix-headers?style=for-the-badge&logo=github&logoColor=white&labelColor=181717
+[repo_size_url]: https://github.com/CLDMV/fix-headers
+[github license]: https://img.shields.io/github/license/CLDMV/fix-headers.svg?style=for-the-badge&logo=github&logoColor=white&labelColor=181717
+[github_license_url]: https://github.com/CLDMV/fix-headers/blob/HEAD/LICENSE
+[npm license]: https://img.shields.io/npm/l/%40cldmv%2Ffix-headers.svg?style=for-the-badge&logo=npm&logoColor=white&labelColor=CB3837
+[npm_license_url]: https://www.npmjs.com/package/@cldmv/fix-headers
