@@ -35,7 +35,7 @@ function escapeRegex(text) {
  * Splits detector-defined preserved prefix from file content when present.
  * @param {string} filePath - File path used for detector selection.
  * @param {string} content - File content.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax/detector options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax/detector options.
  * @returns {{prefix: string, body: string}} Shebang prefix and remaining body.
  */
 function splitPreservedPrefix(filePath, content, syntaxOptions = {}) {
@@ -87,7 +87,7 @@ function matchHeaderSegment(content, syntax) {
  * Finds the first top-level project header block in a file.
  * @param {string} content - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
  * @returns {{start: number, end: number} | null} Header location.
  */
 export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
@@ -129,7 +129,7 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
  * @param {string} content - Original file content.
  * @param {string} newHeader - Generated header text.
  * @param {string} [filePath=""] - File path used for syntax selection.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
  * @returns {{nextContent: string, changed: boolean}} Updated content result.
  */
 export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxOptions = {}) {

@@ -13,6 +13,7 @@
  *
  */
 
+import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { getAllowedExtensions } from "../detectors/index.mjs";
@@ -29,7 +30,8 @@ import { createIgnoreFilter } from "./ignore-rules.mjs";
  * @param {{
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
- *  disabledDetectors?: string[]
+ *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[]
  * }} options - Extension options.
  * @returns {Set<string>} Effective extension set.
  */
@@ -38,11 +40,44 @@ function resolveExtensions(options) {
 }
 
 /**
- * Git's own storage is never a project file, so discovery never walks into it. Nothing else is
- * skipped by name: ignore files and the consumer's `excludeFolders` decide.
+ * Package-manager dependency folders. They hold installed third-party code, never the project's
+ * own source, so discovery skips them at any depth whatever the ignore files say (a project with
+ * no `.gitignore`, a sub-package's own `node_modules`, a tracked dependency folder). A folder
+ * named explicitly through `includeFolders` / `input` is still processed.
+ * @type {readonly string[]}
+ */
+export const DEPENDENCY_FOLDERS = Object.freeze(["node_modules", "bower_components", "jspm_packages", ".pnpm-store", ".yarn"]);
+
+/**
+ * Folders discovery never walks into: git's own storage plus {@link DEPENDENCY_FOLDERS}. Nothing
+ * else is skipped by name (build output such as `dist` included): ignore files and the consumer's
+ * `excludeFolders` decide.
  * @type {Set<string>}
  */
-const NEVER_WALKED_FOLDERS = new Set([".git"]);
+const NEVER_WALKED_FOLDERS = new Set([".git", ...DEPENDENCY_FOLDERS]);
+
+/**
+ * Files only a package manager's `vendor` folder holds: Composer's autoloader and Go's
+ * `vendor/modules.txt`. A `vendor` folder without one is treated as project source, because the
+ * name is also used for hand-maintained code (front-end `vendor/` scripts, Laravel's published
+ * `resources/views/vendor`).
+ * @type {readonly string[]}
+ */
+const VENDOR_MARKERS = Object.freeze(["autoload.php", "modules.txt"]);
+
+/**
+ * Whether discovery skips a folder by name: one of {@link NEVER_WALKED_FOLDERS}, or a `vendor`
+ * folder a package manager installed (see {@link VENDOR_MARKERS}).
+ * @param {string} dirPath - Folder path.
+ * @param {string} dirName - Folder name.
+ * @returns {boolean} True when the folder is never walked.
+ */
+function isNeverWalked(dirPath, dirName) {
+	if (NEVER_WALKED_FOLDERS.has(dirName)) {
+		return true;
+	}
+	return dirName === "vendor" && VENDOR_MARKERS.some((marker) => existsSync(join(dirPath, marker)));
+}
 
 /**
  * Normalizes a user-provided folder path to a project-relative value.
@@ -154,6 +189,7 @@ function buildExclusionMatcher(projectRoot, excludeFolders) {
  *  includeExtensions?: string[],
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[],
  *  includeFolders?: IncludeFolderEntry[],
  *  excludeFolders?: string[],
  *  gitignore?: boolean | string | string[]
@@ -172,13 +208,14 @@ export async function discoverFiles(options) {
 	const exclusionMatcher = buildExclusionMatcher(options.projectRoot, excludeFolders);
 	const ignoreFilter = createIgnoreFilter({ root: options.projectRoot, gitignore: options.gitignore });
 	/**
-	 * Whether the walk skips a directory: the consumer excluded it, or an ignore file ignores it.
+	 * Whether the walk skips a directory: it is a package-manager `vendor` folder, the consumer
+	 * excluded it, or an ignore file ignores it.
 	 * @param {string} targetPath - Directory path.
 	 * @param {string} targetName - Directory name.
 	 * @returns {Promise<boolean>} True when the directory is skipped.
 	 */
 	const shouldSkipDirectory = async (targetPath, targetName) =>
-		exclusionMatcher(targetPath, targetName) || (await ignoreFilter.isIgnored(targetPath, true));
+		isNeverWalked(targetPath, targetName) || exclusionMatcher(targetPath, targetName) || (await ignoreFilter.isIgnored(targetPath, true));
 	const requestedRoots =
 		includeFolders.length > 0
 			? includeFolders.map((entry) => ({
@@ -230,14 +267,14 @@ export async function discoverFiles(options) {
 		}
 
 		// The container's walk only reaches the candidate if it descends through every directory in
-		// between. A directory it never enters (`.git`, a consumer exclusion) hides the candidate's
+		// between. A directory it never enters (`.git`, a dependency folder, a consumer exclusion) hides the candidate's
 		// files from it, so an explicitly listed folder under such a directory keeps being walked on
 		// its own. A directory an ignore file ignores does not: everything inside it is ignored too,
 		// so walking the candidate separately could only return files that are then dropped.
 		let current = container.rootPath;
 		for (const segment of candidate.realRoot.slice(containerPrefix.length).split(sep)) {
 			current = join(current, segment);
-			if (NEVER_WALKED_FOLDERS.has(segment) || exclusionMatcher(current, segment)) {
+			if (isNeverWalked(current, segment) || exclusionMatcher(current, segment)) {
 				return false;
 			}
 		}

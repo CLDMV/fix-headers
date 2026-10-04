@@ -18,6 +18,7 @@ import { relative, resolve } from "node:path";
 import { applyConfigOption } from "../config/load.mjs";
 import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
+import { getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
 	checkHeaderDates,
@@ -38,7 +39,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
 /**
  * @typedef {{
  *  cwd?: string,
- *  input?: string,
+ *  input?: string | string[],
  *  dryRun?: boolean,
  *  check?: boolean,
  *  fixCreatedDate?: boolean,
@@ -53,6 +54,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  useGpgSignerAuthor?: boolean,
  *  enabledDetectors?: string[],
  *  disabledDetectors?: string[],
+ *  forcedDetectors?: string[],
  *  detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>,
  *  includeFolders?: Array<string | { path: string, recursive?: boolean }>,
  *  excludeFolders?: string[],
@@ -104,6 +106,12 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *   `"created-date"` (the year of the file's `@Date`).
  *
  * `metadata.copyrightStartYear` is the `copyrightStartYear` option, or null when it is not set.
+ *
+ * Files whose format cannot carry the header comment are not processed: each is listed in
+ * `skipped` as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or
+ * `changes`. That covers strict `.json`, files with no extension or an extension no enabled
+ * detector handles (for example one added through `includeExtensions`), and Markdown unless
+ * `forcedDetectors` includes `"markdown"`.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
@@ -120,6 +128,8 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  detectedProjects: string[],
  *  filesScanned: number,
  *  filesUpdated: number,
+ *  filesSkipped: number,
+ *  skipped: Array<{file: string, reason: string}>,
  *  dryRun: boolean,
  *  check: boolean,
  *  filesWithDateDrift?: number,
@@ -152,6 +162,23 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  */
 function resolveRuntimeOptions(options) {
 	return applyConfigOption(options, "configFile");
+}
+
+/**
+ * Normalizes the `input` option to a list of paths. A string is one path, an array is several
+ * (CLI `--input` is repeatable); blank entries are dropped, so an empty list means no input.
+ * @param {unknown} input - Option value.
+ * @returns {string[]} Non-blank input paths, possibly empty.
+ */
+function resolveInputs(input) {
+	if (input === undefined || input === null) {
+		return [];
+	}
+	const list = Array.isArray(input) ? input : [input];
+	if (list.some((entry) => typeof entry !== "string")) {
+		throw new Error(`input must be a path or an array of paths, got ${JSON.stringify(input)}`);
+	}
+	return list.filter((entry) => entry.trim().length > 0);
 }
 
 /**
@@ -247,6 +274,7 @@ export async function fixHeaders(options = {}) {
 			"convertTimezone requires timezone: set timezone (CLI --timezone <name>) to the IANA zone to convert header dates into"
 		);
 	}
+	const forcedDetectors = resolveForcedDetectors(effectiveOptions.forcedDetectors);
 	const scanRoot = resolve(effectiveOptions.projectRoot || effectiveOptions.cwd || process.cwd());
 	const metadata = await resolveProjectMetadata({
 		...effectiveOptions,
@@ -267,53 +295,69 @@ export async function fixHeaders(options = {}) {
 	const toZone = timeZone ? (payload) => convertDatePayload(payload, timeZone) : keepDate;
 	const toZoneIfSweeping = convertTimezone ? toZone : keepDate;
 
+	const discoveryOptions = {
+		language: metadata.language,
+		enabledDetectors: effectiveOptions.enabledDetectors,
+		disabledDetectors: effectiveOptions.disabledDetectors,
+		forcedDetectors,
+		includeFolders: effectiveOptions.includeFolders,
+		excludeFolders: effectiveOptions.excludeFolders,
+		includeExtensions: effectiveOptions.includeExtensions,
+		gitignore: effectiveOptions.gitignore
+	};
+	const inputs = resolveInputs(effectiveOptions.input);
+
 	/** @type {string[]} */
 	let files;
-	if (typeof effectiveOptions.input === "string" && effectiveOptions.input.trim().length > 0) {
-		const inputPath = resolve(scanRoot, effectiveOptions.input);
-		const targetStats = await stat(inputPath).catch(() => null);
-		if (!targetStats) {
-			throw new Error(`Input path does not exist: ${effectiveOptions.input}`);
-		}
+	if (inputs.length > 0) {
+		// Every input is processed: the union of the files named and the files discovered
+		// under the folders named, each file once, in the order the inputs were given.
+		const collected = new Set();
+		for (const input of inputs) {
+			const inputPath = resolve(scanRoot, input);
+			const targetStats = await stat(inputPath).catch(() => null);
+			if (!targetStats) {
+				throw new Error(`Input path does not exist: ${input}`);
+			}
 
-		if (targetStats.isFile()) {
-			files = [inputPath];
-		} else if (targetStats.isDirectory()) {
-			files = await discoverFiles({
-				projectRoot: inputPath,
-				language: metadata.language,
-				enabledDetectors: effectiveOptions.enabledDetectors,
-				disabledDetectors: effectiveOptions.disabledDetectors,
-				includeFolders: effectiveOptions.includeFolders,
-				excludeFolders: effectiveOptions.excludeFolders,
-				includeExtensions: effectiveOptions.includeExtensions,
-				gitignore: effectiveOptions.gitignore
-			});
-		} else {
-			throw new Error(`Input path must be a file or directory: ${effectiveOptions.input}`);
+			if (targetStats.isFile()) {
+				collected.add(inputPath);
+			} else if (targetStats.isDirectory()) {
+				for (const file of await discoverFiles({ ...discoveryOptions, projectRoot: inputPath })) {
+					collected.add(file);
+				}
+			} else {
+				throw new Error(`Input path must be a file or directory: ${input}`);
+			}
 		}
+		files = Array.from(collected);
 	} else {
-		files = await discoverFiles({
-			projectRoot: scanRoot,
-			language: metadata.language,
-			enabledDetectors: effectiveOptions.enabledDetectors,
-			disabledDetectors: effectiveOptions.disabledDetectors,
-			includeFolders: effectiveOptions.includeFolders,
-			excludeFolders: effectiveOptions.excludeFolders,
-			includeExtensions: effectiveOptions.includeExtensions,
-			gitignore: effectiveOptions.gitignore
-		});
+		files = await discoverFiles({ ...discoveryOptions, projectRoot: scanRoot });
 	}
 
 	const currentYear = new Date().getFullYear();
 	/** @type {FixHeadersResult["changes"]} */
 	const changes = [];
+	/** @type {FixHeadersResult["skipped"]} */
+	const skipped = [];
 	const detectedProjects = new Set();
 	let filesUpdated = 0;
 	let filesWithDateDrift = 0;
 	let dateAdvisories = 0;
 
 	for (const filePath of files) {
+		// A file whose format cannot carry the header comment (strict JSON, Markdown that is not
+		// forced, an extension no enabled detector handles) is skipped, never given a JS comment.
+		const skipReason = getHeaderSkipReason(filePath, {
+			enabledDetectors: effectiveOptions.enabledDetectors,
+			disabledDetectors: effectiveOptions.disabledDetectors,
+			forcedDetectors
+		});
+		if (skipReason !== null) {
+			skipped.push({ file: relative(scanRoot, filePath), reason: skipReason });
+			continue;
+		}
+
 		const fileMetadata = await resolveProjectMetadata({
 			...effectiveOptions,
 			cwd: scanRoot,
@@ -323,14 +367,16 @@ export async function fixHeaders(options = {}) {
 		detectedProjects.add(`${fileMetadata.language}:${fileMetadata.projectRoot}`);
 		const relativePath = relative(scanRoot, filePath);
 		const original = await readFile(filePath, "utf8");
-		const existingHeader = findProjectHeader(original, filePath, {
+		const syntaxOptions = {
 			language: fileMetadata.language,
 			enabledDetectors: effectiveOptions.enabledDetectors,
 			disabledDetectors: effectiveOptions.disabledDetectors,
+			forcedDetectors,
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
 			spacing: effectiveOptions.spacing,
 			margin: effectiveOptions.margin
-		});
+		};
+		const existingHeader = findProjectHeader(original, filePath, syntaxOptions);
 		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
 		const existingIdentity = existingHeaderText.length > 0 ? extractHeaderAuthorIdentity(existingHeaderText) : {};
 		const existingLastModifiedIdentity = existingHeaderText.length > 0 ? extractHeaderLastModifiedIdentity(existingHeaderText) : {};
@@ -374,14 +420,7 @@ export async function fixHeaders(options = {}) {
 		const comparisonHeader = buildHeader({
 			absoluteFilePath: filePath,
 			language: fileMetadata.language,
-			syntaxOptions: {
-				language: fileMetadata.language,
-				enabledDetectors: effectiveOptions.enabledDetectors,
-				disabledDetectors: effectiveOptions.disabledDetectors,
-				detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
-				spacing: effectiveOptions.spacing,
-				margin: effectiveOptions.margin
-			},
+			syntaxOptions,
 			projectRoot: fileMetadata.projectRoot,
 			projectName: fileMetadata.projectName,
 			createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
@@ -401,14 +440,7 @@ export async function fixHeaders(options = {}) {
 			currentYear
 		});
 
-		const comparisonReplacement = replaceOrInsertHeader(original, comparisonHeader, filePath, {
-			language: fileMetadata.language,
-			enabledDetectors: effectiveOptions.enabledDetectors,
-			disabledDetectors: effectiveOptions.disabledDetectors,
-			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
-			spacing: effectiveOptions.spacing,
-			margin: effectiveOptions.margin
-		});
+		const comparisonReplacement = replaceOrInsertHeader(original, comparisonHeader, filePath, syntaxOptions);
 		const needsUpdate = comparisonReplacement.changed;
 		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
@@ -417,14 +449,7 @@ export async function fixHeaders(options = {}) {
 			? buildHeader({
 					absoluteFilePath: filePath,
 					language: fileMetadata.language,
-					syntaxOptions: {
-						language: fileMetadata.language,
-						enabledDetectors: effectiveOptions.enabledDetectors,
-						disabledDetectors: effectiveOptions.disabledDetectors,
-						detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
-						spacing: effectiveOptions.spacing,
-						margin: effectiveOptions.margin
-					},
+					syntaxOptions,
 					projectRoot: fileMetadata.projectRoot,
 					projectName: fileMetadata.projectName,
 					createdByName: shouldForceAuthorUpdate ? fileMetadata.authorName : existingIdentity.authorName || fileMetadata.authorName,
@@ -445,16 +470,7 @@ export async function fixHeaders(options = {}) {
 				})
 			: comparisonHeader;
 
-		const replacement = needsUpdate
-			? replaceOrInsertHeader(original, header, filePath, {
-					language: fileMetadata.language,
-					enabledDetectors: effectiveOptions.enabledDetectors,
-					disabledDetectors: effectiveOptions.disabledDetectors,
-					detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
-					spacing: effectiveOptions.spacing,
-					margin: effectiveOptions.margin
-				})
-			: comparisonReplacement;
+		const replacement = needsUpdate ? replaceOrInsertHeader(original, header, filePath, syntaxOptions) : comparisonReplacement;
 		/** @type {FixHeadersResult["changes"][number]} */
 		const changeEntry = {
 			file: relativePath,
@@ -521,11 +537,13 @@ export async function fixHeaders(options = {}) {
 	return {
 		metadata,
 		detectedProjects: Array.from(detectedProjects),
-		filesScanned: files.length,
+		filesScanned: files.length - skipped.length,
 		filesUpdated,
+		filesSkipped: skipped.length,
 		dryRun,
 		check,
 		...(check ? { filesWithDateDrift, dateAdvisories } : {}),
-		changes
+		changes,
+		skipped
 	};
 }

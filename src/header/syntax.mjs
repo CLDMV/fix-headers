@@ -37,7 +37,7 @@ import { DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 /**
  * Resolves comment syntax for a file path based on extension.
  * @param {string} filePath - Absolute or relative file path.
- * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number }} [options={}] - Syntax resolution options. `spacing` is the number of empty comment lines just inside the header's opening and closing (default 1).
+ * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number }} [options={}] - Syntax resolution options. `spacing` is the number of empty comment lines just inside the header's opening and closing (default 1).
  * @returns {HeaderSyntax} Header syntax descriptor.
  */
 export function getHeaderSyntaxForFile(filePath, options = {}) {

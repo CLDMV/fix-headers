@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.1.3",
+	"version": "2.1.4",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -30,9 +30,10 @@
 	},
 	"scripts": {
 		"build:ci": "npm run lint --if-present && npm run format:check --if-present && npm run types:check && npm run types:build && npm run build",
-		"test": "node tests/run-vitest.mjs",
+		"test": "node tests/run-vitest.mjs && npm run test:cjs",
+		"test:cjs": "npm run build && node --test tests/cjs/entry.test.cjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
-		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
+		"coverage": "node tests/run-vitest.mjs --coverage-quiet && npm run test:cjs",
 		"ci:coverage": "npm run coverage",
 		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",

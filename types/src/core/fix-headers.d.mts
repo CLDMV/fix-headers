@@ -10,7 +10,7 @@
 export function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;
 export type FixHeadersOptions = {
     cwd?: string;
-    input?: string;
+    input?: string | string[];
     dryRun?: boolean;
     check?: boolean;
     fixCreatedDate?: boolean;
@@ -25,6 +25,7 @@ export type FixHeadersOptions = {
     useGpgSignerAuthor?: boolean;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
+    forcedDetectors?: string[];
     detectorSyntaxOverrides?: Record<string, {
         linePrefix?: string;
         lineSeparator?: string;
@@ -85,6 +86,12 @@ export type DateRewrite = (payload: {
  *   `"created-date"` (the year of the file's `@Date`).
  *
  * `metadata.copyrightStartYear` is the `copyrightStartYear` option, or null when it is not set.
+ *
+ * Files whose format cannot carry the header comment are not processed: each is listed in
+ * `skipped` as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or
+ * `changes`. That covers strict `.json`, files with no extension or an extension no enabled
+ * detector handles (for example one added through `includeExtensions`), and Markdown unless
+ * `forcedDetectors` includes `"markdown"`.
  */
 export type FixHeadersResult = {
     metadata: {
@@ -102,6 +109,11 @@ export type FixHeadersResult = {
     detectedProjects: string[];
     filesScanned: number;
     filesUpdated: number;
+    filesSkipped: number;
+    skipped: Array<{
+        file: string;
+        reason: string;
+    }>;
     dryRun: boolean;
     check: boolean;
     filesWithDateDrift?: number;

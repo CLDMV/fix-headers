@@ -23,7 +23,7 @@ import { discoverFiles } from "../src/core/file-discovery.mjs";
  * @fileoverview Real-filesystem coverage for discoverFiles' `.gitignore` support outside a git
  * work tree (auto-detect, disable, and explicit-file). Only the ignore file decides: `/build`
  * skips the top-level build folder while a nested `tools/build` is still processed, and
- * `node_modules` is processed because nothing ignores it (issue #71). Git-backed ignore rules are
+ * `node_modules` is skipped although nothing ignores it, because it is a dependency folder (issue #123). Git-backed ignore rules are
  * covered in file-discovery-ignore-files.test.vitest.mjs.
  * @module fix-headers/tests/file-discovery-gitignore
  */
@@ -40,7 +40,7 @@ describe("discoverFiles ignore scoping + .gitignore", () => {
 	});
 
 	/**
-	 * Builds a fixture tree with a .gitignore, a nested vs top-level `build`, and an unignored node_modules.
+	 * Builds a fixture tree with a .gitignore, a nested vs top-level `build`, and an unignored node_modules (a dependency folder, skipped anyway).
 	 * @returns {Promise<string>} Absolute fixture root.
 	 */
 	async function fixture() {
@@ -69,21 +69,14 @@ describe("discoverFiles ignore scoping + .gitignore", () => {
 	it("auto-detects .gitignore: skips what it lists (top-level /build, ignored/, *.skip.mjs) and nothing else", async () => {
 		const base = await fixture();
 		const files = await discoverFiles({ projectRoot: base, includeExtensions: [".mjs"] });
-		// node_modules is not in the .gitignore, so it is processed
-		expect(rel(base, files)).toEqual(["node_modules/pkg/dep.mjs", "src/keep.mjs", "tools/build/nested.mjs"]);
+		// node_modules is not in the .gitignore, but dependency folders are never walked
+		expect(rel(base, files)).toEqual(["src/keep.mjs", "tools/build/nested.mjs"]);
 	});
 
-	it("gitignore:false skips nothing", async () => {
+	it("gitignore:false skips nothing but dependency folders", async () => {
 		const base = await fixture();
 		const files = await discoverFiles({ projectRoot: base, includeExtensions: [".mjs"], gitignore: false });
-		expect(rel(base, files)).toEqual([
-			"build/out.mjs",
-			"ignored/a.mjs",
-			"node_modules/pkg/dep.mjs",
-			"src/drop.skip.mjs",
-			"src/keep.mjs",
-			"tools/build/nested.mjs"
-		]);
+		expect(rel(base, files)).toEqual(["build/out.mjs", "ignored/a.mjs", "src/drop.skip.mjs", "src/keep.mjs", "tools/build/nested.mjs"]);
 	});
 
 	it("accepts an explicit gitignore file path", async () => {

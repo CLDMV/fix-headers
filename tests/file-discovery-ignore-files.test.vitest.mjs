@@ -38,9 +38,8 @@ const execFileAsync = promisify(execFile);
 /** Several git spawns per test (fixture setup plus discovery), too slow for vitest's 5s default under load. */
 const GIT_TIMEOUT = { timeout: 30_000 };
 
-/** Folder names the old discovery skipped without any ignore file saying so. */
+/** Build-output folder names the old discovery skipped without any ignore file saying so; now processed unless ignored. */
 const FORMERLY_SKIPPED = [
-	"node_modules/pkg/index.mjs",
 	"dist/out.mjs",
 	"build/out.mjs",
 	"coverage/report.mjs",
@@ -149,16 +148,16 @@ async function discover(root, options = {}) {
 }
 
 describe("discovery inside a git work tree", () => {
-	it("includes node_modules, dist, build, coverage, tmp, .next and .turbo when no ignore file lists them", GIT_TIMEOUT, async () => {
+	it("includes dist, build, coverage, tmp, .next and .turbo when no ignore file lists them, never node_modules", GIT_TIMEOUT, async () => {
 		const root = await gitWorkspace("ignore-none");
-		await writeTree(root, ["src/a.mjs", ...FORMERLY_SKIPPED]);
+		await writeTree(root, ["src/a.mjs", "node_modules/pkg/index.mjs", ...FORMERLY_SKIPPED]);
 
 		expect(await discover(root)).toEqual([...FORMERLY_SKIPPED, "src/a.mjs"].sort());
 	});
 
 	it("excludes exactly the folders a .gitignore lists", GIT_TIMEOUT, async () => {
 		const root = await gitWorkspace("ignore-listed");
-		await writeTree(root, ["src/a.mjs", ...FORMERLY_SKIPPED]);
+		await writeTree(root, ["src/a.mjs", "node_modules/pkg/index.mjs", ...FORMERLY_SKIPPED]);
 		await writeTree(root, { ".gitignore": "node_modules/\ndist/\ncoverage/\ntmp/\n" });
 
 		expect(await discover(root)).toEqual([".next/server.mjs", ".turbo/cache.mjs", "build/out.mjs", "src/a.mjs"]);
@@ -241,7 +240,7 @@ describe("discovery inside a git work tree", () => {
 		const root = await gitWorkspace("ignore-exclude-folders");
 		await writeTree(root, ["src/a.mjs", "src/generated/g.mjs", "dist/d.mjs", "node_modules/pkg/index.mjs"]);
 
-		expect(await discover(root, { excludeFolders: ["dist", "src/generated"] })).toEqual(["node_modules/pkg/index.mjs", "src/a.mjs"]);
+		expect(await discover(root, { excludeFolders: ["dist", "src/generated"] })).toEqual(["src/a.mjs"]);
 	});
 
 	it("uses the repository's rules when discovery starts in a subfolder", GIT_TIMEOUT, async () => {
@@ -272,9 +271,9 @@ describe("discovery inside a git work tree", () => {
 });
 
 describe("discovery outside a git work tree", () => {
-	it("includes every folder when there are no ignore files", async () => {
+	it("includes every folder but node_modules when there are no ignore files", async () => {
 		const root = await plainWorkspace("plain-none");
-		await writeTree(root, ["src/a.mjs", ...FORMERLY_SKIPPED]);
+		await writeTree(root, ["src/a.mjs", "node_modules/pkg/index.mjs", ...FORMERLY_SKIPPED]);
 
 		expect(await discover(root)).toEqual([...FORMERLY_SKIPPED, "src/a.mjs"].sort());
 	});
@@ -293,8 +292,9 @@ describe("discovery outside a git work tree", () => {
 		]);
 		await writeTree(root, { ".gitignore": "dist/\n*.gen.mjs\n", "lib/.gitignore": "!keep.gen.mjs\ncache/\n" });
 
-		expect(await discover(root)).toEqual(["cache/c.mjs", "lib/keep.gen.mjs", "node_modules/pkg/index.mjs", "src/a.mjs"]);
-		expect(await discover(root, { gitignore: false })).toHaveLength(8);
+		expect(await discover(root)).toEqual(["cache/c.mjs", "lib/keep.gen.mjs", "src/a.mjs"]);
+		// node_modules is a dependency folder, skipped even with ignore files disabled
+		expect(await discover(root, { gitignore: false })).toHaveLength(7);
 	});
 
 	it("ignores an include folder under an ignored folder, whatever a nested .gitignore re-includes", async () => {
