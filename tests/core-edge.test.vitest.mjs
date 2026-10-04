@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:17-07:00 (1790969297)
+ *	@Last modified time: 2026-10-03T22:50:31-07:00 (1791093031)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -206,7 +206,7 @@ describe("core edge coverage", () => {
 		}
 	});
 
-	it("preserves original header author and last-modified identity when nothing else changes", async () => {
+	it("preserves original header author and last-modified identity of a committed, unedited file when nothing else changes", async () => {
 		const workspace = await createWorkspace("core-edge-preserve-author");
 		const currentYear = new Date().getFullYear();
 
@@ -216,6 +216,9 @@ describe("core edge coverage", () => {
 				join(workspace, "src", "one.mjs"),
 				`/**\n *\n *\t@Project: core-edge-preserve-author\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${currentYear} Catalyzed Motivation Inc. All rights reserved.\n *\n */\n\n\nexport const one = true;\n`
 			);
+
+			// Committed and not edited since: the recorded editor is kept.
+			await initializeGitWorkspace(workspace);
 
 			const result = await coreFixHeaders({
 				cwd: workspace,
@@ -299,7 +302,7 @@ describe("core edge coverage", () => {
 		}
 	});
 
-	it("does not cascade a forced author update into the last-modified identity of an unrelated rewrite", async () => {
+	it("does not cascade a forced author update into the last-modified identity of a file whose content was not edited", async () => {
 		const workspace = await createWorkspace("core-edge-force-author-no-cascade");
 
 		try {
@@ -308,6 +311,9 @@ describe("core edge coverage", () => {
 				join(workspace, "src", "one.mjs"),
 				`/**\n *\n *\t@Project: core-edge-force-author-no-cascade\n *\t@Filename: /src/one.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Original Author\n *\t@Email: <original@example.com>\n *\t-----\n *\t@Last modified by: Old Updater (old@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc All rights reserved.\n *\n */\n\n\nexport const one = true;\n`
 			);
+
+			// Committed and not edited since: the recorded editor is kept.
+			await initializeGitWorkspace(workspace);
 
 			await coreFixHeaders({
 				cwd: workspace,

@@ -2,7 +2,7 @@
 
 **@cldmv/fix-headers** is a multi-language source header normalizer for Node.js projects. It scans a project's files, works out which project each file belongs to from the manifests around it (`package.json`, `pyproject.toml`, `composer.json`, `Cargo.toml`, `go.mod`, …), detects the author from git, and inserts or updates a standard header at the top of every file in that file's own comment syntax.
 
-Headers stay correct without hand-editing: `@Date` follows the file's real creation time, `@Last modified time` only moves when the header changes, the `@Copyright` holder and years come from the manifest and the file's history, and `--check` validates existing headers in CI without writing anything. It runs as a `fix-headers` command line tool or as a library from ESM and CommonJS, and one shared config can serve every repository in an organisation.
+Headers stay correct without hand-editing: `@Date` follows the file's real creation time, `@Author` keeps the original author, `@Last modified by` names whoever last edited the file's content and `@Last modified time` only moves when the header changes, the `@Copyright` holder and years come from the manifest and the file's history, and `--check` validates existing headers in CI without writing anything. It runs as a `fix-headers` command line tool or as a library from ESM and CommonJS, and one shared config can serve every repository in an organisation.
 
 > _One header format for every file in every repository, detected from the project itself and kept current by a single command._
 
@@ -14,19 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.1.4 (October 2026)
+### Latest: v2.2.0 (October 2026)
 
-- **`require()` fails clearly where Node.js cannot load ES modules synchronously** — the CommonJS entry point (`dist/index.cjs`, a small wrapper around the ES module build) now checks `process.features.require_module` first. On a Node.js version without `require(esm)` it throws an `ERR_REQUIRE_ESM` error that names the package, the versions `require()` needs (^20.19.0 or >=22.12.0) and the running version, and points at `import()`, instead of Node's bare error from inside the package ([#117](https://github.com/CLDMV/fix-headers/pull/117)). New `node:test` checks run the built CommonJS entry point on every `npm test` and coverage run. On supported Node.js versions (`engines.node` is `>=22.12.0`) nothing changes.
-- **Never breaks files it can't stamp** — strict JSON (`package.json` included), Markdown named with `--input`, and files with no or an unhandled extension are now skipped and reported instead of getting a JavaScript comment that broke them. Markdown gets a header only when forced with `--force-detector markdown`, as an HTML comment ([#124](https://github.com/CLDMV/fix-headers/pull/124)).
-- **Repeatable `--input` and no more dependency folders** — every `--input` value is processed, not just the last ([#125](https://github.com/CLDMV/fix-headers/pull/125)), and `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` are never walked, at any depth, even without a `.gitignore` ([#126](https://github.com/CLDMV/fix-headers/pull/126)).
-- [View full v2.1.4 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md)
+- **`@Last modified by` names whoever last edited the file's content** — a run that only rewrites a header (a date format conversion, a corrected `@Project`, new spacing or margin) now keeps the recorded editor instead of writing the run's identity, so running fix-headers never claims other people's files. The edit check compares the file, header removed, with its body at git `HEAD`: a changed or not-yet-committed body makes the run's identity the last editor, and `@Author` stays the original author unless `forceAuthorUpdate` is set. `@Last modified time` still moves whenever a header is rewritten, and `forceLastModifiedAuthorUpdate` is no longer needed for normal use ([#128](https://github.com/CLDMV/fix-headers/pull/128)).
+- [View full v2.2.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md)
 
 ### Recent Releases
 
+- **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
 - **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
 - **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config from `@cldmv/configs` and stamps uniform file headers across its own sources ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.2.md))
 - **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines; `esbuild` 0.28.2 clears GHSA-g7r4-m6w7-qqqr ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.1.md))
-- **v2.1.0** (September 2026) — `spacing` and `margin` header layout options: every header is framed with empty comment lines and followed by two blank lines ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
@@ -37,6 +35,7 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 - Finds the project each file belongs to from its manifest (`package.json`, `pyproject.toml` / `setup.cfg` / `setup.py`, `composer.json`, `Cargo.toml`, `go.mod`), whatever the file's type
 - `@Project` is the name from that project's manifest, so a CSS, HTML, YAML or JSONC file in a Python, PHP, Rust or Go project gets that project's name too; the folder name is used only when no manifest provides one. Override it with `projectName`. See [Project name and root](#-project-name-and-root)
 - Auto-detects author and email from git config/commit history
+- Keeps the original `@Author`, and changes `@Last modified by` only when the file's content (everything outside the header) was edited, so a run that only rewrites headers never claims other people's files. See [Author and last modified](#-author-and-last-modified)
 - Supports per-run overrides for every detected value
 - Supports folder inclusion and exclusion configuration; skips only what the project's ignore files (everything git honours) or your own exclusions say
 - Supports monorepos: every file resolves its own project from the nearest manifest in its parent tree
@@ -124,8 +123,8 @@ Common CLI options:
 - `--verbose` - list updated files; together with `--sample-output` or `--diff`, also list each file's field differences (`authorName: found "X", expected "Y"`)
 - `--sample-output` - print the previous/new header and detected values for each changed file
 - `--diff` - print a unified diff of each changed file's header (implies sample output)
-- `--force-author-update`
-- `--force-last-modified-author-update`
+- `--force-author-update` - replace an existing `@Author`/`@Email` with the detected identity (see [Author and last modified](#-author-and-last-modified))
+- `--force-last-modified-author-update` - write the detected identity as `@Last modified by` on every file, edited or not (rarely needed, see [Author and last modified](#-author-and-last-modified))
 - `--use-gpg-signer-author` (the signing key's UID name, with the OpenPGP UID comment dropped)
 - `--cwd <path>`
 - `--input <path>` (repeatable) - process these files and folders instead of the whole project: the union of every value, each file once (`--input src/a.mjs --input src/b.mjs --input scripts`). A named file whose type cannot carry a header (see [Supported file types](#-supported-file-types)) is reported as `skipped: <file> (<reason>)` and left unchanged
@@ -178,8 +177,8 @@ Important options:
 - `authorName?: string`
 - `authorEmail?: string`
 - `company?: string` - appends to `@Author` as `Name <Company>`
-- `forceAuthorUpdate?: boolean` - force update `@Author`/`@Email` to detected or overridden current values
-- `forceLastModifiedAuthorUpdate?: boolean` - force update `@Last modified by` to detected or overridden current values. Without this, an existing header's recorded `@Last modified by` identity is preserved and does not by itself trigger an update just because the running author differs (e.g. a different `git config user.name` than whoever last touched the file)
+- `forceAuthorUpdate?: boolean` - replace an existing `@Author`/`@Email` with the detected (or overridden) identity. Off by default: `@Author` is the file's original author, and an existing value is never changed; a missing one is filled in. See [Author and last modified](#-author-and-last-modified)
+- `forceLastModifiedAuthorUpdate?: boolean` - write the detected (or overridden) identity as `@Last modified by` on every file, whether its content was edited or not, and update files whose only difference is that identity. Off by default, and not needed for normal use: `@Last modified by` already becomes the run's identity on every file whose content was edited. See [Author and last modified](#-author-and-last-modified)
 - `useGpgSignerAuthor?: boolean` - take the detected `@Author` name from the user ID of the OpenPGP key git signs commits with (`user.signingkey`, read through `gpg.openpgp.program` / `gpg.program` / `gpg`; the first user ID that is not revoked or expired). The OpenPGP UID comment is dropped, so `Nate Corcoran (2023 PC) <nate@example.com>` becomes `Nate Corcoran` (with `company: "CLDMV"`: `Nate Corcoran <CLDMV>`). It describes whoever runs the tool, whatever the last commit is — a squash merge made by GitHub or a bot has no locally verifiable signer. With no readable OpenPGP signing key (none configured, `gpg.format` is `ssh`/`x509`, or gpg is unavailable) it falls back to the last commit's signer (`%GS`), then `git config user.name`, then the last commit's author
 - `companyName?: string` - the `@Copyright` holder for every file, instead of the one the project's manifests provide. There is no built-in default: unset, the holder comes from the manifests, and with none it is left out of the line (see [Copyright holder](#-copyright-holder))
 - `copyrightStartYear?: number` - the `@Copyright` start year for every file. Unset (the default): each file's start year is the year of its own `@Date`, see [Copyright years](#-copyright-years)
@@ -341,6 +340,34 @@ With `sampleOutput`, `detectedValues.companyName` is the resolved holder (`null`
 - **Existing `@Date` with `fixCreatedDate`**: the oldest of the existing `@Date`, the git first commit, and the filesystem creation time. The existing value wins a tie, so the correction only ever moves `@Date` earlier. An existing value whose datetime is not recognised is replaced.
 
 The filesystem creation time is the earlier of the file's birth time and its modification time. Content last written at the modification time existed by then, so it bounds creation even when the birth time is later (an extracted archive or a `cp -p` copy keeps the source's modification time). Where the platform reports no birth time, the modification time is used. A fresh clone or CI checkout gives every file a current filesystem time, so there the git first commit decides.
+
+---
+
+## 👤 Author and last modified
+
+`@Author` / `@Email` name the file's original author, and `@Last modified by` / `@Last modified time` its last edit.
+
+- **`@Author` / `@Email`** are written once. An existing value is never changed, whoever runs the tool, unless `forceAuthorUpdate` is set. A file without one gets the detected identity.
+- **`@Last modified by`** changes only when the file's **content** was edited: everything outside the header. It then becomes the identity detected for the run (`authorName` / `authorEmail`, or git as described under `useGpgSignerAuthor`). Changes fix-headers makes to the header on its own, such as the date format (`normalizeDateFormat`), an epoch repair, `@Date` (`fixCreatedDate`), a time zone conversion, the frame, spacing or margin, or the `@Project`, `@Filename` or `@Copyright` values, keep the recorded editor.
+- **`@Last modified time`** is restamped with the time of the run whenever fix-headers rewrites the header, header-only rewrites included. A file whose header is already current is not touched.
+
+Whether the content was edited is decided against git `HEAD`. The header is taken out of the file and out of its `HEAD` version (`git show HEAD:<path>`), along with the blank lines after it, and the rest is compared:
+
+| File                                                         | Content edited?            | `@Author`                  | `@Last modified by` | `@Last modified time` |
+| ------------------------------------------------------------ | -------------------------- | -------------------------- | ------------------- | --------------------- |
+| Tracked, body the same as at `HEAD`, header rewritten        | no                         | kept                       | kept                | now                   |
+| Tracked, body differs from `HEAD`                            | yes                        | kept                       | run identity        | now                   |
+| Not in `HEAD` (new, untracked or ignored, or no commits yet) | yes                        | kept (filled when missing) | run identity        | now                   |
+| Outside a git work tree, header rewritten                    | cannot tell, treated as no | kept                       | kept                | now                   |
+| Header already current, content not edited                   | no                         | unchanged                  | unchanged           | unchanged             |
+
+A missing field is filled with the run identity in every row, and a file without a header gets the run identity in both. Adding a header to a committed file is not a content edit, so a later header-only run by someone else keeps whoever was recorded then.
+
+`@Last modified time` also moves for a content edit by the editor already recorded: when the body differs from `HEAD` and the recorded time is older than the file's last commit, the edit has not been stamped yet, so it is restamped. Once stamped, the time is newer than the last commit, and running fix-headers again changes nothing until the next commit.
+
+The check compares the working tree with `HEAD`, so run fix-headers before committing (a pre-commit hook, or `npm run fix:headers` before `git commit`). Content committed without a run is not detected later: at that point the body matches `HEAD`.
+
+`forceLastModifiedAuthorUpdate` writes the run identity as `@Last modified by` on every file, edited or not. It is the old behaviour for configurations that relied on it; with content-edit detection it is not needed for normal use.
 
 ---
 
@@ -541,7 +568,7 @@ With `sampleOutput: true` (CLI: `--sample-output` or `--diff`), every changed en
 - `issues` - one `{ field, previous, detected }` entry per header field whose written value differs from the existing header, in header order. Fields: `projectName`, `filename`, `createdAt`, `authorName`, `authorEmail`, `lastModifiedByName`, `lastModifiedByEmail`, `lastModifiedAt`, `copyrightStartYear`, `copyrightEndYear`, `companyName`. Values are the field text as written in the header (dates keep their `date (timestamp)` form); `previous` is `null` when the field was missing.
 - `detectedValues` - the metadata resolved for the file. `projectNameSource` says where `projectName` came from: `{ from: "manifest", driver, manifest, dir }` (the driver, its manifest and the folder it sits in), `{ from: "folder", dir }` (the project root's folder name) or `{ from: "option" }` (`projectName`). `copyrightStartYear` is the start year written for the file, and `copyrightStartYearSource` says where it came from: `"option"` (`copyrightStartYear`) or `"created-date"` (the year of the file's `@Date`, see [Copyright years](#-copyright-years)). The run-level `result.metadata.copyrightStartYear` is the `copyrightStartYear` option, or `null` when it is not set.
 
-`issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` and `@Last modified by` identity unless `forceAuthorUpdate` / `forceLastModifiedAuthorUpdate` is set, so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
+`issues` compares the existing header against what is actually written, not against the raw detected metadata. fix-headers preserves an existing `@Author`/`@Email` unless `forceAuthorUpdate` is set, and an existing `@Last modified by` unless the file's content was edited or `forceLastModifiedAuthorUpdate` is set (see [Author and last modified](#-author-and-last-modified)), so those fields only appear when they really change. An updated file always gets a fresh `@Last modified time`, so `lastModifiedAt` is listed for every changed file that already had a header.
 
 ```js
 const { changes } = await fixHeaders({ dryRun: true, sampleOutput: true });
