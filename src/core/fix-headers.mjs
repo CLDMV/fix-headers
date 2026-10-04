@@ -39,7 +39,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
 /**
  * @typedef {{
  *  cwd?: string,
- *  input?: string,
+ *  input?: string | string[],
  *  dryRun?: boolean,
  *  check?: boolean,
  *  fixCreatedDate?: boolean,
@@ -165,6 +165,23 @@ function resolveRuntimeOptions(options) {
 }
 
 /**
+ * Normalizes the `input` option to a list of paths. A string is one path, an array is several
+ * (CLI `--input` is repeatable); blank entries are dropped, so an empty list means no input.
+ * @param {unknown} input - Option value.
+ * @returns {string[]} Non-blank input paths, possibly empty.
+ */
+function resolveInputs(input) {
+	if (input === undefined || input === null) {
+		return [];
+	}
+	const list = Array.isArray(input) ? input : [input];
+	if (list.some((entry) => typeof entry !== "string")) {
+		throw new Error(`input must be a path or an array of paths, got ${JSON.stringify(input)}`);
+	}
+	return list.filter((entry) => entry.trim().length > 0);
+}
+
+/**
  * Extracts original author identity from an existing header block.
  * @param {string} headerText - Existing header content.
  * @returns {{ authorName?: string, authorEmail?: string }} Parsed identity values.
@@ -278,44 +295,44 @@ export async function fixHeaders(options = {}) {
 	const toZone = timeZone ? (payload) => convertDatePayload(payload, timeZone) : keepDate;
 	const toZoneIfSweeping = convertTimezone ? toZone : keepDate;
 
+	const discoveryOptions = {
+		language: metadata.language,
+		enabledDetectors: effectiveOptions.enabledDetectors,
+		disabledDetectors: effectiveOptions.disabledDetectors,
+		forcedDetectors,
+		includeFolders: effectiveOptions.includeFolders,
+		excludeFolders: effectiveOptions.excludeFolders,
+		includeExtensions: effectiveOptions.includeExtensions,
+		gitignore: effectiveOptions.gitignore
+	};
+	const inputs = resolveInputs(effectiveOptions.input);
+
 	/** @type {string[]} */
 	let files;
-	if (typeof effectiveOptions.input === "string" && effectiveOptions.input.trim().length > 0) {
-		const inputPath = resolve(scanRoot, effectiveOptions.input);
-		const targetStats = await stat(inputPath).catch(() => null);
-		if (!targetStats) {
-			throw new Error(`Input path does not exist: ${effectiveOptions.input}`);
-		}
+	if (inputs.length > 0) {
+		// Every input is processed: the union of the files named and the files discovered
+		// under the folders named, each file once, in the order the inputs were given.
+		const collected = new Set();
+		for (const input of inputs) {
+			const inputPath = resolve(scanRoot, input);
+			const targetStats = await stat(inputPath).catch(() => null);
+			if (!targetStats) {
+				throw new Error(`Input path does not exist: ${input}`);
+			}
 
-		if (targetStats.isFile()) {
-			files = [inputPath];
-		} else if (targetStats.isDirectory()) {
-			files = await discoverFiles({
-				projectRoot: inputPath,
-				language: metadata.language,
-				enabledDetectors: effectiveOptions.enabledDetectors,
-				disabledDetectors: effectiveOptions.disabledDetectors,
-				forcedDetectors,
-				includeFolders: effectiveOptions.includeFolders,
-				excludeFolders: effectiveOptions.excludeFolders,
-				includeExtensions: effectiveOptions.includeExtensions,
-				gitignore: effectiveOptions.gitignore
-			});
-		} else {
-			throw new Error(`Input path must be a file or directory: ${effectiveOptions.input}`);
+			if (targetStats.isFile()) {
+				collected.add(inputPath);
+			} else if (targetStats.isDirectory()) {
+				for (const file of await discoverFiles({ ...discoveryOptions, projectRoot: inputPath })) {
+					collected.add(file);
+				}
+			} else {
+				throw new Error(`Input path must be a file or directory: ${input}`);
+			}
 		}
+		files = Array.from(collected);
 	} else {
-		files = await discoverFiles({
-			projectRoot: scanRoot,
-			language: metadata.language,
-			enabledDetectors: effectiveOptions.enabledDetectors,
-			disabledDetectors: effectiveOptions.disabledDetectors,
-			forcedDetectors,
-			includeFolders: effectiveOptions.includeFolders,
-			excludeFolders: effectiveOptions.excludeFolders,
-			includeExtensions: effectiveOptions.includeExtensions,
-			gitignore: effectiveOptions.gitignore
-		});
+		files = await discoverFiles({ ...discoveryOptions, projectRoot: scanRoot });
 	}
 
 	const currentYear = new Date().getFullYear();

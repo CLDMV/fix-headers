@@ -10,7 +10,7 @@
 export function fixHeaders(options?: FixHeadersOptions): Promise<FixHeadersResult>;
 export type FixHeadersOptions = {
     cwd?: string;
-    input?: string;
+    input?: string | string[];
     dryRun?: boolean;
     check?: boolean;
     fixCreatedDate?: boolean;
