@@ -14,19 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.1.4 (October 2026)
+### Latest: v2.2.0 (October 2026)
 
-- **`require()` fails clearly where Node.js cannot load ES modules synchronously** — the CommonJS entry point (`dist/index.cjs`, a small wrapper around the ES module build) now checks `process.features.require_module` first. On a Node.js version without `require(esm)` it throws an `ERR_REQUIRE_ESM` error that names the package, the versions `require()` needs (^20.19.0 or >=22.12.0) and the running version, and points at `import()`, instead of Node's bare error from inside the package ([#117](https://github.com/CLDMV/fix-headers/pull/117)). New `node:test` checks run the built CommonJS entry point on every `npm test` and coverage run. On supported Node.js versions (`engines.node` is `>=22.12.0`) nothing changes.
-- **Never breaks files it can't stamp** — strict JSON (`package.json` included), Markdown named with `--input`, and files with no or an unhandled extension are now skipped and reported instead of getting a JavaScript comment that broke them. Markdown gets a header only when forced with `--force-detector markdown`, as an HTML comment ([#124](https://github.com/CLDMV/fix-headers/pull/124)).
-- **Repeatable `--input` and no more dependency folders** — every `--input` value is processed, not just the last ([#125](https://github.com/CLDMV/fix-headers/pull/125)), and `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` are never walked, at any depth, even without a `.gitignore` ([#126](https://github.com/CLDMV/fix-headers/pull/126)).
-- [View full v2.1.4 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md)
+- **`@Last modified by` names whoever last edited the file's content** — a run that only rewrites a header (a date format conversion, a corrected `@Project`, new spacing or margin) now keeps the recorded editor instead of writing the run's identity, so running fix-headers never claims other people's files. The edit check compares the file, header removed, with its body at git `HEAD`: a changed or not-yet-committed body makes the run's identity the last editor, and `@Author` stays the original author unless `forceAuthorUpdate` is set. `@Last modified time` still moves whenever a header is rewritten, and `forceLastModifiedAuthorUpdate` is no longer needed for normal use ([#128](https://github.com/CLDMV/fix-headers/pull/128)).
+- [View full v2.2.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md)
 
 ### Recent Releases
 
+- **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
 - **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
 - **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config from `@cldmv/configs` and stamps uniform file headers across its own sources ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.2.md))
 - **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines; `esbuild` 0.28.2 clears GHSA-g7r4-m6w7-qqqr ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.1.md))
-- **v2.1.0** (September 2026) — `spacing` and `margin` header layout options: every header is framed with empty comment lines and followed by two blank lines ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.0.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
