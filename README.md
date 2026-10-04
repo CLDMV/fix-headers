@@ -17,6 +17,8 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 ### Latest: v2.1.4 (October 2026)
 
 - **`require()` fails clearly where Node.js cannot load ES modules synchronously** — the CommonJS entry point (`dist/index.cjs`, a small wrapper around the ES module build) now checks `process.features.require_module` first. On a Node.js version without `require(esm)` it throws an `ERR_REQUIRE_ESM` error that names the package, the versions `require()` needs (^20.19.0 or >=22.12.0) and the running version, and points at `import()`, instead of Node's bare error from inside the package ([#117](https://github.com/CLDMV/fix-headers/pull/117)). New `node:test` checks run the built CommonJS entry point on every `npm test` and coverage run. On supported Node.js versions (`engines.node` is `>=22.12.0`) nothing changes.
+- **Never breaks files it can't stamp** — strict JSON (`package.json` included), Markdown named with `--input`, and files with no or an unhandled extension are now skipped and reported instead of getting a JavaScript comment that broke them. Markdown gets a header only when forced with `--force-detector markdown`, as an HTML comment ([#124](https://github.com/CLDMV/fix-headers/pull/124)).
+- **Repeatable `--input` and no more dependency folders** — every `--input` value is processed, not just the last ([#125](https://github.com/CLDMV/fix-headers/pull/125)), and `node_modules`, `bower_components`, `jspm_packages`, `.pnpm-store` and `.yarn` are never walked, at any depth, even without a `.gitignore` ([#126](https://github.com/CLDMV/fix-headers/pull/126)).
 - [View full v2.1.4 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md)
 
 ### Recent Releases
