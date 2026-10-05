@@ -86,7 +86,7 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
-		"@cldmv/configs": "^1.2.0",
+		"@cldmv/configs": "^1.2.4",
 		"@cldmv/eslint-plugin-jsonv": "^1.0.10",
 		"@cldmv/jsonv": "^1.0.9",
 		"@cldmv/prettier-plugin-jsonv": "^1.0.6",
