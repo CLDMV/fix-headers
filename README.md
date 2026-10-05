@@ -14,17 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.0 (October 2026)
+### Latest: v2.2.1 (October 2026)
 
-- **`@Last modified by` names whoever last edited the file's content** — a run that only rewrites a header (a date format conversion, a corrected `@Project`, new spacing or margin) now keeps the recorded editor instead of writing the run's identity, so running fix-headers never claims other people's files. The edit check compares the file, header removed, with its body at git `HEAD`: a changed or not-yet-committed body makes the run's identity the last editor, and `@Author` stays the original author unless `forceAuthorUpdate` is set. `@Last modified time` still moves whenever a header is rewritten, and `forceLastModifiedAuthorUpdate` is no longer needed for normal use ([#128](https://github.com/CLDMV/fix-headers/pull/128)).
-- [View full v2.2.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md)
+- **Development-setup patch, nothing the package ships changed** — the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; `dist/`, `bin/`, the types and the runtime dependency are exactly as in v2.2.0.
+- [View full v2.2.1 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md)
 
 ### Recent Releases
 
+- **v2.2.0** (October 2026) — `@Last modified by` names whoever last edited the file's content: a run that only rewrites a header keeps the recorded editor instead of writing the run's identity ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md))
 - **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
 - **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
 - **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config from `@cldmv/configs` and stamps uniform file headers across its own sources ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.2.md))
-- **v2.1.1** (October 2026) — a file that holds only a header now ends with the header instead of trailing `margin` blank lines; `esbuild` 0.28.2 clears GHSA-g7r4-m6w7-qqqr ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.1.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
