@@ -14,17 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.1 (October 2026)
+### Latest: v2.2.2 (October 2026)
 
-- **Development-setup patch, nothing the package ships changed** — the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; `dist/`, `bin/`, the types and the runtime dependency are exactly as in v2.2.0.
-- [View full v2.2.1 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md)
+- **Dependency refresh, nothing the package ships changed** — only `package-lock.json` moves: `ignore` 7.0.10 → 7.0.12 inside its existing range, and development tooling including `@cldmv/vitest-runner` 1.5.3 (which brings `chalk` 6 and a Node.js 22.12 floor), `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0. No `package.json` range, API, CLI option or header format changed ([#134](https://github.com/CLDMV/fix-headers/pull/134), [#135](https://github.com/CLDMV/fix-headers/pull/135), [#137](https://github.com/CLDMV/fix-headers/pull/137), [#138](https://github.com/CLDMV/fix-headers/pull/138)).
+- [View full v2.2.2 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md)
 
 ### Recent Releases
 
+- **v2.2.1** (October 2026) — development-setup patch: the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; nothing the package ships changed ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md))
 - **v2.2.0** (October 2026) — `@Last modified by` names whoever last edited the file's content: a run that only rewrites a header keeps the recorded editor instead of writing the run's identity ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md))
 - **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
 - **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
-- **v2.1.2** (October 2026) — no runtime change: the repository adopts the shared CLDMV fix-headers config from `@cldmv/configs` and stamps uniform file headers across its own sources ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.2.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
