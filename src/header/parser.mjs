@@ -107,7 +107,7 @@ function segmentLines(segment, syntax) {
 	}
 
 	const html = syntax.kind === "html";
-	const inner = html ? body.replace(/^<!--/, "").replace(/-->\s*$/, "") : body.replace(/^\/\*+/, "").replace(/\*+\/\s*$/, "");
+	const inner = html ? body.replace(/^<!--/, "").replace(/--!?>\s*$/, "") : body.replace(/^\/\*+/, "").replace(/\*+\/\s*$/, "");
 	const linePrefix = syntax.blockLinePrefix || (html ? "\t" : " *\t");
 	const strip = html ? /^\s*/ : /^\s*\*?[ \t]*/;
 	const lines = inner.split("\n").map((line, index) => {
