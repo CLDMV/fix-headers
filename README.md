@@ -14,17 +14,18 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.2 (October 2026)
+### Latest: v2.2.3 (October 2026)
 
-- **Dependency refresh, nothing the package ships changed** — only `package-lock.json` moves: `ignore` 7.0.10 → 7.0.12 inside its existing range, and development tooling including `@cldmv/vitest-runner` 1.5.3 (which brings `chalk` 6 and a Node.js 22.12 floor), `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0. No `package.json` range, API, CLI option or header format changed ([#134](https://github.com/CLDMV/fix-headers/pull/134), [#135](https://github.com/CLDMV/fix-headers/pull/135), [#137](https://github.com/CLDMV/fix-headers/pull/137), [#138](https://github.com/CLDMV/fix-headers/pull/138)).
-- [View full v2.2.2 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md)
+- **Text inside an existing header is never deleted** — rewriting a header used to drop any line in it that was not a header field: a description under `@Copyright`, a co-author or licence line, a line wrapping a field's value. That text is now kept verbatim and in order. By default it moves to its own comment block directly below the header, so the header holds only fields; turning `strictHeaderBlock` off (`--no-strict-header-block`) keeps it inside the header instead. Files whose header carries extra text get a one-time diff on the first run; review it with `--dry-run --diff` ([#160](https://github.com/CLDMV/fix-headers/issues/160), [#161](https://github.com/CLDMV/fix-headers/pull/161)).
+- **Dependency refresh** — `ignore` 7.0.14 within its existing range, plus development tooling (`vitest` 5.0.5, `eslint` 10.14.0, `prettier` 3.9.10, `@cldmv/vitest-runner` 1.5.6) ([#144](https://github.com/CLDMV/fix-headers/pull/144), [#163](https://github.com/CLDMV/fix-headers/pull/163)).
+- [View full v2.2.3 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md)
 
 ### Recent Releases
 
+- **v2.2.2** (October 2026) — dependency refresh with nothing the package ships changed: `ignore` 7.0.12 within its range, plus `@cldmv/vitest-runner` 1.5.3, `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md))
 - **v2.2.1** (October 2026) — development-setup patch: the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; nothing the package ships changed ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md))
 - **v2.2.0** (October 2026) — `@Last modified by` names whoever last edited the file's content: a run that only rewrites a header keeps the recorded editor instead of writing the run's identity ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md))
 - **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
-- **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
