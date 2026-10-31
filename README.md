@@ -14,17 +14,18 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.2 (October 2026)
+### Latest: v2.2.3 (October 2026)
 
-- **Dependency refresh, nothing the package ships changed** — only `package-lock.json` moves: `ignore` 7.0.10 → 7.0.12 inside its existing range, and development tooling including `@cldmv/vitest-runner` 1.5.3 (which brings `chalk` 6 and a Node.js 22.12 floor), `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0. No `package.json` range, API, CLI option or header format changed ([#134](https://github.com/CLDMV/fix-headers/pull/134), [#135](https://github.com/CLDMV/fix-headers/pull/135), [#137](https://github.com/CLDMV/fix-headers/pull/137), [#138](https://github.com/CLDMV/fix-headers/pull/138)).
-- [View full v2.2.2 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md)
+- **Text inside an existing header is never deleted** — rewriting a header used to drop any line in it that was not a header field: a description under `@Copyright`, a co-author or licence line, a line wrapping a field's value. That text is now kept verbatim and in order. By default it moves to its own comment block directly below the header, so the header holds only fields; turning `strictHeaderBlock` off (`--no-strict-header-block`) keeps it inside the header instead. Files whose header carries extra text get a one-time diff on the first run; review it with `--dry-run --diff` ([#160](https://github.com/CLDMV/fix-headers/issues/160), [#161](https://github.com/CLDMV/fix-headers/pull/161)).
+- **Dependency refresh** — `ignore` 7.0.14 within its existing range, plus development tooling (`vitest` 5.0.5, `eslint` 10.14.0, `prettier` 3.9.10, `@cldmv/vitest-runner` 1.5.6) ([#144](https://github.com/CLDMV/fix-headers/pull/144), [#163](https://github.com/CLDMV/fix-headers/pull/163)).
+- [View full v2.2.3 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md)
 
 ### Recent Releases
 
+- **v2.2.2** (October 2026) — dependency refresh with nothing the package ships changed: `ignore` 7.0.12 within its range, plus `@cldmv/vitest-runner` 1.5.3, `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md))
 - **v2.2.1** (October 2026) — development-setup patch: the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; nothing the package ships changed ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md))
 - **v2.2.0** (October 2026) — `@Last modified by` names whoever last edited the file's content: a run that only rewrites a header keeps the recorded editor instead of writing the run's identity ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md))
 - **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
-- **v2.1.3** (October 2026) — CI and development-dependency maintenance with no runtime change: a skipped PR run can no longer satisfy `✅ Required PR Check` and let a pull request merge before its tests finish ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.3.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
@@ -116,6 +117,7 @@ Common CLI options:
 - `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#-date-checks))
 - `--fix-created-date`
 - `--strict-created-date`
+- `--strict-header-block [true|false]` / `--no-strict-header-block` - set `strictHeaderBlock` (on by default); `--no-strict-header-block` (or `--strict-header-block false`) keeps text found in a header that is not a header field inside the header, after the fields, instead of moving it to its own block below (see [Text in the header block](#text-in-the-header-block))
 - `--normalize-date-format`
 - `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#-time-zone))
 - `--convert-timezone` - with `--timezone`, also rewrite existing header dates into that zone
@@ -157,6 +159,7 @@ Important options:
 - `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#-date-checks)
 - `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#-creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
 - `strictCreatedDate?: boolean` - with `check`, count a `@Date` later than the file's git first commit or filesystem creation time as drift (fails the run). Off by default, where it is an advisory
+- `strictHeaderBlock?: boolean` - the header block holds only header fields. On by default: text in an existing header that is not a header field (a description, an unknown `@Tag:` line) is moved, verbatim and in order, to its own comment block directly below the header. `false` keeps it inside the header, after the fields. It is never deleted either way. See [Text in the header block](#text-in-the-header-block)
 - `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
 - `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#-time-zone)
 - `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#-time-zone)
@@ -420,6 +423,40 @@ name: CI
 With `spacing: 0, margin: 1` the header is compact, with no empty comment lines and a single blank line after it. Both accept any whole number of `0` or more; anything else is rejected before a file is touched.
 
 An existing header is restyled in place to match, so changing either option rewrites the layout of every header on the next run, and a run with unchanged options finds nothing to update. A line-comment header always keeps at least one blank line after it, even with `margin: 0`, so a comment that follows the file's header is not read as part of it.
+
+### Text in the header block
+
+The header block is only a header. A line in an existing header that is not one of the fields fix-headers writes (`@Project`, `@Filename`, `@Date`, `@Author`, `@Email`, `@Last modified by`, `@Last modified time`, `@Copyright`), a `-----` separator or an empty comment line is kept, never deleted. Only the first line with each field tag is that field: a second `@Author` or `@Copyright` line (a third-party notice, say) is kept as text, and so is a dash line among text rather than next to a field. A line that wraps a field's value is text as well: fix-headers never deletes text it did not write. In a `#` header, directive lines at the top of the comment (a `# -*- coding: utf-8 -*-` encoding declaration on the file's first or second line, `#cloud-config`, a `yaml-language-server` or `vim:` modeline) stay above the header; any other comment line there is header text. With `strictHeaderBlock` (the default) those lines move to a comment block of their own directly below the regenerated header, written as they were (comment prefix included) and in their original order, in the file's comment style (`/** … */`, `<!-- … -->`, or `#` lines). The margin separates the header, that block and the rest of the file:
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ *	What this module does.
+ */
+```
+
+becomes
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ */
+
+
+/**
+ *	What this module does.
+ */
+```
+
+The moved block is no longer part of the header, so the next run leaves it alone: a comment after the header is only taken for a stacked copy of the header when its first line is `@Project:`, and a moved block whose first line is a `@Project:` line is written with the lead line `Moved out of the file header by fix-headers:` above it. With `"strictHeaderBlock": false` in the config file (CLI `--no-strict-header-block` or `--strict-header-block false`) the lines stay inside the header instead, after an empty comment line below the fields. The moved block uses the file's own line ending. In `--diff` and `--sample-output` the new value covers the header and the block moved below it, so moved text shows as moved rather than deleted. Moving the text is not a content edit, so it keeps the recorded `@Last modified by`.
 
 ---
 
