@@ -514,7 +514,7 @@ export async function fixHeaders(options = {}) {
 		if (effectiveOptions.sampleOutput === true && replacement.changed) {
 			const previousValue = existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null;
 			const diffPath = relativePath.replace(/\\/g, "/");
-			const writtenHeader = replacement.header;
+			const writtenHeader = replacement.written;
 			const headerLineOffset = replacement.nextContent.slice(0, replacement.nextContent.indexOf(writtenHeader)).split("\n").length - 1;
 			changeEntry.sample = {
 				previousValue,

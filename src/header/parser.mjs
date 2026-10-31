@@ -84,12 +84,21 @@ function matchHeaderSegment(content, syntax) {
 }
 
 /**
- * Header field tags fix-headers writes. A header line holding one of these, a `-----`
- * separator, or nothing is part of the managed header; any other line is text the header
- * block merely carries (see {@link extractForeignHeaderLines}).
+ * Header field tags fix-headers writes. The first line in a header comment carrying one of
+ * these is that field; a later line with the same tag is text the block carries (a second
+ * `@Copyright` notice, say), never a field.
  * @type {RegExp}
  */
-const MANAGED_HEADER_LINE = /^(?:@(?:Project|Filename|Date|Author|Email|Last modified by|Last modified time|Copyright):.*|-{3,})?$/;
+const MANAGED_TAG = /^@(Project|Filename|Date|Author|Email|Last modified by|Last modified time|Copyright):/;
+
+/**
+ * Width of a run of indentation, a tab counting as four columns.
+ * @param {string} whitespace - Leading whitespace.
+ * @returns {number} Column width.
+ */
+function indentWidth(whitespace) {
+	return whitespace.replace(/\t/g, "    ").length;
+}
 
 /**
  * Splits one matched header segment into its lines, as written, with the comment's own
@@ -97,22 +106,34 @@ const MANAGED_HEADER_LINE = /^(?:@(?:Project|Filename|Date|Author|Email|Last mod
  * given the syntax's block line prefix so it still reads as a line of a block comment.
  * @param {string} segment - One matched header comment (trailing blank lines included).
  * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockLinePrefix?: string}} syntax - Header syntax descriptor.
- * @returns {Array<{raw: string, text: string}>} Each line as written and its text without the comment prefix.
+ * @returns {Array<{raw: string, text: string, indent: number, prefixed: boolean}>} Each line as written, its text without
+ * the comment prefix, the width of the indentation before that text, and whether the line carries the comment's line prefix.
  */
 function segmentLines(segment, syntax) {
-	const body = segment.replace(/\n+$/, "");
+	const body = segment.replace(/(?:\r?\n)+$/, "");
 	if (syntax.kind === "line") {
-		const prefix = new RegExp(`^${escapeRegex(syntax.linePrefix || "#")}[ \\t]*`);
-		return body.split("\n").map((raw) => ({ raw, text: raw.replace(prefix, "").trim() }));
+		const prefix = new RegExp(`^${escapeRegex(syntax.linePrefix || "#")}([ \\t]*)`);
+		return body.split("\n").map((line) => {
+			const raw = line.replace(/\r$/, "");
+			const match = raw.match(prefix);
+			return { raw, text: raw.replace(prefix, "").trim(), indent: indentWidth(match ? match[1] : ""), prefixed: true };
+		});
 	}
 
 	const html = syntax.kind === "html";
 	const inner = html ? body.replace(/^<!--/, "").replace(/--!?>\s*$/, "") : body.replace(/^\/\*+/, "").replace(/\*+\/\s*$/, "");
 	const linePrefix = syntax.blockLinePrefix || (html ? "\t" : " *\t");
-	const strip = html ? /^\s*/ : /^\s*\*?[ \t]*/;
+	const strip = html ? /^(\s*)/ : /^\s*\*?([ \t]*)/;
 	const lines = inner.split("\n").map((line, index) => {
 		const raw = index === 0 && line.trim() !== "" ? `${linePrefix}${line.trim()}` : line.trimEnd();
-		return { raw, text: (index === 0 ? line.trim() : line.replace(strip, "")).trim() };
+		const opener = index === 0;
+		const lead = opener ? "" : (line.match(strip)?.[1] ?? "");
+		return {
+			raw,
+			text: (opener ? line : line.replace(strip, "")).trim(),
+			indent: indentWidth(lead),
+			prefixed: opener || html || /^\s*\*/.test(line)
+		};
 	});
 	// What is left of the opener's and the closer's own lines is not a line of the comment.
 	const first = lines[0].raw === "" ? 1 : 0;
@@ -121,38 +142,124 @@ function segmentLines(segment, syntax) {
 }
 
 /**
- * Returns the lines of an existing header block that are not header fields: description
- * text and anything else the block carries besides the fields fix-headers writes, the
- * `-----` separators and empty lines. Lines come back as written (comment prefix included),
- * in their original order, with blank lines between them kept and blank lines around them
- * dropped. Unknown `@Tag:` lines count as such text. Empty when the block holds only fields.
+ * Classifies the lines of one header comment. A line is a `field` when it carries a managed
+ * tag not seen earlier in the same comment, a `continuation` when it directly follows a field
+ * (or another continuation) and is indented further than that field or lacks the comment's
+ * line prefix (a wrapped field value), a `separator` when it is a dash line next to a field,
+ * `blank` when empty, and `text` otherwise.
+ * @param {Array<{raw: string, text: string, indent: number, prefixed: boolean}>} lines - The comment's lines.
+ * @returns {Array<"field" | "continuation" | "separator" | "blank" | "text">} One kind per line.
+ */
+function classifyLines(lines) {
+	const seen = new Set();
+	/** @type {Array<"field" | "continuation" | "separator" | "blank" | "text" | "dash">} */
+	const kinds = [];
+	let fieldIndent = 0;
+	lines.forEach((line, index) => {
+		const tag = line.text.match(MANAGED_TAG);
+		const previous = kinds[index - 1];
+		if (line.text === "") {
+			kinds.push("blank");
+		} else if (tag && !seen.has(tag[1])) {
+			seen.add(tag[1]);
+			fieldIndent = line.indent;
+			kinds.push("field");
+		} else if (
+			(previous === "field" || previous === "continuation") &&
+			!line.text.startsWith("@") &&
+			!/^-{3,}$/.test(line.text) &&
+			(!line.prefixed || line.indent > fieldIndent)
+		) {
+			kinds.push("continuation");
+		} else {
+			kinds.push(/^-{3,}$/.test(line.text) ? "dash" : "text");
+		}
+	});
+
+	/**
+	 * Kind of the nearest line in a direction that is neither blank nor a dash line.
+	 * @param {number} from - Start index.
+	 * @param {number} step - Direction (-1 or 1).
+	 * @returns {string | undefined} The neighbour's kind.
+	 */
+	const neighbour = (from, step) => {
+		for (let index = from + step; index >= 0 && index < kinds.length; index += step) {
+			if (kinds[index] !== "blank" && kinds[index] !== "dash") {
+				return kinds[index];
+			}
+		}
+		return undefined;
+	};
+	const isField = (kind) => kind === "field" || kind === "continuation";
+	return kinds.map((kind, index) =>
+		kind === "dash" ? (isField(neighbour(index, -1)) || isField(neighbour(index, 1)) ? "separator" : "text") : kind
+	);
+}
+
+/**
+ * Splits the text of an existing header block that is not header fields from the fields.
+ * `foreign` holds the lines that are neither fields, their wrapped continuations, the
+ * separators between them, nor empty lines around them: description text, unknown `@Tag:`
+ * lines, a repeated managed tag, a dash line among text. `above` holds, for a line-comment
+ * header only, the comment lines directly above the first field with no blank line between
+ * (a `# -*- coding -*-` line, `#cloud-config`, a modeline); they are separate comments the
+ * header's line match took in, and stay above the header. Lines come back as written
+ * (comment prefix included), in their original order, with blank lines between them kept
+ * and blank lines around them dropped.
+ * @param {string} headerText - The existing header block (every stacked segment).
+ * @param {string} [filePath=""] - File path used for syntax selection.
+ * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
+ * @returns {{above: string[], foreign: string[]}} The non-field lines, as written.
+ */
+export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}) {
+	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
+	/** @type {string[]} */
+	const above = [];
+	/** @type {Array<{raw: string, kind: string}>} */
+	const lines = [];
+	let rest = headerText;
+	let segment = matchHeaderSegment(rest, syntax);
+	let firstSegment = true;
+	while (segment && segment[0].length > 0) {
+		const segmentLineList = segmentLines(segment[0], syntax);
+		const kinds = classifyLines(segmentLineList);
+		let start = 0;
+		if (firstSegment && syntax.kind === "line") {
+			const firstField = kinds.indexOf("field");
+			const leading = kinds.slice(0, firstField === -1 ? 0 : firstField);
+			const lastText = leading.lastIndexOf("text");
+			// Lines above the header's first field (past its own empty opening lines) are separate comments.
+			above.push(...segmentLineList.slice(0, lastText + 1).map((line) => line.raw));
+			start = lastText + 1;
+		}
+		segmentLineList.slice(start).forEach((line, index) => lines.push({ raw: line.raw, kind: kinds[start + index] }));
+		rest = rest.slice(segment[0].length);
+		segment = matchHeaderSegment(rest, syntax);
+		firstSegment = false;
+	}
+
+	const first = lines.findIndex((line) => line.kind === "text");
+	if (first === -1) {
+		return { above, foreign: [] };
+	}
+	const last = lines.map((line) => line.kind).lastIndexOf("text");
+	const foreign = lines
+		.slice(first, last + 1)
+		.filter((line) => line.kind === "text" || line.kind === "blank")
+		.map((line) => line.raw);
+	return { above, foreign };
+}
+
+/**
+ * Returns the lines of an existing header block that are not header fields (the `foreign`
+ * lines of {@link splitHeaderText}).
  * @param {string} headerText - The existing header block (every stacked segment).
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
  * @returns {string[]} The non-field lines, as written.
  */
 export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptions = {}) {
-	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
-	/** @type {Array<{raw: string, text: string}>} */
-	const lines = [];
-	let rest = headerText;
-	let segment = matchHeaderSegment(rest, syntax);
-	while (segment && segment[0].length > 0) {
-		lines.push(...segmentLines(segment[0], syntax));
-		rest = rest.slice(segment[0].length);
-		segment = matchHeaderSegment(rest, syntax);
-	}
-
-	const foreign = lines.map((line) => !MANAGED_HEADER_LINE.test(line.text));
-	const first = foreign.indexOf(true);
-	if (first === -1) {
-		return [];
-	}
-	const last = foreign.lastIndexOf(true);
-	return lines
-		.slice(first, last + 1)
-		.filter((line) => line.text === "" || !MANAGED_HEADER_LINE.test(line.text))
-		.map((line) => line.raw);
+	return splitHeaderText(headerText, filePath, syntaxOptions).foreign;
 }
 
 /**
@@ -160,14 +267,15 @@ export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptio
  * A line-comment block is the lines themselves.
  * @param {string[]} lines - Lines as written, comment prefixes included.
  * @param {{kind: "block" | "line" | "html", blockStart?: string, blockEnd?: string}} syntax - Header syntax descriptor.
+ * @param {string} eol - Line ending to join the block with.
  * @returns {string} The comment block.
  */
-function renderForeignBlock(lines, syntax) {
+function renderForeignBlock(lines, syntax, eol) {
 	if (syntax.kind === "line") {
-		return lines.join("\n");
+		return lines.join(eol);
 	}
 	const html = syntax.kind === "html";
-	return [syntax.blockStart || (html ? "<!--" : "/**"), ...lines, syntax.blockEnd || (html ? "-->" : " */")].join("\n");
+	return [syntax.blockStart || (html ? "<!--" : "/**"), ...lines, syntax.blockEnd || (html ? "-->" : " */")].join(eol);
 }
 
 /**
@@ -230,15 +338,18 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
 
 /**
  * Replaces or inserts a project header block. Text in the existing header that is not a
- * header field (see {@link extractForeignHeaderLines}) is never dropped: with
+ * header field (see {@link splitHeaderText}) is never dropped: with
  * `strictHeaderBlock` (the default) it is written as its own comment block directly below
  * the header, separated from it and from the rest of the file by the margin; with
- * `strictHeaderBlock: false` it stays inside the header, after the fields.
+ * `strictHeaderBlock: false` it stays inside the header, after the fields. Comment lines a
+ * line-comment header took in from directly above it stay above it.
  * @param {string} content - Original file content.
  * @param {string} newHeader - Generated header text.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number, strictHeaderBlock?: boolean }} [syntaxOptions={}] - Syntax resolution options.
- * @returns {{nextContent: string, changed: boolean, header: string}} Updated content result; `header` is the header block as written.
+ * @returns {{nextContent: string, changed: boolean, header: string, written: string}} Updated content result: `header` is the
+ * header block as written, and `written` everything that took the old header's place (comment lines kept above the
+ * header, the header, and the block of text moved below it).
  */
 export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxOptions = {}) {
 	const existing = findProjectHeader(content, filePath, syntaxOptions);
@@ -252,17 +363,22 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 		const rest = body.replace(/^\n+/, "");
 		// With nothing after the header there is no next content to separate from, so the file just ends with the header.
 		const nextContent = `${prefix}${rest.trim() === "" ? `${newHeader}\n` : `${newHeader}${gap}${rest}`}`;
-		return { nextContent, changed: nextContent !== content, header: newHeader };
+		return { nextContent, changed: nextContent !== content, header: newHeader, written: newHeader };
 	}
 
-	const foreign = extractForeignHeaderLines(content.slice(existing.start, existing.end), filePath, syntaxOptions);
+	const region = content.slice(existing.start, existing.end);
+	const { above, foreign } = splitHeaderText(region, filePath, syntaxOptions);
+	const eol = region.includes("\r\n") ? "\r\n" : "\n";
 	const strict = syntaxOptions.strictHeaderBlock !== false;
 	const header = foreign.length > 0 && !strict ? appendToHeader(newHeader, foreign, syntax) : newHeader;
-	const after = content.slice(existing.end).replace(/^\n+/, "");
-	const below =
-		foreign.length > 0 && strict ? `${renderForeignBlock(foreign, syntax)}${after.trim() === "" ? "\n" : `${gap}${after}`}` : after;
-	const nextContent = `${content.slice(0, existing.start)}${below.trim() === "" ? `${header}\n` : `${header}${gap}${below}`}`;
-	return { nextContent, changed: nextContent !== content, header };
+	const lead = above.length > 0 ? `${above.join(eol)}${eol}` : "";
+	const moved = foreign.length > 0 && strict ? renderForeignBlock(foreign, syntax, eol) : "";
+	const after = content.slice(existing.end).replace(moved === "" ? /^\n+/ : /^(?:\r?\n)+/, "");
+	const below = moved === "" ? after : `${moved}${after.trim() === "" ? eol : `${gap.replace(/\n/g, eol)}${after}`}`;
+	const nextContent = `${content.slice(0, existing.start)}${lead}${below.trim() === "" ? `${header}\n` : `${header}${gap}${below}`}`;
+	// What took the old header's place: lines kept above it, the header, and the block moved below it.
+	const written = `${lead}${header}${moved === "" ? "" : `${gap}${moved}`}`;
+	return { nextContent, changed: nextContent !== content, header, written };
 }
 
 /**

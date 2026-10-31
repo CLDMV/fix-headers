@@ -18,7 +18,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { parseCliArgs } from "../src/cli.mjs";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
-import { extractForeignHeaderLines, extractHeaderlessBody, replaceOrInsertHeader } from "../src/header/parser.mjs";
+import { extractForeignHeaderLines, extractHeaderlessBody, replaceOrInsertHeader, splitHeaderText } from "../src/header/parser.mjs";
 import { getHeaderSyntaxForFile, renderHeaderLines } from "../src/header/syntax.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
@@ -69,6 +69,8 @@ const CASES = [
 	{ name: "JSONC block comment", file: "/r/src/a.jsonc", body: '{ "a": 1 }\n', raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
 	{ name: "CSS block comment", file: "/r/src/a.css", body: "a { color: red; }\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
 	{ name: "PHP block comment", file: "/r/src/a.php", body: "echo 1;\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "Go block comment", file: "/r/src/a.go", body: "package main\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "Rust block comment", file: "/r/src/a.rs", body: "fn main() {}\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
 	{ name: "HTML comment", file: "/r/src/a.html", body: "<p></p>\n", raw: ["\tWhat this pins.", "", "\tAnd why."] },
 	{ name: "YAML # comment", file: "/r/src/a.yaml", body: "name: x\n", raw: ["#\tWhat this pins.", "#", "#\tAnd why."] },
 	{ name: "Python # comment", file: "/r/src/a.py", body: "print(1)\n", raw: ["#\tWhat this pins.", "#", "#\tAnd why."] }
@@ -155,6 +157,14 @@ describe("non-field text in an existing header (#160)", () => {
 		expect(parseCliArgs([]).options.strictHeaderBlock).toBeUndefined();
 	});
 
+	it("reads --strict-header-block bare, with true, and with false", () => {
+		expect(parseCliArgs(["--strict-header-block"]).options.strictHeaderBlock).toBe(true);
+		expect(parseCliArgs(["--strict-header-block", "--dry-run"]).options).toEqual({ strictHeaderBlock: true, dryRun: true });
+		expect(parseCliArgs(["--strict-header-block", "true"]).options.strictHeaderBlock).toBe(true);
+		expect(parseCliArgs(["--strict-header-block", "false"]).options.strictHeaderBlock).toBe(false);
+		expect(parseCliArgs(["--strict-header-block", "false", "--check"]).options).toEqual({ strictHeaderBlock: false, check: true });
+	});
+
 	it("applies both settings end to end, and settles after one run", async () => {
 		const identity = { authorName: "Run Identity", authorEmail: "run@example.com", companyName: "Example Inc." };
 		const description = " *\tWhat this test pins and why.\n *\tSecond line.";
@@ -202,6 +212,166 @@ describe("non-field text in an existing header (#160)", () => {
 			} finally {
 				await cleanupWorkspace(workspace);
 			}
+		}
+	});
+
+	describe("text that looks like a field", () => {
+		const fields = [
+			"/**",
+			" *",
+			" *\t@Project: demo",
+			" *\t@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
+			" *\t@Author: Tester",
+			" *\t-----",
+			" *\t@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.",
+			" *"
+		];
+		const text = [
+			" *\t@Author: Second Author",
+			" *\t@Copyright: Portions (c) 2019 Foo Corp, MIT licence",
+			" *\tWhat changed:",
+			" *\t---",
+			" *\t@Date: see changelog"
+		];
+		const content = [...fields, ...text, " */", "", "code();", ""].join("\n");
+		const next = header("/r/a.mjs", NEW_FIELDS);
+
+		it("keeps a repeated tag, a dash line among text and a tag inside a description, in both modes", () => {
+			expect(extractForeignHeaderLines(content, "/r/a.mjs")).toEqual(text);
+			const strict = replaceOrInsertHeader(content, next, "/r/a.mjs");
+			expect(strict.nextContent).toBe(`${next}\n\n\n${["/**", ...text, " */"].join("\n")}\n\n\ncode();\n`);
+			expect(replaceOrInsertHeader(strict.nextContent, next, "/r/a.mjs").changed).toBe(false);
+			const kept = replaceOrInsertHeader(content, next, "/r/a.mjs", { strictHeaderBlock: false });
+			for (const line of text) {
+				expect(kept.header.split("\n")).toContain(line);
+			}
+			expect(replaceOrInsertHeader(kept.nextContent, next, "/r/a.mjs", { strictHeaderBlock: false }).changed).toBe(false);
+		});
+
+		it("still treats a dash line next to a field as a separator", () => {
+			const separated = ["/**", " *\t@Project: demo", " *\t-----", " *\t@Author: A", " *", " *\tText.", " */", ""].join("\n");
+			expect(extractForeignHeaderLines(separated, "/r/a.mjs")).toEqual([" *\tText."]);
+		});
+
+		it("rewrites a wrapped field value with its field instead of moving the continuation", () => {
+			const wrapped = (continuation) =>
+				["/**", " *\t@Project: demo", " *\t@Copyright: Copyright (c) 2020 X", continuation, " *", " *\tText.", " */", ""].join("\n");
+			expect(extractForeignHeaderLines(wrapped(" *\t\tAll rights reserved."), "/r/a.mjs")).toEqual([" *\tText."]);
+			expect(extractForeignHeaderLines(wrapped("    All rights reserved."), "/r/a.mjs")).toEqual([" *\tText."]);
+			const yaml = "#\n#\t@Project: demo\n#\t@Copyright: Copyright (c) 2020 X\n#\t\tAll rights reserved.\n#\n#\tText.\n\nname: x\n";
+			expect(extractForeignHeaderLines(yaml, "/r/a.yaml")).toEqual(["#\tText."]);
+			// A line at the field's own indentation directly after it is text, not a continuation.
+			expect(extractForeignHeaderLines(wrapped(" *\tAll rights reserved."), "/r/a.mjs")).toEqual([
+				" *\tAll rights reserved.",
+				" *",
+				" *\tText."
+			]);
+		});
+	});
+
+	describe("comment lines directly above a # header", () => {
+		const header = "#\n#\t@Project: renamed\n#";
+		for (const [name, file, directive] of [
+			["a Python coding line", "/r/a.py", "# -*- coding: utf-8 -*-"],
+			["#cloud-config", "/r/a.yaml", "#cloud-config"],
+			["a yaml-language-server modeline", "/r/a.yaml", "# yaml-language-server: $schema=./schema.json"]
+		]) {
+			it(`keeps ${name} in place above the header, in both modes`, () => {
+				const content = `${directive}\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n#\tText.\n\nkey: 1\n`;
+				expect(splitHeaderText(content, file)).toEqual({ above: [directive], foreign: ["#\tText."] });
+				for (const options of [{}, { strictHeaderBlock: false }]) {
+					const first = replaceOrInsertHeader(content, header, file, options);
+					expect(first.nextContent.startsWith(`${directive}\n#\n#\t@Project: renamed`)).toBe(true);
+					expect(first.nextContent).toContain("#\tText.");
+					expect(replaceOrInsertHeader(first.nextContent, header, file, options).changed).toBe(false);
+				}
+			});
+		}
+
+		it("keeps a coding line under a shebang on line 2", () => {
+			const content = "#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n#\n#\t@Project: demo\n#\n\nprint(1)\n";
+			const { nextContent } = replaceOrInsertHeader(content, header, "/r/a.py");
+			expect(nextContent.split("\n").slice(0, 3)).toEqual(["#!/usr/bin/env python3", "# -*- coding: utf-8 -*-", "#"]);
+		});
+	});
+
+	it("writes the moved block with the file's own CRLF line endings, and a second run is a no-op", () => {
+		const content = "/**\r\n *\t@Project: demo\r\n *\r\n *\tText one.\r\n *\tText two.\r\n */\r\n\r\ncode();\r\n";
+		const next = "/**\n *\t@Project: renamed\n */";
+		const first = replaceOrInsertHeader(content, next, "/r/a.mjs");
+		expect(first.nextContent).toBe(`${next}\n\n\n/**\r\n *\tText one.\r\n *\tText two.\r\n */\r\n\r\n\r\ncode();\r\n`);
+		expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.mjs").changed).toBe(false);
+	});
+
+	it("moves the text of a Markdown (forced detector) header", () => {
+		const options = { forcedDetectors: ["markdown"] };
+		const content = "<!--\n\t@Project: demo\n\n\tText.\n-->\n\n# Title\n";
+		const next = "<!--\n\t@Project: renamed\n-->";
+		const first = replaceOrInsertHeader(content, next, "/r/a.md", options);
+		expect(first.nextContent).toBe(`${next}\n\n\n<!--\n\tText.\n-->\n\n\n# Title\n`);
+		expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.md", options).changed).toBe(false);
+		const kept = replaceOrInsertHeader(content, next, "/r/a.md", { ...options, strictHeaderBlock: false });
+		expect(kept.header).toContain("\tText.");
+		expect(replaceOrInsertHeader(kept.nextContent, next, "/r/a.md", { ...options, strictHeaderBlock: false }).changed).toBe(false);
+	});
+
+	it("puts the moved block on the next line with margin 0, and a second run is a no-op", () => {
+		const content = "/**\n *\t@Project: demo\n *\n *\tText.\n */\ncode();\n";
+		const next = "/**\n *\t@Project: renamed\n */";
+		const first = replaceOrInsertHeader(content, next, "/r/a.mjs", { margin: 0 });
+		expect(first.nextContent).toBe(`${next}\n/**\n *\tText.\n */\ncode();\n`);
+		expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.mjs", { margin: 0 }).changed).toBe(false);
+	});
+
+	it("reports the moved text as moved in the sample diff, not deleted", async () => {
+		const workspace = await createWorkspace("header-block-text-diff");
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "block-text" }, null, 2));
+			await writeWorkspaceFile(
+				join(workspace, "src", "one.mjs"),
+				"/**\n *\t@Project: old-name\n *\n *\tKeep me.\n */\n\nexport const one = 1;\n"
+			);
+			const result = await fixHeaders({
+				cwd: workspace,
+				input: "src/one.mjs",
+				authorName: "A",
+				authorEmail: "a@example.com",
+				sampleOutput: true,
+				dryRun: true
+			});
+			const { sample } = result.changes[0];
+			expect(sample.newValue).toContain("@Project: block-text");
+			expect(sample.newValue.endsWith("/**\n *\tKeep me.\n */")).toBe(true);
+			expect(sample.diff.split("\n").some((line) => line.startsWith("-") && line.includes("Keep me."))).toBe(false);
+			expect(sample.diff.split("\n")).toContain("  *\tKeep me.");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("reads strictHeaderBlock: false from a config file", async () => {
+		const workspace = await createWorkspace("header-block-text-config");
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "block-text" }, null, 2));
+			await writeWorkspaceFile(join(workspace, "fix-headers.json"), JSON.stringify({ strictHeaderBlock: false }));
+			await writeWorkspaceFile(
+				join(workspace, "src", "one.mjs"),
+				"/**\n *\t@Project: old-name\n *\n *\tKeep me.\n */\n\nexport const one = 1;\n"
+			);
+			const options = {
+				cwd: workspace,
+				input: "src/one.mjs",
+				authorName: "A",
+				authorEmail: "a@example.com",
+				configFile: "fix-headers.json"
+			};
+			expect((await fixHeaders(options)).filesUpdated).toBe(1);
+			const content = await readFile(join(workspace, "src", "one.mjs"), "utf8");
+			expect(content.indexOf("Keep me.")).toBeLessThan(content.indexOf(" */"));
+			expect(content).toMatch(/ \*\/\n\n\nexport const one = 1;\n$/);
+			expect((await fixHeaders(options)).filesUpdated).toBe(0);
+		} finally {
+			await cleanupWorkspace(workspace);
 		}
 	});
 });

@@ -116,7 +116,7 @@ Common CLI options:
 - `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#-date-checks))
 - `--fix-created-date`
 - `--strict-created-date`
-- `--no-strict-header-block` - keep text found in a header that is not a header field inside the header, after the fields, instead of moving it to its own block below (see [Text in the header block](#text-in-the-header-block))
+- `--strict-header-block [true|false]` / `--no-strict-header-block` - set `strictHeaderBlock` (on by default); `--no-strict-header-block` (or `--strict-header-block false`) keeps text found in a header that is not a header field inside the header, after the fields, instead of moving it to its own block below (see [Text in the header block](#text-in-the-header-block))
 - `--normalize-date-format`
 - `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#-time-zone))
 - `--convert-timezone` - with `--timezone`, also rewrite existing header dates into that zone
@@ -425,7 +425,7 @@ An existing header is restyled in place to match, so changing either option rewr
 
 ### Text in the header block
 
-The header block is only a header. A line in an existing header that is not one of the fields fix-headers writes (`@Project`, `@Filename`, `@Date`, `@Author`, `@Email`, `@Last modified by`, `@Last modified time`, `@Copyright`), a `-----` separator or an empty comment line is kept, never deleted. With `strictHeaderBlock` (the default) those lines move to a comment block of their own directly below the regenerated header, written as they were (comment prefix included) and in their original order, in the file's comment style (`/** … */`, `<!-- … -->`, or `#` lines). The margin separates the header, that block and the rest of the file:
+The header block is only a header. A line in an existing header that is not one of the fields fix-headers writes (`@Project`, `@Filename`, `@Date`, `@Author`, `@Email`, `@Last modified by`, `@Last modified time`, `@Copyright`), a `-----` separator or an empty comment line is kept, never deleted. Only the first line with each field tag is that field: a second `@Author` or `@Copyright` line (a third-party notice, say) is kept as text, and so is a dash line among text rather than next to a field. A line directly after a field that is indented further than it, or has no comment prefix, is that field's wrapped value and is rewritten with it. In a `#` header, comment lines directly above the first field (a `# -*- coding: utf-8 -*-` line, `#cloud-config`, a `yaml-language-server` modeline) are separate comments and stay above the header. With `strictHeaderBlock` (the default) those lines move to a comment block of their own directly below the regenerated header, written as they were (comment prefix included) and in their original order, in the file's comment style (`/** … */`, `<!-- … -->`, or `#` lines). The margin separates the header, that block and the rest of the file:
 
 ```text
 /**
@@ -455,7 +455,7 @@ becomes
  */
 ```
 
-The moved block is no longer part of the header, so the next run leaves it alone. With `"strictHeaderBlock": false` in the config file (CLI `--no-strict-header-block`) the lines stay inside the header instead, after an empty comment line below the fields. Moving the text is not a content edit, so it keeps the recorded `@Last modified by`.
+The moved block is no longer part of the header, so the next run leaves it alone. With `"strictHeaderBlock": false` in the config file (CLI `--no-strict-header-block` or `--strict-header-block false`) the lines stay inside the header instead, after an empty comment line below the fields. The moved block uses the file's own line ending. In `--diff` and `--sample-output` the new value covers the header and the block moved below it, so moved text shows as moved rather than deleted. Moving the text is not a content edit, so it keeps the recorded `@Last modified by`.
 
 ---
 
