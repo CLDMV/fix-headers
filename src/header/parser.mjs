@@ -200,22 +200,57 @@ function isModeline(line) {
 const CODING_LINE = /^#.*?(?<![A-Za-z])coding[:=]\s*[-\w.]+/;
 
 /**
- * Lead line of a block moved out of the header whose own first line is a `@Project:` line,
- * so that the block never reads as a stacked header (see {@link findProjectHeader}).
+ * Lead line of a block moved out of the header that would otherwise read as a stacked header,
+ * so that it never does (see {@link readsAsStackedHeader}).
  * @type {string}
  */
 const MOVED_BLOCK_LEAD = "Moved out of the file header by fix-headers:";
 
 /**
- * Whether a header comment that follows the file's header is a stacked copy of a header:
- * its first non-empty line is a `@Project:` field.
+ * Fewest managed fields (`@Project` included) a comment that does not start with `@Project:`
+ * must carry to be taken for a stacked header.
+ * @type {number}
+ */
+const STACKED_HEADER_MIN_FIELDS = 4;
+
+/**
+ * Whether the lines of a comment that follows the file's header are a stacked copy of a
+ * header, to be merged into it. That is the case when its first non-empty line is a
+ * `@Project:` field, or when, after description text, it carries a run of at least
+ * {@link STACKED_HEADER_MIN_FIELDS} managed fields that starts with `@Project:` and has no
+ * text among the fields (separators and empty lines only). A comment whose first line is the
+ * {@link MOVED_BLOCK_LEAD} lead line never is one.
+ * @param {Array<{raw: string, text: string}>} lines - The comment's lines.
+ * @returns {boolean} Whether the comment reads as a stacked header.
+ */
+function readsAsStackedHeader(lines) {
+	const first = lines.find((line) => line.text !== "");
+	if (first === undefined || first.text === MOVED_BLOCK_LEAD) {
+		return false;
+	}
+	if (first.text.startsWith("@Project:")) {
+		return true;
+	}
+	const kinds = classifyLines(lines);
+	const firstField = kinds.indexOf("field");
+	const lastField = kinds.lastIndexOf("field");
+	return (
+		firstField !== -1 &&
+		lines[firstField].text.startsWith("@Project:") &&
+		kinds.filter((kind) => kind === "field").length >= STACKED_HEADER_MIN_FIELDS &&
+		kinds.slice(firstField, lastField + 1).every((kind) => kind !== "text")
+	);
+}
+
+/**
+ * Whether a header comment that follows the file's header is a stacked copy of a header (see
+ * {@link readsAsStackedHeader}).
  * @param {string} segment - The following comment.
  * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockLinePrefix?: string}} syntax - Header syntax descriptor.
- * @returns {boolean} Whether it starts with `@Project:`.
+ * @returns {boolean} Whether it reads as a stacked header.
  */
 function isStackedHeader(segment, syntax) {
-	const first = segmentLines(segment, syntax).find((line) => line.text !== "");
-	return first !== undefined && first.text.startsWith("@Project:");
+	return readsAsStackedHeader(segmentLines(segment, syntax));
 }
 
 /**
@@ -366,8 +401,8 @@ export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptio
 
 /**
  * Wraps non-field header lines in a comment block of their own, in the file's comment syntax.
- * A line-comment block is the lines themselves. When the first line is a `@Project:` line, a
- * lead line comes first so the block never reads as a stacked header.
+ * A line-comment block is the lines themselves. When the lines would read as a stacked header
+ * (see {@link readsAsStackedHeader}), a lead line comes first so the block never does.
  * @param {string[]} lines - Lines as written, comment prefixes included.
  * @param {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Header syntax descriptor.
  * @param {string} eol - Line ending to join the block with.
@@ -379,12 +414,11 @@ function renderForeignBlock(lines, syntax, eol) {
 		syntax.kind === "line"
 			? `${syntax.linePrefix || "#"}${typeof syntax.lineSeparator === "string" ? syntax.lineSeparator : "\t"}`
 			: syntax.blockLinePrefix || (html ? "\t" : " *\t");
-	// A block whose first line is a @Project: line would read as a stacked header on the next
-	// run and its lines would be taken for fields: a lead line keeps it a plain comment.
+	// A block that reads as a stacked header would be merged back into the header on the next
+	// run and its lines taken for fields: a lead line keeps it a plain comment.
 	const strip = syntax.kind === "line" ? new RegExp(`^${escapeRegex(syntax.linePrefix || "#")}[ \\t]*`) : html ? /^\s*/ : /^\s*\*?[ \t]*/;
-	const firstText = lines.map((line) => line.replace(strip, "").trim()).find((text) => text !== "");
-	const leadsWithProject = firstText !== undefined && firstText.startsWith("@Project:");
-	const body = leadsWithProject ? [`${linePrefix}${MOVED_BLOCK_LEAD}`, ...lines] : lines;
+	const stacked = readsAsStackedHeader(lines.map((line) => ({ raw: line, text: line.replace(strip, "").trim() })));
+	const body = stacked ? [`${linePrefix}${MOVED_BLOCK_LEAD}`, ...lines] : lines;
 	if (syntax.kind === "line") {
 		return body.join(eol);
 	}
@@ -432,7 +466,7 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
 		const segment = matchHeaderSegment(remaining, syntax);
 
 		// The header itself is the first comment carrying @Project:; a comment after it is a
-		// stacked copy only when it starts with @Project:.
+		// stacked copy only when it reads as one (see readsAsStackedHeader).
 		if (!segment || !(offset === 0 ? segment[0].includes("@Project:") : isStackedHeader(segment[0], syntax))) {
 			break;
 		}

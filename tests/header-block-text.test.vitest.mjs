@@ -433,7 +433,21 @@ describe("non-field text in an existing header (#160)", () => {
 				"/**\n *\t@Project: demo\n *\t@Project: legacy-name (renamed 2024)\n */\n\ncode();\n",
 				["@Project: legacy-name (renamed 2024)"]
 			],
-			["a # header holding two copies of the header", "/r/a.yaml", yamlHeader, yamlTwice, FIELDS.filter((line) => line !== "-----")]
+			["a # header holding two copies of the header", "/r/a.yaml", yamlHeader, yamlTwice, FIELDS.filter((line) => line !== "-----")],
+			[
+				"a JS header holding text and then a second copy of the fields (#162)",
+				"/r/a.mjs",
+				jsHeader,
+				`${headerWithText("/r/a.mjs", ["Old header:", ...FIELDS])}\n\ncode();\n`,
+				["Old header:", ...FIELDS.filter((line) => line !== "-----")]
+			],
+			[
+				"a # header holding text and then a second copy of the fields (#162)",
+				"/r/a.yaml",
+				yamlHeader,
+				`${headerWithText("/r/a.yaml", ["Old header:", ...FIELDS])}\n\nkey: 1\n`,
+				["Old header:", ...FIELDS.filter((line) => line !== "-----")]
+			]
 		];
 		for (const [name, file, next, content, kept] of repros) {
 			for (const options of [{}, { margin: 0 }, { strictHeaderBlock: false }, { strictHeaderBlock: false, margin: 0 }]) {
@@ -459,6 +473,55 @@ describe("non-field text in an existing header (#160)", () => {
 			expect(findProjectHeader(content, "/r/a.mjs")).toEqual({ start: 0, end: content.indexOf("/**", 1) });
 			const stacked = "/**\n *\t@Project: demo\n */\n\n/**\n *\n *\t@Project: copy\n */\n\ncode();\n";
 			expect(findProjectHeader(stacked, "/r/a.mjs").end).toBe(stacked.indexOf("code();"));
+		});
+	});
+
+	describe("a stacked header that starts with text (#162)", () => {
+		const OLD_FIELDS = ["@Project: old", "@Filename: /old", "@Date: 2015-01-01T00:00:00-08:00 (1420099200)", "@Author: Old"];
+		for (const { name, file, body } of [CASES[0], CASES[7]]) {
+			const syntax = getHeaderSyntaxForFile(file);
+			const stacked = header(file, ["Old notes.", "", ...OLD_FIELDS, "-----", "@Copyright: old"]).replace(/\n(#|[ ]\*)\t\n/g, "\n$1\n");
+			const content = `${header(file)}\n\n${stacked}\n\n${body}`;
+			const next = header(file, NEW_FIELDS);
+			const notes = syntax.kind === "line" ? "#\tOld notes." : " *\tOld notes.";
+
+			it(`${name}: is merged into the header, its text kept and its stale fields dropped, and a second run is a no-op`, () => {
+				expect(findProjectHeader(content, file)).toEqual({ start: 0, end: content.indexOf(body) });
+				const block = syntax.kind === "line" ? notes : [syntax.blockStart, notes, syntax.blockEnd].join("\n");
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.nextContent).toBe(`${next}\n\n\n${block}\n\n\n${body}`);
+				expect(first.nextContent).not.toContain("@Project: old");
+				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
+			});
+
+			it(`${name}: non-strict keeps its text inside the header, and a second run is a no-op`, () => {
+				const options = { strictHeaderBlock: false };
+				const first = replaceOrInsertHeader(content, next, file, options);
+				expect(first.nextContent).toBe(`${first.header}\n\n\n${body}`);
+				expect(first.header.split("\n")).toContain(notes);
+				expect(first.nextContent).not.toContain("@Project: old");
+				expect(replaceOrInsertHeader(first.nextContent, next, file, options).changed).toBe(false);
+			});
+		}
+
+		it("leaves a following comment alone when its fields are too few, mixed with text, or do not start with @Project:", () => {
+			const lead = "/**\n *\t@Project: demo\n */\n\n";
+			for (const comment of [
+				"/**\n *\tNotes.\n *\t@Project: a\n *\t@Filename: b\n *\t@Author: c\n */",
+				"/**\n *\tNotes.\n *\t@Project: a\n *\tMore notes.\n *\t@Filename: b\n *\t@Date: d\n *\t@Author: c\n */",
+				"/**\n *\tNotes.\n *\t@Filename: b\n *\t@Project: a\n *\t@Date: d\n *\t@Author: c\n */",
+				"/**\n *\tNotes moved by fix-headers 2.2.3.\n */",
+				"/**\n */"
+			]) {
+				const content = `${lead}${comment}\n\ncode();\n`;
+				expect(findProjectHeader(content, "/r/a.mjs")).toEqual({ start: 0, end: lead.length });
+			}
+		});
+
+		it("writes a lead line on a moved block that would read as a stacked header", () => {
+			const content = `${headerWithText("/r/a.mjs", ["Old header:", ...FIELDS])}\n\ncode();\n`;
+			const { nextContent } = replaceOrInsertHeader(content, header("/r/a.mjs", NEW_FIELDS), "/r/a.mjs");
+			expect(nextContent).toContain("/**\n *\tMoved out of the file header by fix-headers:\n *\tOld header:\n *\t@Project: demo\n");
 		});
 	});
 
