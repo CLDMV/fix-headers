@@ -32,22 +32,35 @@ function escapeRegex(text) {
 }
 
 /**
- * Splits detector-defined preserved prefix from file content when present.
+ * Splits the part of a file that stays above the header from the rest: a UTF-8 byte order
+ * mark, which keeps byte 0, then the detector-defined preserved prefix (a shebang, front
+ * matter, `<?php`).
  * @param {string} filePath - File path used for detector selection.
  * @param {string} content - File content.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax/detector options.
- * @returns {{prefix: string, body: string}} Shebang prefix and remaining body.
+ * @returns {{prefix: string, body: string}} Byte order mark and preserved prefix, and the remaining body.
  */
 function splitPreservedPrefix(filePath, content, syntaxOptions = {}) {
-	const prefix = getPreservedPrefixForFile(filePath, content, syntaxOptions);
-	if (prefix.length === 0) {
-		return { prefix: "", body: content };
-	}
-
+	const bom = content.startsWith("\uFEFF") ? "\uFEFF" : "";
+	const rest = content.slice(bom.length);
+	const prefix = `${bom}${getPreservedPrefixForFile(filePath, rest, syntaxOptions)}`;
 	return {
 		prefix,
 		body: content.slice(prefix.length)
 	};
+}
+
+/**
+ * The line ending of the first line break in a text.
+ * @param {string} text - Text to read.
+ * @returns {"\r\n" | "\n" | null} The line ending, or null when the text has no line break.
+ */
+function lineEnding(text) {
+	const index = text.indexOf("\n");
+	if (index === -1) {
+		return null;
+	}
+	return index > 0 && text[index - 1] === "\r" ? "\r\n" : "\n";
 }
 
 /**
@@ -60,12 +73,13 @@ function matchHeaderSegment(content, syntax) {
 	if (syntax.kind === "html") {
 		const blockStart = escapeRegex(syntax.blockStart || "<!--");
 		const blockEnd = escapeRegex(syntax.blockEnd || "-->");
-		return content.match(new RegExp(`^${blockStart}[\\s\\S]*?${blockEnd}\\n*`));
+		return content.match(new RegExp(`^${blockStart}[\\s\\S]*?${blockEnd}(?:\\r?\\n)*`));
 	}
 
 	if (syntax.kind === "line") {
+		// `[^\n]`, not `.`: a line of a CRLF file ends in \r, which `.` does not match.
 		const linePrefix = escapeRegex(syntax.linePrefix || "#");
-		return content.match(new RegExp(`^(?:${linePrefix}.*\\n)+\\n*`));
+		return content.match(new RegExp(`^(?:${linePrefix}[^\\n]*\\n)+(?:\\r?\\n)*`));
 	}
 
 	// Block comments (/* … */ family). A block comment opens with `/*` and is
@@ -80,7 +94,7 @@ function matchHeaderSegment(content, syntax) {
 	// everything in between is deleted on replace. Trim the styled space off so we stop
 	// at the header's own terminator.
 	const blockEnd = escapeRegex((syntax.blockEnd || " */").trim());
-	return content.match(new RegExp(`^/\\*[\\s\\S]*?${blockEnd}\\n*`));
+	return content.match(new RegExp(`^/\\*[\\s\\S]*?${blockEnd}(?:\\r?\\n)*`));
 }
 
 /**
@@ -378,25 +392,37 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 	// A line-comment header needs one blank line after it, or the comment that follows would read as part of it.
 	const configuredMargin = resolveLayoutCount(syntaxOptions.margin, "margin", DEFAULT_HEADER_MARGIN);
 	const margin = syntax.kind === "line" ? Math.max(1, configuredMargin) : configuredMargin;
-	const gap = "\n".repeat(margin + 1);
+	/**
+	 * Writes text in the file's line ending.
+	 * @param {string} text - Text with \n line breaks.
+	 * @param {string} eol - The file's line ending.
+	 * @returns {string} The text with that line ending.
+	 */
+	const withEol = (text, eol) => (eol === "\n" ? text : text.replace(/\r?\n/g, eol));
 	if (!existing) {
 		const { prefix, body } = splitPreservedPrefix(filePath, content, syntaxOptions);
-		const rest = body.replace(/^\n+/, "");
+		// A new header takes the line ending the file already uses.
+		const eol = lineEnding(content) ?? "\n";
+		const header = withEol(newHeader, eol);
+		const rest = body.replace(/^(?:\r?\n)+/, "");
 		// With nothing after the header there is no next content to separate from, so the file just ends with the header.
-		const nextContent = `${prefix}${rest.trim() === "" ? `${newHeader}\n` : `${newHeader}${gap}${rest}`}`;
-		return { nextContent, changed: nextContent !== content, header: newHeader, written: newHeader };
+		const nextContent = `${prefix}${rest.trim() === "" ? `${header}${eol}` : `${header}${eol.repeat(margin + 1)}${rest}`}`;
+		return { nextContent, changed: nextContent !== content, header, written: header };
 	}
 
 	const region = content.slice(existing.start, existing.end);
 	const { above, foreign } = splitHeaderText(region, filePath, syntaxOptions, content.slice(0, existing.start).split("\n").length - 1);
-	const eol = region.includes("\r\n") ? "\r\n" : "\n";
+	// The header is written in the line ending of the content after it (the file's own), so a
+	// CRLF file stays CRLF, and a header an earlier run wrote with \n in a CRLF file is repaired.
+	const eol = lineEnding(content.slice(existing.end)) ?? lineEnding(region) ?? "\n";
+	const gap = eol.repeat(margin + 1);
 	const strict = syntaxOptions.strictHeaderBlock !== false;
-	const header = foreign.length > 0 && !strict ? appendToHeader(newHeader, foreign, syntax) : newHeader;
+	const header = withEol(foreign.length > 0 && !strict ? appendToHeader(newHeader, foreign, syntax) : newHeader, eol);
 	const lead = above.length > 0 ? `${above.join(eol)}${eol}` : "";
 	const moved = foreign.length > 0 && strict ? renderForeignBlock(foreign, syntax, eol) : "";
-	const after = content.slice(existing.end).replace(moved === "" ? /^\n+/ : /^(?:\r?\n)+/, "");
-	const below = moved === "" ? after : `${moved}${after.trim() === "" ? eol : `${gap.replace(/\n/g, eol)}${after}`}`;
-	const nextContent = `${content.slice(0, existing.start)}${lead}${below.trim() === "" ? `${header}\n` : `${header}${gap}${below}`}`;
+	const after = content.slice(existing.end).replace(/^(?:\r?\n)+/, "");
+	const below = moved === "" ? after : `${moved}${after.trim() === "" ? eol : `${gap}${after}`}`;
+	const nextContent = `${content.slice(0, existing.start)}${lead}${below.trim() === "" ? `${header}${eol}` : `${header}${gap}${below}`}`;
 	// What took the old header's place: lines kept above it, the header, and the block moved below it.
 	const written = `${lead}${header}${moved === "" ? "" : `${gap}${moved}`}`;
 	return { nextContent, changed: nextContent !== content, header, written };
@@ -421,10 +447,10 @@ export function extractHeaderlessBody(content, filePath = "", syntaxOptions = {}
 		const written = replaceOrInsertHeader(content, "", filePath, { ...syntaxOptions, strictHeaderBlock: true }).nextContent.slice(
 			prefix.length
 		);
-		const rest = written.replace(/^\n+/, "");
+		const rest = written.replace(/^(?:\r?\n)+/, "");
 		return `${prefix}${rest.trim() === "" ? "" : rest}`;
 	}
 	const { prefix, body } = splitPreservedPrefix(filePath, content, syntaxOptions);
-	const rest = body.replace(/^\n+/, "");
+	const rest = body.replace(/^(?:\r?\n)+/, "");
 	return `${prefix}${rest.trim() === "" ? "" : rest}`;
 }

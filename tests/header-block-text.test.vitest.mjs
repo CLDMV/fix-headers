@@ -332,11 +332,13 @@ describe("non-field text in an existing header (#160)", () => {
 		});
 	});
 
-	it("writes the moved block with the file's own CRLF line endings, and a second run is a no-op", () => {
+	it("writes the header and the moved block with the file's own CRLF line endings, and a second run is a no-op", () => {
 		const content = "/**\r\n *\t@Project: demo\r\n *\r\n *\tText one.\r\n *\tText two.\r\n */\r\n\r\ncode();\r\n";
 		const next = "/**\n *\t@Project: renamed\n */";
 		const first = replaceOrInsertHeader(content, next, "/r/a.mjs");
-		expect(first.nextContent).toBe(`${next}\n\n\n/**\r\n *\tText one.\r\n *\tText two.\r\n */\r\n\r\n\r\ncode();\r\n`);
+		expect(first.nextContent).toBe(
+			`${next.replace(/\n/g, "\r\n")}\r\n\r\n\r\n/**\r\n *\tText one.\r\n *\tText two.\r\n */\r\n\r\n\r\ncode();\r\n`
+		);
 		expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.mjs").changed).toBe(false);
 	});
 
