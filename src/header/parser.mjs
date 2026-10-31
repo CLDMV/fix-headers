@@ -107,11 +107,89 @@ const MANAGED_TAG = /^@(Project|Filename|Date|Author|Email|Last modified by|Last
 
 /**
  * Comment lines that must keep their place at the top of a file (`#cloud-config`, a
- * `yaml-language-server` modeline, a `vim:` / `vi:` / `ex:` editor modeline). Found directly
- * above the first field of a line-comment header, they stay above it.
+ * `yaml-language-server` modeline). Found directly above the first field of a line-comment
+ * header, they stay above it, as does an editor modeline (see {@link isModeline}).
  * @type {RegExp}
  */
-const DIRECTIVE_LINE = /^#cloud-config\b|^#\s*yaml-language-server:|^#\s+(?:vim?|ex):/;
+const DIRECTIVE_LINE = /^#cloud-config\b|^#\s*yaml-language-server:/;
+
+/**
+ * The start of a vi/Vim/ex modeline in a `#` comment: `vi:`, `vim:`, `vim<version>:` (with an
+ * optional `<`, `=` or `>`), `Vim:` or `ex:`, after white space. The rest of the line is captured.
+ * @type {RegExp}
+ */
+const MODELINE_START = /^#\s+(vi|vim(?:[<=>]?\d+)?|Vim|ex):[ \t]*(.*)$/;
+
+/**
+ * One option of a modeline: `opt`, `noopt`, `opt!`, `opt&`, or `opt=val` (also `+=`, `-=`,
+ * `^=`), where a value runs to white space or an unescaped `:`.
+ * @type {RegExp}
+ */
+const MODELINE_OPTION = /^[a-z]+(?:[!&]|[+^-]?=(?:\\.|[^\s:\\])*)?$/;
+
+/**
+ * Boolean options common enough in modelines to mark a line as one on their own (`vim: et`,
+ * `vim: noexpandtab`). Any other bare word could be prose, so a line of bare words needs one of
+ * these, or an `opt=val` option, to count.
+ * @type {Set<string>}
+ */
+const MODELINE_BOOLEANS = new Set([
+	"et",
+	"expandtab",
+	"ai",
+	"autoindent",
+	"si",
+	"smartindent",
+	"ro",
+	"readonly",
+	"bin",
+	"binary",
+	"noet",
+	"noexpandtab",
+	"noai",
+	"noautoindent",
+	"nosi",
+	"nosmartindent",
+	"noro",
+	"noreadonly",
+	"nobin",
+	"nobinary",
+	"nowrap",
+	"nolist",
+	"nospell",
+	"nofen",
+	"nofoldenable",
+	"noeol",
+	"nofixeol",
+	"nofixendofline"
+]);
+
+/**
+ * Whether a `#` comment line is a vi/Vim/ex modeline, in either of Vim's forms:
+ * `vim: set ts=4 sw=4:` (`se`/`set`, options, a closing `:`, then any text) or
+ * `vim: ts=4 sw=4 et` (options to the end of the line, separated by white space or `:`).
+ * Every option must be option syntax, and at least one must be `opt=val` or a common boolean
+ * option, so prose such as `vi: is the editor we use` is not a modeline.
+ * @param {string} line - The comment line, prefix included.
+ * @returns {boolean} Whether the line is a modeline.
+ */
+function isModeline(line) {
+	const start = line.match(MODELINE_START);
+	if (!start) {
+		return false;
+	}
+	const set = start[2].match(/^se(?:t)?[ \t]+((?:\\.|[^:\\])*):/);
+	if (!set && start[1] === "Vim") {
+		// `Vim:` only opens the `set` form.
+		return false;
+	}
+	const options = set ? set[1].match(/(?:\\.|[^\s\\])+/g) : start[2].match(/(?:\\.|[^\s:\\])+/g);
+	return (
+		options !== null &&
+		options.every((option) => MODELINE_OPTION.test(option)) &&
+		options.some((option) => option.includes("=") || MODELINE_BOOLEANS.has(option))
+	);
+}
 
 /**
  * A PEP 263 encoding declaration (`# -*- coding: utf-8 -*-`, `# coding=utf-8`), which only
@@ -248,7 +326,9 @@ export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}, f
 			// Directive lines at the very top of the comment are separate comments the header's
 			// line match took in; they keep their place above the header.
 			const isDirective = (index) =>
-				DIRECTIVE_LINE.test(segmentLineList[index].raw) || (firstLine + index <= 1 && CODING_LINE.test(segmentLineList[index].raw));
+				DIRECTIVE_LINE.test(segmentLineList[index].raw) ||
+				isModeline(segmentLineList[index].raw) ||
+				(firstLine + index <= 1 && CODING_LINE.test(segmentLineList[index].raw));
 			while (start < segmentLineList.length && kinds[start] === "text" && isDirective(start)) {
 				above.push(segmentLineList[start].raw);
 				start += 1;

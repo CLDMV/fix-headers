@@ -299,7 +299,14 @@ describe("non-field text in an existing header (#160)", () => {
 			["a Python coding line", "/r/a.py", "# -*- coding: utf-8 -*-"],
 			["#cloud-config", "/r/a.yaml", "#cloud-config"],
 			["a yaml-language-server modeline", "/r/a.yaml", "# yaml-language-server: $schema=./schema.json"],
-			["a vim modeline", "/r/a.py", "# vim: set ts=4 sw=4:"]
+			["a vim modeline", "/r/a.py", "# vim: set ts=4 sw=4:"],
+			["a vim modeline of options only (#162)", "/r/a.py", "# vim: ts=4 sw=4 et"],
+			["a vi set modeline (#162)", "/r/a.yaml", "# vi: set ts=8:"],
+			["a versioned vim modeline (#162)", "/r/a.py", "# vim600: set foldmethod=marker:"],
+			["a modeline of one boolean option (#162)", "/r/a.py", "# vim: noexpandtab"],
+			["an ex modeline (#162)", "/r/a.py", "# ex: set sw=2:"],
+			["a Vim: set modeline (#162)", "/r/a.py", "# Vim: set ts=4: trailing text"],
+			["a modeline with an escaped colon in a value (#162)", "/r/a.py", "# vim: set fdm=marker fmr=a\\:b:"]
 		]) {
 			it(`keeps ${name} in place above the header, in both modes`, () => {
 				const content = `${directive}\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n#\tText.\n\nkey: 1\n`;
@@ -456,7 +463,15 @@ describe("non-field text in an existing header (#160)", () => {
 	});
 
 	describe("prose is not a directive", () => {
-		for (const prose of ["#\tDecoding: base64 helpers", "#\tUse it like vi: modal"]) {
+		for (const prose of [
+			"#\tDecoding: base64 helpers",
+			"#\tUse it like vi: modal",
+			"#\tvi: is the editor we use",
+			"# vim: is great, ts=4",
+			"# vim: set the record straight: twice",
+			"# Vim: ts=4 sw=4",
+			"# vim:"
+		]) {
 			it(`moves "${prose}" with the header text instead of keeping it above the header`, () => {
 				const content = `${prose}\n#\n#\t@Project: demo\n#\n\nprint(1)\n`;
 				expect(splitHeaderText(content, "/r/a.py")).toEqual({ above: [], foreign: [prose] });
