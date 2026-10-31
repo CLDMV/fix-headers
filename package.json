@@ -64,7 +64,7 @@
 	},
 	"homepage": "https://github.com/CLDMV/fix-headers#readme",
 	"engines": {
-		"node": ">=22.12.0"
+		"node": ">=22.13.0"
 	},
 	"author": {
 		"name": "Shinrai",
