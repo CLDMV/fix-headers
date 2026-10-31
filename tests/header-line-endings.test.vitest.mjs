@@ -139,6 +139,12 @@ describe("headers in CRLF and byte-order-mark files (#162)", () => {
 		expect(replaceOrInsertHeader("\r\n", "#\n#\t@Project: x\n#", "/r/a.py").nextContent).toBe("#\r\n#\t@Project: x\r\n#\r\n");
 	});
 
+	it("writes \\n line endings for a one-line header with no line break in the file", () => {
+		expect(replaceOrInsertHeader("/** @Project: demo */", "/**\n *\t@Project: x\n */", "/r/a.mjs").nextContent).toBe(
+			"/**\n *\t@Project: x\n */\n"
+		);
+	});
+
 	it("reads the same body with or without the header in a CRLF or byte-order-mark file", () => {
 		const content = `${BOM}#\r\n#\t@Project: demo\r\n#\r\n\r\nprint(1)\r\n`;
 		expect(extractHeaderlessBody(content, "/r/a.py")).toBe(`${BOM}print(1)\r\n`);
