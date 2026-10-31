@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
+ *	@Last modified time: 2026-10-31T14:46:55-07:00 (1793483215)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -22,7 +22,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { build } from "tsup";
 import tsupConfigs from "../tsup.config.mjs";
-import fixHeadersDefault, { fixHeaders } from "../src/fix-header.mjs";
+import fixHeadersDefault, { fixHeaders } from "../src/index.mjs";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
 import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/project.mjs";
@@ -130,10 +130,10 @@ describe("module integration and coverage", () => {
 		expect(typeof esmModule.default).toBe("function");
 		expect(esmModule.fixHeaders).toBe(esmModule.default);
 
-		// dist/index.cjs is the thin src/cjs/index.cjs wrapper copied verbatim, not a second
+		// dist/index.cjs is the thin src/index.cjs wrapper copied verbatim, not a second
 		// bundle of the library: it must stay tiny and only delegate to dist/index.mjs.
 		const cjsSource = await readFile(join(outRoot, "dist", "index.cjs"), "utf8");
-		expect(cjsSource).toBe(await readFile(new URL("../src/cjs/index.cjs", import.meta.url), "utf8"));
+		expect(cjsSource).toBe(await readFile(new URL("../src/index.cjs", import.meta.url), "utf8"));
 		expect(cjsSource).toContain('require("./index.mjs").default');
 		expect(Buffer.byteLength(cjsSource)).toBeLessThan(2048);
 

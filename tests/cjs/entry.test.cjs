@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-03T10:29:51-07:00 (1791048591)
+ *	@Last modified time: 2026-10-31T14:46:54-07:00 (1793483214)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -48,4 +48,30 @@ test("require() fails with a clear message where Node.js has no require(esm)", (
 	assert.match(res.stderr, /ERR_REQUIRE_ESM/);
 	assert.match(res.stderr, /require\(\) needs Node\.js \^20\.19\.0 or >=22\.12\.0/);
 	assert.match(res.stderr, /import\(\)/);
+});
+
+test("src/index.cjs loads from source and returns the ESM entry's default export", async () => {
+	const required = require("../../src/index.cjs");
+	const esm = await import("../../src/index.mjs");
+
+	assert.equal(required, esm.default);
+	assert.equal(required, esm.fixHeaders);
+});
+
+test("the fix-headers-dev condition routes require() and import() of the package to src/", async () => {
+	// The suite runs with --conditions=fix-headers-dev (package.json "test:cjs"), so the
+	// package's self-reference resolves through that branch of the "." export.
+	assert.equal(require.resolve("@cldmv/fix-headers"), path.join(repoRoot, "src", "index.cjs"));
+	assert.equal(require("@cldmv/fix-headers"), require("../../src/index.cjs"));
+	const esm = await import("@cldmv/fix-headers");
+	assert.equal(esm.default, (await import("../../src/index.mjs")).default);
+});
+
+test("the built API and CLI import ../devcheck.mjs instead of bundling it", () => {
+	const fs = require("node:fs");
+	for (const built of ["dist/index.mjs", "bin/fix-headers.mjs"]) {
+		const source = fs.readFileSync(path.join(repoRoot, built), "utf8");
+		assert.match(source, /import\(\s*["']\.\.\/devcheck\.mjs["']\s*\)/, `${built} should import ../devcheck.mjs`);
+		assert.doesNotMatch(source, /Development environment not properly configured/, `${built} should not inline devcheck`);
+	}
 });
