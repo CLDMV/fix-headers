@@ -25,9 +25,12 @@ import { createRequire } from "node:module";
 // bin/fix-headers.mjs load the same root file instead of bundling it.
 try {
 	createRequire(import.meta.url)("../devcheck.mjs");
+	/* v8 ignore start -- runs in the published package (no devcheck.mjs) or when devcheck.mjs itself
+	   fails to load; the suite always runs from a checkout where it exists and loads */
 } catch (error) {
 	if (error?.code !== "MODULE_NOT_FOUND") throw error;
 }
+/* v8 ignore stop */
 
 import { fixHeaders as fixHeadersCore } from "./core/fix-headers.mjs";
 
