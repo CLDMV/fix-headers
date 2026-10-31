@@ -15,6 +15,7 @@ export type FixHeadersOptions = {
     check?: boolean;
     fixCreatedDate?: boolean;
     strictCreatedDate?: boolean;
+    strictHeaderBlock?: boolean;
     normalizeDateFormat?: boolean;
     timezone?: string;
     convertTimezone?: boolean;

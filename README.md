@@ -116,6 +116,7 @@ Common CLI options:
 - `--check` - validate header dates without writing; exits `1` on date drift (see [Date checks](#-date-checks))
 - `--fix-created-date`
 - `--strict-created-date`
+- `--no-strict-header-block` - keep text found in a header that is not a header field inside the header, after the fields, instead of moving it to its own block below (see [Text in the header block](#text-in-the-header-block))
 - `--normalize-date-format`
 - `--timezone <name>` - write new header dates in an IANA time zone (see [Time zone](#-time-zone))
 - `--convert-timezone` - with `--timezone`, also rewrite existing header dates into that zone
@@ -157,6 +158,7 @@ Important options:
 - `check?: boolean` - validate each existing header's dates and write nothing (implies `dryRun`). Each result entry gets `dateIssues`, and the result gets `filesWithDateDrift` and `dateAdvisories`. See [Date checks](#-date-checks)
 - `fixCreatedDate?: boolean` - move an existing `@Date` back to the oldest of itself, the file's git first commit, and its filesystem creation time (see [Creation date](#-creation-date)). It only ever moves `@Date` earlier. Off by default: an existing `@Date` is kept as written
 - `strictCreatedDate?: boolean` - with `check`, count a `@Date` later than the file's git first commit or filesystem creation time as drift (fails the run). Off by default, where it is an advisory
+- `strictHeaderBlock?: boolean` - the header block holds only header fields. On by default: text in an existing header that is not a header field (a description, an unknown `@Tag:` line) is moved, verbatim and in order, to its own comment block directly below the header. `false` keeps it inside the header, after the fields. It is never deleted either way. See [Text in the header block](#text-in-the-header-block)
 - `normalizeDateFormat?: boolean` - write every header date in the git `%aI` form (`2026-03-01T17:59:32-08:00`), keeping each date's offset and instant. Off by default; the first run rewrites (and restamps) every managed file whose dates use the space form (`2026-03-01 17:59:32 -08:00`)
 - `timezone?: string` - an IANA time zone name (`America/Los_Angeles`, `UTC`, `Asia/Kolkata`, ...). Every date fix-headers writes (a new header's `@Date`, and `@Last modified time`) is expressed in that zone; the instant and its epoch never change. Unset (the default): dates are written as today. An unknown zone name throws. See [Time zone](#-time-zone)
 - `convertTimezone?: boolean` - with `timezone`, also rewrite the existing `@Date` and `@Last modified time` values of every header into that zone, keeping each instant. Throws when `timezone` is not set. See [Time zone](#-time-zone)
@@ -420,6 +422,40 @@ name: CI
 With `spacing: 0, margin: 1` the header is compact, with no empty comment lines and a single blank line after it. Both accept any whole number of `0` or more; anything else is rejected before a file is touched.
 
 An existing header is restyled in place to match, so changing either option rewrites the layout of every header on the next run, and a run with unchanged options finds nothing to update. A line-comment header always keeps at least one blank line after it, even with `margin: 0`, so a comment that follows the file's header is not read as part of it.
+
+### Text in the header block
+
+The header block is only a header. A line in an existing header that is not one of the fields fix-headers writes (`@Project`, `@Filename`, `@Date`, `@Author`, `@Email`, `@Last modified by`, `@Last modified time`, `@Copyright`), a `-----` separator or an empty comment line is kept, never deleted. With `strictHeaderBlock` (the default) those lines move to a comment block of their own directly below the regenerated header, written as they were (comment prefix included) and in their original order, in the file's comment style (`/** … */`, `<!-- … -->`, or `#` lines). The margin separates the header, that block and the rest of the file:
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ *	What this module does.
+ */
+```
+
+becomes
+
+```text
+/**
+ *
+ *	@Project: @cldmv/example
+ *	...
+ *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
+ *
+ */
+
+
+/**
+ *	What this module does.
+ */
+```
+
+The moved block is no longer part of the header, so the next run leaves it alone. With `"strictHeaderBlock": false` in the config file (CLI `--no-strict-header-block`) the lines stay inside the header instead, after an empty comment line below the fields. Moving the text is not a content edit, so it keeps the recorded `@Last modified by`.
 
 ---
 

@@ -1,0 +1,207 @@
+/**
+ *
+ *	@Project: @cldmv/fix-headers
+ *	@Filename: /tests/header-block-text.test.vitest.mjs
+ *	@Date: 2026-10-30T12:00:00-07:00 (1793386800)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-30T12:00:00-07:00 (1793386800)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+import { parseCliArgs } from "../src/cli.mjs";
+import { fixHeaders } from "../src/core/fix-headers.mjs";
+import { extractForeignHeaderLines, extractHeaderlessBody, replaceOrInsertHeader } from "../src/header/parser.mjs";
+import { getHeaderSyntaxForFile, renderHeaderLines } from "../src/header/syntax.mjs";
+import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
+
+/**
+ * @fileoverview Text in an existing header that is not a header field is never deleted
+ * (#160): with strictHeaderBlock (the default) it moves to its own comment block directly
+ * below the header; with strictHeaderBlock: false it stays inside the header after the fields.
+ */
+
+const FIELDS = [
+	"@Project: demo",
+	"@Filename: /src/file",
+	"@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
+	"@Author: Tester",
+	"@Email: <t@example.com>",
+	"-----",
+	"@Last modified by: Tester (t@example.com)",
+	"@Last modified time: 2026-01-02T00:00:00-08:00 (1767340800)",
+	"-----",
+	"@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved."
+];
+
+/**
+ * Renders a header for a file path with the given lines.
+ * @param {string} filePath - File path used for syntax selection.
+ * @param {string[]} [lines=FIELDS] - Header lines without comment wrappers.
+ * @returns {string} Header block.
+ */
+function header(filePath, lines = FIELDS) {
+	return renderHeaderLines(getHeaderSyntaxForFile(filePath), lines);
+}
+
+/**
+ * Renders an existing header that carries description lines after its fields, the way a
+ * hand-written header does: an empty comment line, then the text.
+ * @param {string} filePath - File path used for syntax selection.
+ * @param {string[]} description - Description lines without comment wrappers.
+ * @returns {string} Header block.
+ */
+function headerWithText(filePath, description) {
+	return header(filePath, [...FIELDS, "", ...description]).replace(/\n(#|[ ]\*)\t\n/g, "\n$1\n");
+}
+
+const NEW_FIELDS = FIELDS.map((line) => line.replace("@Project: demo", "@Project: renamed"));
+
+const CASES = [
+	{ name: "JS block comment", file: "/r/src/a.mjs", body: "export const a = 1;\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "JSONC block comment", file: "/r/src/a.jsonc", body: '{ "a": 1 }\n', raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "CSS block comment", file: "/r/src/a.css", body: "a { color: red; }\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "PHP block comment", file: "/r/src/a.php", body: "echo 1;\n", raw: [" *\tWhat this pins.", " *", " *\tAnd why."] },
+	{ name: "HTML comment", file: "/r/src/a.html", body: "<p></p>\n", raw: ["\tWhat this pins.", "", "\tAnd why."] },
+	{ name: "YAML # comment", file: "/r/src/a.yaml", body: "name: x\n", raw: ["#\tWhat this pins.", "#", "#\tAnd why."] },
+	{ name: "Python # comment", file: "/r/src/a.py", body: "print(1)\n", raw: ["#\tWhat this pins.", "#", "#\tAnd why."] }
+];
+
+describe("non-field text in an existing header (#160)", () => {
+	for (const { name, file, body, raw } of CASES) {
+		const syntax = getHeaderSyntaxForFile(file);
+		const original = `${headerWithText(file, ["What this pins.", "", "And why."])}\n\n${body}`;
+		const next = header(file, NEW_FIELDS);
+
+		it(`${name}: finds the text as written`, () => {
+			expect(extractForeignHeaderLines(original, file)).toEqual(raw);
+		});
+
+		it(`${name}: strict (default) moves the text to its own block below the header, and a second run is a no-op`, () => {
+			const first = replaceOrInsertHeader(original, next, file);
+			const block = syntax.kind === "line" ? raw.join("\n") : [syntax.blockStart, ...raw, syntax.blockEnd].join("\n");
+			expect(first.nextContent).toBe(`${next}\n\n\n${block}\n\n\n${body}`);
+			expect(first.header).toBe(next);
+			const second = replaceOrInsertHeader(first.nextContent, next, file);
+			expect(second.changed).toBe(false);
+			expect(replaceOrInsertHeader(first.nextContent, next, file, { strictHeaderBlock: true }).changed).toBe(false);
+		});
+
+		it(`${name}: non-strict keeps the text inside the header after the fields, and a second run is a no-op`, () => {
+			const options = { strictHeaderBlock: false };
+			const first = replaceOrInsertHeader(original, next, file, options);
+			expect(first.nextContent).toBe(`${first.header}\n\n\n${body}`);
+			for (const line of raw) {
+				expect(first.header.split("\n")).toContain(line);
+			}
+			expect(first.header).toContain("@Project: renamed");
+			expect(first.header.indexOf(raw[0])).toBeGreaterThan(first.header.indexOf("@Copyright:"));
+			expect(replaceOrInsertHeader(first.nextContent, next, file, options).changed).toBe(false);
+		});
+
+		it(`${name}: moving the text out is not a content edit`, () => {
+			const moved = replaceOrInsertHeader(original, next, file).nextContent;
+			const kept = replaceOrInsertHeader(original, next, file, { strictHeaderBlock: false }).nextContent;
+			expect(extractHeaderlessBody(moved, file)).toBe(extractHeaderlessBody(original, file));
+			expect(extractHeaderlessBody(kept, file, { strictHeaderBlock: false })).toBe(extractHeaderlessBody(original, file));
+		});
+
+		it(`${name}: a header with only fields is rewritten as before, in both modes`, () => {
+			const plain = `${header(file)}\n\n${body}`;
+			expect(extractForeignHeaderLines(plain, file)).toEqual([]);
+			for (const options of [{}, { strictHeaderBlock: false }]) {
+				expect(replaceOrInsertHeader(plain, next, file, options).nextContent).toBe(`${next}\n\n\n${body}`);
+			}
+		});
+	}
+
+	it("keeps text found between fields, unknown @tags and text on the opener line, in order", () => {
+		const content = [
+			"/** Opener text.",
+			" *\t@Project: demo",
+			" *\tBetween fields.",
+			" *\t@Custom: kept",
+			" *\t@Copyright: x",
+			" */",
+			"",
+			"code();",
+			""
+		].join("\n");
+		expect(extractForeignHeaderLines(content, "/r/a.mjs")).toEqual([" *\tOpener text.", " *\tBetween fields.", " *\t@Custom: kept"]);
+	});
+
+	it("collects the text of stacked headers in order", () => {
+		const content = "/**\n *\t@Project: one\n *\tFirst.\n */\n/**\n *\t@Project: two\n *\tSecond.\n */\n\ncode();\n";
+		const { nextContent } = replaceOrInsertHeader(content, "/**\n *\t@Project: x\n */", "/r/a.mjs");
+		expect(nextContent).toBe("/**\n *\t@Project: x\n */\n\n\n/**\n *\tFirst.\n *\tSecond.\n */\n\n\ncode();\n");
+	});
+
+	it("ends the file with the moved block when the header was all there was", () => {
+		const content = "/**\n *\t@Project: one\n *\tOnly text.\n */\n";
+		expect(replaceOrInsertHeader(content, "/**\n *\t@Project: x\n */", "/r/a.mjs").nextContent).toBe(
+			"/**\n *\t@Project: x\n */\n\n\n/**\n *\tOnly text.\n */\n"
+		);
+	});
+
+	it("reads --no-strict-header-block from the command line", () => {
+		expect(parseCliArgs(["--no-strict-header-block"]).options.strictHeaderBlock).toBe(false);
+		expect(parseCliArgs([]).options.strictHeaderBlock).toBeUndefined();
+	});
+
+	it("applies both settings end to end, and settles after one run", async () => {
+		const identity = { authorName: "Run Identity", authorEmail: "run@example.com", companyName: "Example Inc." };
+		const description = " *\tWhat this test pins and why.\n *\tSecond line.";
+		const existing = [
+			"/**",
+			" *",
+			" *\t@Project: block-text",
+			" *\t@Filename: /src/one.mjs",
+			" *\t@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
+			" *\t@Author: Original <CLDMV>",
+			" *\t@Email: <original@example.com>",
+			" *\t-----",
+			" *\t@Last modified by: Editor (editor@example.com)",
+			" *\t@Last modified time: 2026-01-02T00:00:00-08:00 (1767340800)",
+			" *\t-----",
+			" *\t@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.",
+			" *",
+			description,
+			" */",
+			"",
+			"export const one = true;",
+			""
+		].join("\n");
+		for (const strictHeaderBlock of [undefined, true, false]) {
+			const workspace = await createWorkspace("header-block-text");
+			try {
+				await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "block-text" }, null, 2));
+				await writeWorkspaceFile(join(workspace, "src", "one.mjs"), existing);
+				const options = { cwd: workspace, input: "src/one.mjs", ...identity, normalizeDateFormat: true, strictHeaderBlock };
+				const first = await fixHeaders(options);
+				expect(first.filesUpdated).toBe(1);
+				const content = await readFile(join(workspace, "src", "one.mjs"), "utf8");
+				expect(content).toContain(description);
+				const headerEnd = content.indexOf(" */");
+				if (strictHeaderBlock === false) {
+					expect(content.indexOf(description)).toBeLessThan(headerEnd);
+				} else {
+					expect(content.slice(headerEnd)).toMatch(
+						/^ \*\/\n\n\n\/\*\*\n \*\tWhat this test pins and why\.\n \*\tSecond line\.\n \*\/\n\n\nexport const one = true;\n$/
+					);
+				}
+				const second = await fixHeaders(options);
+				expect(second.filesUpdated).toBe(0);
+				expect(await readFile(join(workspace, "src", "one.mjs"), "utf8")).toBe(content);
+			} finally {
+				await cleanupWorkspace(workspace);
+			}
+		}
+	});
+});

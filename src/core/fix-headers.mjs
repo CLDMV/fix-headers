@@ -44,6 +44,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  check?: boolean,
  *  fixCreatedDate?: boolean,
  *  strictCreatedDate?: boolean,
+ *  strictHeaderBlock?: boolean,
  *  normalizeDateFormat?: boolean,
  *  timezone?: string,
  *  convertTimezone?: boolean,
@@ -397,7 +398,8 @@ export async function fixHeaders(options = {}) {
 			forcedDetectors,
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides,
 			spacing: effectiveOptions.spacing,
-			margin: effectiveOptions.margin
+			margin: effectiveOptions.margin,
+			strictHeaderBlock: effectiveOptions.strictHeaderBlock !== false
 		};
 		const existingHeader = findProjectHeader(original, filePath, syntaxOptions);
 		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
@@ -512,16 +514,17 @@ export async function fixHeaders(options = {}) {
 		if (effectiveOptions.sampleOutput === true && replacement.changed) {
 			const previousValue = existingHeaderText.length > 0 ? existingHeaderText.trimEnd() : null;
 			const diffPath = relativePath.replace(/\\/g, "/");
-			const headerLineOffset = replacement.nextContent.slice(0, replacement.nextContent.indexOf(header)).split("\n").length - 1;
+			const writtenHeader = replacement.header;
+			const headerLineOffset = replacement.nextContent.slice(0, replacement.nextContent.indexOf(writtenHeader)).split("\n").length - 1;
 			changeEntry.sample = {
 				previousValue,
-				newValue: header,
-				diff: createUnifiedDiff(previousValue, header, {
+				newValue: writtenHeader,
+				diff: createUnifiedDiff(previousValue, writtenHeader, {
 					fromFile: `a/${diffPath}`,
 					toFile: `b/${diffPath}`,
 					lineOffset: headerLineOffset
 				}),
-				issues: compareHeaderFields(previousValue, header),
+				issues: compareHeaderFields(previousValue, writtenHeader),
 				detectedValues: {
 					projectName: fileMetadata.projectName,
 					projectNameSource: fileMetadata.projectNameSource,
