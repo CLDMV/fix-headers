@@ -253,19 +253,37 @@ describe("non-field text in an existing header (#160)", () => {
 			expect(extractForeignHeaderLines(separated, "/r/a.mjs")).toEqual([" *\tText."]);
 		});
 
-		it("rewrites a wrapped field value with its field instead of moving the continuation", () => {
-			const wrapped = (continuation) =>
-				["/**", " *\t@Project: demo", " *\t@Copyright: Copyright (c) 2020 X", continuation, " *", " *\tText.", " */", ""].join("\n");
-			expect(extractForeignHeaderLines(wrapped(" *\t\tAll rights reserved."), "/r/a.mjs")).toEqual([" *\tText."]);
-			expect(extractForeignHeaderLines(wrapped("    All rights reserved."), "/r/a.mjs")).toEqual([" *\tText."]);
-			const yaml = "#\n#\t@Project: demo\n#\t@Copyright: Copyright (c) 2020 X\n#\t\tAll rights reserved.\n#\n#\tText.\n\nname: x\n";
-			expect(extractForeignHeaderLines(yaml, "/r/a.yaml")).toEqual(["#\tText."]);
-			// A line at the field's own indentation directly after it is text, not a continuation.
-			expect(extractForeignHeaderLines(wrapped(" *\tAll rights reserved."), "/r/a.mjs")).toEqual([
-				" *\tAll rights reserved.",
-				" *",
-				" *\tText."
-			]);
+		describe("a line wrapping a field's value is text, never deleted", () => {
+			const repros = [
+				["a star-less block header", "/*\n\t@Project: demo\n\t@Copyright: (c) X\nDescription line\n*/\n\ncode();\n", ["Description line"]],
+				[
+					"a deeper-indented co-author line",
+					"/**\n *\t@Project: demo\n *\t@Author: A\n *\t\tand B (co-author)\n */\n\ncode();\n",
+					[" *\t\tand B (co-author)"]
+				],
+				[
+					"a licence line under @Copyright",
+					"/**\n *\t@Project: demo\n *\t@Copyright: (c) X\n *\t    Licensed MIT, see LICENSE\n */\n\ncode();\n",
+					[" *\t    Licensed MIT, see LICENSE"]
+				]
+			];
+			for (const [name, content, kept] of repros) {
+				it(`${name}, in both modes`, () => {
+					expect(extractForeignHeaderLines(content, "/r/a.mjs")).toEqual(kept);
+					for (const options of [{}, { strictHeaderBlock: false }]) {
+						const first = replaceOrInsertHeader(content, next, "/r/a.mjs", options);
+						for (const line of kept) {
+							expect(first.nextContent.split("\n")).toContain(line);
+						}
+						if (options.strictHeaderBlock === false) {
+							expect(first.header.split("\n")).toContain(kept[0]);
+						} else {
+							expect(first.header).not.toContain(kept[0].trim());
+						}
+						expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.mjs", options).changed).toBe(false);
+					}
+				});
+			}
 		});
 	});
 
@@ -274,7 +292,8 @@ describe("non-field text in an existing header (#160)", () => {
 		for (const [name, file, directive] of [
 			["a Python coding line", "/r/a.py", "# -*- coding: utf-8 -*-"],
 			["#cloud-config", "/r/a.yaml", "#cloud-config"],
-			["a yaml-language-server modeline", "/r/a.yaml", "# yaml-language-server: $schema=./schema.json"]
+			["a yaml-language-server modeline", "/r/a.yaml", "# yaml-language-server: $schema=./schema.json"],
+			["a vim modeline", "/r/a.py", "# vim: set ts=4 sw=4:"]
 		]) {
 			it(`keeps ${name} in place above the header, in both modes`, () => {
 				const content = `${directive}\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n#\tText.\n\nkey: 1\n`;
@@ -287,6 +306,18 @@ describe("non-field text in an existing header (#160)", () => {
 				}
 			});
 		}
+
+		it("treats a description above the first field as header text, in both modes", () => {
+			const content = "#\tMy script does X\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n\nprint(1)\n";
+			expect(splitHeaderText(content, "/r/a.py")).toEqual({ above: [], foreign: ["#\tMy script does X"] });
+			const strict = replaceOrInsertHeader(content, header, "/r/a.py");
+			expect(strict.nextContent).toBe(`${header}\n\n\n#\tMy script does X\n\n\nprint(1)\n`);
+			expect(replaceOrInsertHeader(strict.nextContent, header, "/r/a.py").changed).toBe(false);
+			const kept = replaceOrInsertHeader(content, header, "/r/a.py", { strictHeaderBlock: false });
+			expect(kept.nextContent).toBe(`${kept.header}\n\n\nprint(1)\n`);
+			expect(kept.header.split("\n")).toContain("#\tMy script does X");
+			expect(kept.header.indexOf("My script")).toBeGreaterThan(kept.header.indexOf("@Project"));
+		});
 
 		it("keeps a coding line under a shebang on line 2", () => {
 			const content = "#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n#\n#\t@Project: demo\n#\n\nprint(1)\n";

@@ -1,11 +1,11 @@
 /**
  * Splits the text of an existing header block that is not header fields from the fields.
- * `foreign` holds the lines that are neither fields, their wrapped continuations, the
- * separators between them, nor empty lines around them: description text, unknown `@Tag:`
- * lines, a repeated managed tag, a dash line among text. `above` holds, for a line-comment
- * header only, the comment lines directly above the first field with no blank line between
- * (a `# -*- coding -*-` line, `#cloud-config`, a modeline); they are separate comments the
- * header's line match took in, and stay above the header. Lines come back as written
+ * `foreign` holds every line that is neither a field, a separator next to a field, nor an
+ * empty line around them: description text, unknown `@Tag:` lines, a repeated managed tag,
+ * a dash line among text, a line wrapping a field's value. `above` holds, for a line-comment
+ * header only, the directive lines at the top of the comment (a `# -*- coding -*-` line,
+ * `#cloud-config`, a `yaml-language-server` or `vim:` modeline); they are separate comments
+ * the header's line match took in, and stay above the header. Lines come back as written
  * (comment prefix included), in their original order, with blank lines between them kept
  * and blank lines around them dropped.
  * @param {string} headerText - The existing header block (every stacked segment).
@@ -56,7 +56,7 @@ export function findProjectHeader(content: string, filePath?: string, syntaxOpti
  * header field (see {@link splitHeaderText}) is never dropped: with
  * `strictHeaderBlock` (the default) it is written as its own comment block directly below
  * the header, separated from it and from the rest of the file by the margin; with
- * `strictHeaderBlock: false` it stays inside the header, after the fields. Comment lines a
+ * `strictHeaderBlock: false` it stays inside the header, after the fields. Directive lines a
  * line-comment header took in from directly above it stay above it.
  * @param {string} content - Original file content.
  * @param {string} newHeader - Generated header text.
