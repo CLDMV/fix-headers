@@ -14,6 +14,7 @@
  */
 
 import { extname } from "node:path";
+import { isModeline, takeTopLines } from "./top-lines.mjs";
 
 /**
  * @fileoverview Go detector implementation.
@@ -40,10 +41,37 @@ function resolveGoCommentSyntax(filePath) {
 	return null;
 }
 
+/**
+ * A build constraint line: `//go:build <expr>` or the older `// +build <tags>`.
+ * @type {RegExp}
+ */
+const BUILD_CONSTRAINT = /^\/\/(?:go:build|\s*\+build)\s/;
+
+/**
+ * Resolves the build constraints at the very top of a Go file, with the blank lines after
+ * them. A `// +build` line only counts when nothing but blank lines and `//` comments come
+ * before it and a blank line follows it, so the constraints and that blank line stay above
+ * the header.
+ * @param {string} _filePath - File path.
+ * @param {string} content - File content.
+ * @returns {string} Preserved prefix.
+ */
+function resolveGoPreservedPrefix(_filePath, content) {
+	const lines = takeTopLines(content, (line) => BUILD_CONSTRAINT.test(line) || isModeline(line));
+	if (!lines.split(/\r?\n/).some((line) => BUILD_CONSTRAINT.test(line))) {
+		return "";
+	}
+	const rest = content.slice(lines.length);
+	return `${lines}${rest.slice(0, rest.length - rest.replace(/^(?:[ \t]*\r?\n)*/, "").length)}`;
+}
+
 export const detector = {
 	id: "go",
 	extensions,
 	enabledByDefault: true,
+	resolvePreservedPrefix(filePath, content) {
+		return resolveGoPreservedPrefix(filePath, content);
+	},
 	resolveCommentSyntax(filePath) {
 		return resolveGoCommentSyntax(filePath);
 	}

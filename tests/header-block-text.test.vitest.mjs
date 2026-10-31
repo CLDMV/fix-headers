@@ -16,9 +16,10 @@
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { parseCliArgs } from "../src/cli.mjs";
+import { parseCliArgs, runCli } from "../src/cli.mjs";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
 import {
+	copyrightHolder,
 	extractForeignHeaderLines,
 	extractHeaderlessBody,
 	findProjectHeader,
@@ -242,15 +243,24 @@ describe("non-field text in an existing header (#160)", () => {
 		const content = [...fields, ...text, " */", "", "code();", ""].join("\n");
 		const next = header("/r/a.mjs", NEW_FIELDS);
 
-		it("keeps a repeated tag, a dash line among text and a tag inside a description, in both modes", () => {
-			expect(extractForeignHeaderLines(content, "/r/a.mjs")).toEqual(text);
+		it("drops a repeated tag as a duplicate, keeps another holder's @Copyright as a field and description text as text, in both modes (#162)", () => {
+			const extra = " *\t@Copyright: Portions (c) 2019 Foo Corp, MIT licence";
+			const withExtra = next.replace(/( \*\t@Copyright: [^\n]*)/, `$1\n${extra}`);
+			expect(splitHeaderText(content, "/r/a.mjs")).toEqual({
+				foreign: [" *\tWhat changed:"],
+				copyrights: ["Portions (c) 2019 Foo Corp, MIT licence"]
+			});
 			const strict = replaceOrInsertHeader(content, next, "/r/a.mjs");
-			expect(strict.nextContent).toBe(`${next}\n\n\n${["/**", ...text, " */"].join("\n")}\n\n\ncode();\n`);
-			expect(replaceOrInsertHeader(strict.nextContent, next, "/r/a.mjs").changed).toBe(false);
+			expect(strict.extraCopyrights).toEqual(["Portions (c) 2019 Foo Corp, MIT licence"]);
+			expect(strict.nextContent).toBe(`${withExtra}\n\n\n/**\n *\tWhat changed:\n */\n\n\ncode();\n`);
+			expect(strict.nextContent).not.toContain("Second Author");
+			expect(strict.nextContent).not.toContain("see changelog");
+			const again = replaceOrInsertHeader(strict.nextContent, next, "/r/a.mjs");
+			expect(again.changed).toBe(false);
+			expect(again.extraCopyrights).toEqual(["Portions (c) 2019 Foo Corp, MIT licence"]);
 			const kept = replaceOrInsertHeader(content, next, "/r/a.mjs", { strictHeaderBlock: false });
-			for (const line of text) {
-				expect(kept.header.split("\n")).toContain(line);
-			}
+			expect(kept.header.split("\n")).toContain(" *\tWhat changed:");
+			expect(kept.header.split("\n")).toContain(extra);
 			expect(replaceOrInsertHeader(kept.nextContent, next, "/r/a.mjs", { strictHeaderBlock: false }).changed).toBe(false);
 		});
 
@@ -295,34 +305,9 @@ describe("non-field text in an existing header (#160)", () => {
 
 	describe("comment lines directly above a # header", () => {
 		const header = "#\n#\t@Project: renamed\n#";
-		for (const [name, file, directive] of [
-			["a Python coding line", "/r/a.py", "# -*- coding: utf-8 -*-"],
-			["#cloud-config", "/r/a.yaml", "#cloud-config"],
-			["a yaml-language-server modeline", "/r/a.yaml", "# yaml-language-server: $schema=./schema.json"],
-			["a vim modeline", "/r/a.py", "# vim: set ts=4 sw=4:"],
-			["a vim modeline of options only (#162)", "/r/a.py", "# vim: ts=4 sw=4 et"],
-			["a vi set modeline (#162)", "/r/a.yaml", "# vi: set ts=8:"],
-			["a versioned vim modeline (#162)", "/r/a.py", "# vim600: set foldmethod=marker:"],
-			["a modeline of one boolean option (#162)", "/r/a.py", "# vim: noexpandtab"],
-			["an ex modeline (#162)", "/r/a.py", "# ex: set sw=2:"],
-			["a Vim: set modeline (#162)", "/r/a.py", "# Vim: set ts=4: trailing text"],
-			["a modeline with an escaped colon in a value (#162)", "/r/a.py", "# vim: set fdm=marker fmr=a\\:b:"]
-		]) {
-			it(`keeps ${name} in place above the header, in both modes`, () => {
-				const content = `${directive}\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n#\tText.\n\nkey: 1\n`;
-				expect(splitHeaderText(content, file)).toEqual({ above: [directive], foreign: ["#\tText."] });
-				for (const options of [{}, { strictHeaderBlock: false }]) {
-					const first = replaceOrInsertHeader(content, header, file, options);
-					expect(first.nextContent.startsWith(`${directive}\n#\n#\t@Project: renamed`)).toBe(true);
-					expect(first.nextContent).toContain("#\tText.");
-					expect(replaceOrInsertHeader(first.nextContent, header, file, options).changed).toBe(false);
-				}
-			});
-		}
-
 		it("treats a description above the first field as header text, in both modes", () => {
 			const content = "#\tMy script does X\n#\n#\t@Project: demo\n#\t@Copyright: c\n#\n\nprint(1)\n";
-			expect(splitHeaderText(content, "/r/a.py")).toEqual({ above: [], foreign: ["#\tMy script does X"] });
+			expect(splitHeaderText(content, "/r/a.py")).toEqual({ foreign: ["#\tMy script does X"], copyrights: [] });
 			const strict = replaceOrInsertHeader(content, header, "/r/a.py");
 			expect(strict.nextContent).toBe(`${header}\n\n\n#\tMy script does X\n\n\nprint(1)\n`);
 			expect(replaceOrInsertHeader(strict.nextContent, header, "/r/a.py").changed).toBe(false);
@@ -427,29 +412,32 @@ describe("non-field text in an existing header (#160)", () => {
 		const yamlTwice = `${headerWithText("/r/a.yaml", FIELDS)}\n\nkey: 1\n`;
 		const repros = [
 			[
-				"a JS header with a second @Project line",
+				"a JS header with a second @Project line, which is a duplicate",
 				"/r/a.mjs",
 				jsHeader,
-				"/**\n *\t@Project: demo\n *\t@Project: legacy-name (renamed 2024)\n */\n\ncode();\n",
-				["@Project: legacy-name (renamed 2024)"]
+				"/**\n *\t@Project: demo\n *\t@Project: legacy-name (renamed 2024)\n *\n *\tKept.\n */\n\ncode();\n",
+				["Kept."],
+				["legacy-name"]
 			],
-			["a # header holding two copies of the header", "/r/a.yaml", yamlHeader, yamlTwice, FIELDS.filter((line) => line !== "-----")],
+			["a # header holding two copies of the header", "/r/a.yaml", yamlHeader, yamlTwice, [], []],
 			[
-				"a JS header holding text and then a second copy of the fields (#162)",
+				"a JS header holding text and then a second copy of the fields",
 				"/r/a.mjs",
 				jsHeader,
-				`${headerWithText("/r/a.mjs", ["Old header:", ...FIELDS])}\n\ncode();\n`,
-				["Old header:", ...FIELDS.filter((line) => line !== "-----")]
+				`${headerWithText("/r/a.mjs", ["Old header:", ...FIELDS.map((line) => line.replace("demo", "other"))])}\n\ncode();\n`,
+				["Old header:"],
+				["@Project: other"]
 			],
 			[
-				"a # header holding text and then a second copy of the fields (#162)",
+				"a # header holding text and then a second copy of the fields",
 				"/r/a.yaml",
 				yamlHeader,
-				`${headerWithText("/r/a.yaml", ["Old header:", ...FIELDS])}\n\nkey: 1\n`,
-				["Old header:", ...FIELDS.filter((line) => line !== "-----")]
+				`${headerWithText("/r/a.yaml", ["Old header:", ...FIELDS.map((line) => line.replace("demo", "other"))])}\n\nkey: 1\n`,
+				["Old header:"],
+				["@Project: other"]
 			]
 		];
-		for (const [name, file, next, content, kept] of repros) {
+		for (const [name, file, next, content, kept, gone] of repros) {
 			for (const options of [{}, { margin: 0 }, { strictHeaderBlock: false }, { strictHeaderBlock: false, margin: 0 }]) {
 				it(`${name}: three runs with ${JSON.stringify(options)} keep every line and settle after the first`, () => {
 					const runs = [];
@@ -461,91 +449,197 @@ describe("non-field text in an existing header (#160)", () => {
 					expect(runs[1]).toBe(runs[0]);
 					expect(runs[2]).toBe(runs[0]);
 					for (const line of kept) {
-						// Each kept line appears once in the regenerated header (when it is a field) plus once as kept text.
-						expect(runs[2].split(line).length - 1).toBeGreaterThanOrEqual(next.includes(line) ? 2 : 1);
+						expect(runs[2].split(line).length - 1).toBe(1);
 					}
+					for (const text of gone) {
+						expect(runs[2]).not.toContain(text);
+					}
+					// One header, and nothing below it is a file header (no @Project: or @Filename: line).
+					expect(runs[2].match(/@Project:/g)).toHaveLength(1);
+					expect(runs[2].match(/@Filename:/g)).toHaveLength(1);
+					expect(runs[2]).not.toContain("Moved out of the file header by fix-headers:");
 				});
 			}
 		}
 
-		it("only takes a following comment as a stacked header when it starts with @Project:", () => {
-			const content = "/**\n *\t@Project: demo\n */\n\n/**\n *\tNotes.\n *\t@Project: mentioned\n */\n\ncode();\n";
-			expect(findProjectHeader(content, "/r/a.mjs")).toEqual({ start: 0, end: content.indexOf("/**", 1) });
-			const stacked = "/**\n *\t@Project: demo\n */\n\n/**\n *\n *\t@Project: copy\n */\n\ncode();\n";
-			expect(findProjectHeader(stacked, "/r/a.mjs").end).toBe(stacked.indexOf("code();"));
-		});
-	});
-
-	describe("a stacked header that starts with text (#162)", () => {
-		const OLD_FIELDS = ["@Project: old", "@Filename: /old", "@Date: 2015-01-01T00:00:00-08:00 (1420099200)", "@Author: Old"];
-		for (const { name, file, body } of [CASES[0], CASES[7]]) {
-			const syntax = getHeaderSyntaxForFile(file);
-			const stacked = header(file, ["Old notes.", "", ...OLD_FIELDS, "-----", "@Copyright: old"]).replace(/\n(#|[ ]\*)\t\n/g, "\n$1\n");
-			const content = `${header(file)}\n\n${stacked}\n\n${body}`;
-			const next = header(file, NEW_FIELDS);
-			const notes = syntax.kind === "line" ? "#\tOld notes." : " *\tOld notes.";
-
-			it(`${name}: is merged into the header, its text kept and its stale fields dropped, and a second run is a no-op`, () => {
-				expect(findProjectHeader(content, file)).toEqual({ start: 0, end: content.indexOf(body) });
-				const block = syntax.kind === "line" ? notes : [syntax.blockStart, notes, syntax.blockEnd].join("\n");
-				const first = replaceOrInsertHeader(content, next, file);
-				expect(first.nextContent).toBe(`${next}\n\n\n${block}\n\n\n${body}`);
-				expect(first.nextContent).not.toContain("@Project: old");
-				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
-			});
-
-			it(`${name}: non-strict keeps its text inside the header, and a second run is a no-op`, () => {
-				const options = { strictHeaderBlock: false };
-				const first = replaceOrInsertHeader(content, next, file, options);
-				expect(first.nextContent).toBe(`${first.header}\n\n\n${body}`);
-				expect(first.header.split("\n")).toContain(notes);
-				expect(first.nextContent).not.toContain("@Project: old");
-				expect(replaceOrInsertHeader(first.nextContent, next, file, options).changed).toBe(false);
-			});
-		}
-
-		it("leaves a following comment alone when its fields are too few, mixed with text, or do not start with @Project:", () => {
+		it("takes every following comment with a @Project: or @Filename: line for a copy of the header, and no other (#162)", () => {
 			const lead = "/**\n *\t@Project: demo\n */\n\n";
-			for (const comment of [
-				"/**\n *\tNotes.\n *\t@Project: a\n *\t@Filename: b\n *\t@Author: c\n */",
-				"/**\n *\tNotes.\n *\t@Project: a\n *\tMore notes.\n *\t@Filename: b\n *\t@Date: d\n *\t@Author: c\n */",
-				"/**\n *\tNotes.\n *\t@Filename: b\n *\t@Project: a\n *\t@Date: d\n *\t@Author: c\n */",
-				"/**\n *\tNotes moved by fix-headers 2.2.3.\n */",
-				"/**\n */"
-			]) {
+			for (const comment of ["/**\n *\tNotes.\n *\t@Project: mentioned\n */", "/**\n *\tNotes.\n *\t@Filename: /x\n */"]) {
+				const content = `${lead}${comment}\n\ncode();\n`;
+				expect(findProjectHeader(content, "/r/a.mjs")?.end).toBe(content.indexOf("code();"));
+			}
+			for (const comment of ["/**\n *\tNotes about @Project: names.\n */", "/**\n *\t@Author: x\n *\t@Copyright: y\n */"]) {
 				const content = `${lead}${comment}\n\ncode();\n`;
 				expect(findProjectHeader(content, "/r/a.mjs")).toEqual({ start: 0, end: lead.length });
 			}
 		});
-
-		it("writes a lead line on a moved block that would read as a stacked header", () => {
-			const content = `${headerWithText("/r/a.mjs", ["Old header:", ...FIELDS])}\n\ncode();\n`;
-			const { nextContent } = replaceOrInsertHeader(content, header("/r/a.mjs", NEW_FIELDS), "/r/a.mjs");
-			expect(nextContent).toContain("/**\n *\tMoved out of the file header by fix-headers:\n *\tOld header:\n *\t@Project: demo\n");
-		});
 	});
 
-	describe("prose is not a directive", () => {
-		for (const prose of [
-			"#\tDecoding: base64 helpers",
-			"#\tUse it like vi: modal",
-			"#\tvi: is the editor we use",
-			"# vim: is great, ts=4",
-			"# vim: set the record straight: twice",
-			"# Vim: ts=4 sw=4",
-			"# vim:"
-		]) {
-			it(`moves "${prose}" with the header text instead of keeping it above the header`, () => {
-				const content = `${prose}\n#\n#\t@Project: demo\n#\n\nprint(1)\n`;
-				expect(splitHeaderText(content, "/r/a.py")).toEqual({ above: [], foreign: [prose] });
+	describe("one header per file (#162)", () => {
+		const OTHER = [
+			"@Project: other-project",
+			"@Filename: /other/file",
+			"@Author: Someone Else",
+			"-----",
+			"@Copyright: Copyright (c) 2015 Example Inc. All rights reserved."
+		];
+
+		/**
+		 * Renders a comment holding the given lines, as a hand-written header copy would be.
+		 * @param {string} file - File path used for syntax selection.
+		 * @param {string[]} lines - Lines without comment wrappers.
+		 * @returns {string} The comment.
+		 */
+		const copy = (file, lines) => header(file, lines).replace(/\n(#|[ ]\*)\t\n/g, "\n$1\n");
+
+		it("takes a comment with @Filename: and no @Project: for the file's header and rewrites it in place", () => {
+			for (const [file, body] of [
+				["/r/a.mjs", "code();\n"],
+				["/r/a.yaml", "key: 1\n"]
+			]) {
+				const content = `${header(file, ["@Filename: /src/a", "@Author: Tester"])}\n\n${body}`;
+				const next = header(file, NEW_FIELDS);
+				expect(findProjectHeader(content, file)).toEqual({ start: 0, end: content.indexOf(body) });
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.nextContent).toBe(`${next}\n\n\n${body}`);
+				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
+			}
+		});
+
+		for (const { name, file, body } of [CASES[0], CASES[7]]) {
+			const syntax = getHeaderSyntaxForFile(file);
+			const next = header(file, NEW_FIELDS);
+			const prefix = syntax.kind === "line" ? "#\t" : " *\t";
+			const block = (lines) => (syntax.kind === "line" ? lines.join("\n") : [syntax.blockStart, ...lines, syntax.blockEnd].join("\n"));
+
+			it(`${name}: merges a stacked copy that starts with text and names another project, keeping its text and dropping its fields, in both modes`, () => {
+				const content = `${header(file)}\n\n${copy(file, ["Old notes.", "", ...OTHER])}\n\n${body}`;
+				expect(findProjectHeader(content, file)).toEqual({ start: 0, end: content.indexOf(body) });
+				const strict = replaceOrInsertHeader(content, next, file);
+				expect(strict.nextContent).toBe(`${next}\n\n\n${block([`${prefix}Old notes.`])}\n\n\n${body}`);
+				expect(replaceOrInsertHeader(strict.nextContent, next, file).changed).toBe(false);
+				const options = { strictHeaderBlock: false };
+				const kept = replaceOrInsertHeader(content, next, file, options);
+				expect(kept.nextContent).toBe(`${kept.header}\n\n\n${body}`);
+				expect(kept.header.split("\n")).toContain(`${prefix}Old notes.`);
+				expect(kept.nextContent).not.toContain("other-project");
+				expect(replaceOrInsertHeader(kept.nextContent, next, file, options).changed).toBe(false);
+			});
+
+			it(`${name}: merges two stacked copies, keeping their text in order`, () => {
+				const content = `${header(file)}\n\n${copy(file, ["First.", "", ...OTHER])}\n\n${copy(file, [...OTHER, "", "Second."])}\n\n${body}`;
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.nextContent).toBe(`${next}\n\n\n${block([`${prefix}First.`, `${prefix}Second.`])}\n\n\n${body}`);
+				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
+			});
+
+			it(`${name}: merges a copy that fix-headers 2.2.3 moved out with a lead line, dropping the lead line`, () => {
+				const moved = copy(file, ["Moved out of the file header by fix-headers:", "@Project: legacy", "Notes."]);
+				const content = `${header(file, NEW_FIELDS)}\n\n${moved}\n\n${body}`;
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.nextContent).toBe(`${next}\n\n\n${block([`${prefix}Notes.`])}\n\n\n${body}`);
+				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
+			});
+
+			it(`${name}: leaves a lead-line block with no @Project: or @Filename: line alone`, () => {
+				const content = `${next}\n\n\n${block([`${prefix}Moved out of the file header by fix-headers:`, `${prefix}Notes.`])}\n\n\n${body}`;
+				expect(replaceOrInsertHeader(content, next, file).changed).toBe(false);
+			});
+
+			it(`${name}: leaves a @Copyright line in a comment that is not a file header alone, with no warning`, () => {
+				const notice = block([`${prefix}Bundled code:`, `${prefix}@Copyright: Copyright (c) 2010 Mozilla Foundation`]);
+				const content = `${next}\n\n\n${notice}\n\n\n${body}`;
+				const result = replaceOrInsertHeader(content, next, file);
+				expect(result.changed).toBe(false);
+				expect(result.extraCopyrights).toEqual([]);
 			});
 		}
 
-		it("counts an encoding declaration only on the file's first two lines", () => {
-			const content = "# -*- coding: utf-8 -*-\n#\n#\t@Project: demo\n#\n";
-			expect(splitHeaderText(content, "/r/a.py", {}, 1).above).toEqual(["# -*- coding: utf-8 -*-"]);
-			expect(splitHeaderText(content, "/r/a.py", {}, 2)).toEqual({ above: [], foreign: ["# -*- coding: utf-8 -*-"] });
-			expect(splitHeaderText("# coding=utf-8\n#\t@Project: demo\n", "/r/a.py").above).toEqual(["# coding=utf-8"]);
+		describe("repeated @Copyright lines", () => {
+			const file = "/r/a.mjs";
+			const next = header(file, NEW_FIELDS);
+			const own = " *\t@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.";
+
+			it("drops one naming the same holder with another year range", () => {
+				const content = `${header(file, [...FIELDS, "@Copyright: Copyright (c) 2013-2025 Example Inc. All rights reserved."])}\n\ncode();\n`;
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.nextContent).toBe(`${next}\n\n\ncode();\n`);
+				expect(first.extraCopyrights).toEqual([]);
+			});
+
+			it("keeps ones naming other holders as fields under the header's own, in order, in both modes, and a second run is a no-op", () => {
+				const extras = ["Copyright (c) 2010 Mozilla Foundation", "(c) 2012 Other Ltd"];
+				const content = `${header(file, [...FIELDS, ...extras.map((value) => `@Copyright: ${value}`), "", "Text."])}\n\ncode();\n`;
+				for (const options of [{}, { strictHeaderBlock: false }]) {
+					const first = replaceOrInsertHeader(content, next, file, options);
+					const lines = first.header.split("\n");
+					expect(lines.slice(lines.indexOf(own), lines.indexOf(own) + 3)).toEqual([
+						own,
+						...extras.map((value) => ` *\t@Copyright: ${value}`)
+					]);
+					expect(first.extraCopyrights).toEqual(extras);
+					expect(first.nextContent).toContain("Text.");
+					const second = replaceOrInsertHeader(first.nextContent, next, file, options);
+					expect(second.changed).toBe(false);
+					expect(second.extraCopyrights).toEqual(extras);
+				}
+			});
+
+			it("compares the copyright of a stacked copy with the header's own", () => {
+				const content = `${header(file)}\n\n${copy(file, ["@Project: old", "@Copyright: Copyright (c) 2014 Example Inc.", "@Copyright: © 2010 Mozilla Foundation. All rights reserved."])}\n\ncode();\n`;
+				const first = replaceOrInsertHeader(content, next, file);
+				expect(first.extraCopyrights).toEqual(["© 2010 Mozilla Foundation. All rights reserved."]);
+				expect(first.nextContent).toBe(
+					`${next.replace(own, `${own}\n *\t@Copyright: © 2010 Mozilla Foundation. All rights reserved.`)}\n\n\ncode();\n`
+				);
+				expect(replaceOrInsertHeader(first.nextContent, next, file).changed).toBe(false);
+			});
+
+			it("names the holder without the notice words, years and punctuation", () => {
+				expect(copyrightHolder("Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.")).toBe("catalyzed motivation inc");
+				expect(copyrightHolder("© 2010, 2012  Mozilla   Foundation")).toBe("mozilla foundation");
+				expect(copyrightHolder("Copyright (c) 2019-2026 All rights reserved.")).toBe("");
+			});
+
+			it("warns in the result and the CLI output on every run, and the second run writes nothing", async () => {
+				const workspace = await createWorkspace("header-block-text-copyright");
+				try {
+					await writeWorkspaceFile(join(workspace, "package.json"), JSON.stringify({ name: "block-text" }, null, 2));
+					await writeWorkspaceFile(
+						join(workspace, "src", "one.mjs"),
+						"/**\n *\t@Project: old-name\n *\t@Copyright: Copyright (c) 2020 Old Inc.\n *\t@Copyright: Copyright (c) 2010 Mozilla Foundation\n */\n\nexport const one = 1;\n"
+					);
+					const options = { cwd: workspace, input: "src/one.mjs", authorName: "A", authorEmail: "a@example.com" };
+					const warning = { file: join("src", "one.mjs"), copyright: "Copyright (c) 2010 Mozilla Foundation" };
+					const first = await fixHeaders(options);
+					expect(first.filesUpdated).toBe(1);
+					expect(first.copyrightWarnings).toEqual([warning]);
+					expect(first.changes[0].extraCopyrights).toEqual([warning.copyright]);
+					const content = await readFile(join(workspace, "src", "one.mjs"), "utf8");
+					expect(content).toContain(" *\t@Copyright: Copyright (c) 2010 Mozilla Foundation\n");
+					expect(content).not.toContain("Old Inc.");
+					const second = await fixHeaders(options);
+					expect(second.filesUpdated).toBe(0);
+					expect(second.copyrightWarnings).toEqual([warning]);
+					const stdout = [];
+					const code = await runCli(
+						["--cwd", workspace, "--input", "src/one.mjs", "--author-name", "A", "--author-email", "a@example.com"],
+						{
+							stdout: (message) => stdout.push(message)
+						}
+					);
+					expect(code).toBe(0);
+					expect(stdout[0]).toContain("updated=0, warnings=1");
+					expect(stdout).toContain(`warning: ${warning.file} keeps an additional @Copyright: ${warning.copyright}`);
+					const checkOut = [];
+					expect(
+						await runCli(["--cwd", workspace, "--input", "src/one.mjs", "--check"], { stdout: (message) => checkOut.push(message) })
+					).toBe(0);
+					expect(checkOut).toContain(`warning: ${warning.file} keeps an additional @Copyright: ${warning.copyright}`);
+				} finally {
+					await cleanupWorkspace(workspace);
+				}
+			});
 		});
 	});
 });

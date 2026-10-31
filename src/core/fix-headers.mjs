@@ -18,7 +18,7 @@ import { relative, resolve } from "node:path";
 import { applyConfigOption } from "../config/load.mjs";
 import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
-import { getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
+import { getContentSkipReason, getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
 	checkHeaderDates,
@@ -111,8 +111,14 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  * Files whose format cannot carry the header comment are not processed: each is listed in
  * `skipped` as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or
  * `changes`. That covers strict `.json`, files with no extension or an extension no enabled
- * detector handles (for example one added through `includeExtensions`), and Markdown unless
- * `forcedDetectors` includes `"markdown"`.
+ * detector handles (for example one added through `includeExtensions`), Markdown unless
+ * `forcedDetectors` includes `"markdown"`, and a `.php` file that does not open with `<?php`.
+ *
+ * `copyrightWarnings` lists, as `{ file, copyright }`, every additional `@Copyright` a header
+ * keeps: a `@Copyright` line after the header's own (in the header or a stacked copy of it)
+ * that names another holder. The same values are on the file's entry in `changes` as
+ * `extraCopyrights`. A warning is reported on every run that finds it and changes nothing on
+ * its own.
  * @typedef {{
  *  metadata: {
  *   projectName: string,
@@ -135,7 +141,8 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  check: boolean,
  *  filesWithDateDrift?: number,
  *  dateAdvisories?: number,
- *  changes: Array<{file: string, changed: boolean, dateIssues?: import("../header/dates.mjs").DateCheckIssue[], sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
+ *  copyrightWarnings: Array<{file: string, copyright: string}>,
+ *  changes: Array<{file: string, changed: boolean, extraCopyrights?: string[], dateIssues?: import("../header/dates.mjs").DateCheckIssue[], sample?: { previousValue: string | null, newValue: string, diff: string, issues: HeaderFieldIssue[], detectedValues?: {
  *   projectName: string,
  *   projectNameSource: import("../detect/project.mjs").ProjectNameSource,
  *   language: string,
@@ -368,6 +375,8 @@ export async function fixHeaders(options = {}) {
 	let filesUpdated = 0;
 	let filesWithDateDrift = 0;
 	let dateAdvisories = 0;
+	/** @type {FixHeadersResult["copyrightWarnings"]} */
+	const copyrightWarnings = [];
 
 	for (const filePath of files) {
 		// A file whose format cannot carry the header comment (strict JSON, Markdown that is not
@@ -382,6 +391,20 @@ export async function fixHeaders(options = {}) {
 			continue;
 		}
 
+		const relativePath = relative(scanRoot, filePath);
+		const original = await readFile(filePath, "utf8");
+		// A file whose content cannot take a comment at the top (a PHP file that does not open
+		// with <?php) is skipped too.
+		const contentSkipReason = getContentSkipReason(filePath, original, {
+			enabledDetectors: effectiveOptions.enabledDetectors,
+			disabledDetectors: effectiveOptions.disabledDetectors,
+			forcedDetectors
+		});
+		if (contentSkipReason !== null) {
+			skipped.push({ file: relativePath, reason: contentSkipReason });
+			continue;
+		}
+
 		const fileMetadata = await resolveProjectMetadata({
 			...effectiveOptions,
 			cwd: scanRoot,
@@ -389,8 +412,6 @@ export async function fixHeaders(options = {}) {
 		});
 
 		detectedProjects.add(`${fileMetadata.language}:${fileMetadata.projectRoot}`);
-		const relativePath = relative(scanRoot, filePath);
-		const original = await readFile(filePath, "utf8");
 		const syntaxOptions = {
 			language: fileMetadata.language,
 			enabledDetectors: effectiveOptions.enabledDetectors,
@@ -545,6 +566,13 @@ export async function fixHeaders(options = {}) {
 			};
 		}
 
+		if (replacement.extraCopyrights.length > 0) {
+			changeEntry.extraCopyrights = replacement.extraCopyrights;
+			for (const copyright of replacement.extraCopyrights) {
+				copyrightWarnings.push({ file: relativePath, copyright });
+			}
+		}
+
 		changes.push(changeEntry);
 
 		if (!replacement.changed) {
@@ -566,6 +594,7 @@ export async function fixHeaders(options = {}) {
 		dryRun,
 		check,
 		...(check ? { filesWithDateDrift, dateAdvisories } : {}),
+		copyrightWarnings,
 		changes,
 		skipped
 	};

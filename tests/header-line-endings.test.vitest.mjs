@@ -27,7 +27,7 @@ import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers
  * included, and a byte order mark stays at byte 0 with the header after it.
  */
 
-const BOM = "﻿";
+const BOM = "\uFEFF";
 const OLD = ["@Project: demo", "@Copyright: c"];
 const NEW = ["@Project: renamed", "@Copyright: c"];
 

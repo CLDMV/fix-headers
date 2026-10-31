@@ -2,7 +2,7 @@ export namespace detector {
     export let id: string;
     export { extensions };
     export let enabledByDefault: boolean;
-    export function resolvePreservedPrefix(filePath: any, content: any): string;
+    export { isShebang as keepsAboveHeader };
     export function resolveCommentSyntax(filePath: any): {
         kind: "block";
         blockStart: string;
@@ -15,4 +15,5 @@ export namespace detector {
  * @module fix-headers/detectors/node
  */
 declare const extensions: string[];
+import { isShebang } from "./top-lines.mjs";
 export {};

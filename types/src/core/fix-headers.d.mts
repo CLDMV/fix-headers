@@ -91,8 +91,14 @@ export type DateRewrite = (payload: {
  * Files whose format cannot carry the header comment are not processed: each is listed in
  * `skipped` as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or
  * `changes`. That covers strict `.json`, files with no extension or an extension no enabled
- * detector handles (for example one added through `includeExtensions`), and Markdown unless
- * `forcedDetectors` includes `"markdown"`.
+ * detector handles (for example one added through `includeExtensions`), Markdown unless
+ * `forcedDetectors` includes `"markdown"`, and a `.php` file that does not open with `<?php`.
+ *
+ * `copyrightWarnings` lists, as `{ file, copyright }`, every additional `@Copyright` a header
+ * keeps: a `@Copyright` line after the header's own (in the header or a stacked copy of it)
+ * that names another holder. The same values are on the file's entry in `changes` as
+ * `extraCopyrights`. A warning is reported on every run that finds it and changes nothing on
+ * its own.
  */
 export type FixHeadersResult = {
     metadata: {
@@ -119,9 +125,14 @@ export type FixHeadersResult = {
     check: boolean;
     filesWithDateDrift?: number;
     dateAdvisories?: number;
+    copyrightWarnings: Array<{
+        file: string;
+        copyright: string;
+    }>;
     changes: Array<{
         file: string;
         changed: boolean;
+        extraCopyrights?: string[];
         dateIssues?: import("../header/dates.mjs").DateCheckIssue[];
         sample?: {
             previousValue: string | null;

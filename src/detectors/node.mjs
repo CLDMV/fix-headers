@@ -14,6 +14,7 @@
  */
 
 import { extname } from "node:path";
+import { isShebang } from "./top-lines.mjs";
 
 /**
  * @fileoverview Node.js detector implementation.
@@ -40,24 +41,13 @@ function resolveNodeCommentSyntax(filePath) {
 	return null;
 }
 
-/**
- * Resolves preserved leading prefix for Node files (for example: shebang line).
- * @param {string} _filePath - File path.
- * @param {string} content - File content.
- * @returns {string} Preserved prefix.
- */
-function resolveNodePreservedPrefix(_filePath, content) {
-	const shebangMatch = content.match(/^#!.*\b(node|bun|deno|tsx|ts-node)\b.*(?:\r?\n|$)/);
-	return shebangMatch ? shebangMatch[0] : "";
-}
-
 export const detector = {
 	id: "node",
 	extensions,
 	enabledByDefault: true,
-	resolvePreservedPrefix(filePath, content) {
-		return resolveNodePreservedPrefix(filePath, content);
-	},
+	// A hashbang (`#!`, any interpreter) is only valid as the first two characters of a
+	// JavaScript or TypeScript file.
+	keepsAboveHeader: isShebang,
 	resolveCommentSyntax(filePath) {
 		return resolveNodeCommentSyntax(filePath);
 	}

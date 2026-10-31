@@ -44,6 +44,9 @@ export const detector = {
 	id: "css",
 	extensions,
 	enabledByDefault: true,
+	// `@charset "...";` is only read as the very first bytes of a style sheet; anywhere else it
+	// is ignored.
+	keepsAboveHeader: (line, index) => index === 0 && /^@charset "[^"]*";/.test(line),
 	resolveCommentSyntax(filePath) {
 		return resolveCssCommentSyntax(filePath);
 	}

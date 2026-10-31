@@ -33,8 +33,8 @@ function escapeRegex(text) {
 
 /**
  * Splits the part of a file that stays above the header from the rest: a UTF-8 byte order
- * mark, which keeps byte 0, then the detector-defined preserved prefix (a shebang, front
- * matter, `<?php`).
+ * mark, which keeps byte 0, then what the file's detector keeps at the very top (front matter,
+ * a shebang, `<?php`, an encoding declaration, a modeline, ...; see getPreservedPrefixForFile).
  * @param {string} filePath - File path used for detector selection.
  * @param {string} content - File content.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax/detector options.
@@ -98,159 +98,29 @@ function matchHeaderSegment(content, syntax) {
 }
 
 /**
- * Header field tags fix-headers writes. The first line in a header comment carrying one of
- * these is that field; a later line with the same tag is text the block carries (a second
- * `@Copyright` notice, say), never a field.
+ * Header field tags fix-headers writes. A line in a file header carrying one of these is that
+ * field, and a repeated tag is a duplicate of it, except `@Copyright`: a `@Copyright` line
+ * after the header's own is an additional copyright (see {@link replaceOrInsertHeader}).
  * @type {RegExp}
  */
 const MANAGED_TAG = /^@(Project|Filename|Date|Author|Email|Last modified by|Last modified time|Copyright):/;
 
 /**
- * Comment lines that must keep their place at the top of a file (`#cloud-config`, a
- * `yaml-language-server` modeline). Found directly above the first field of a line-comment
- * header, they stay above it, as does an editor modeline (see {@link isModeline}).
- * @type {RegExp}
- */
-const DIRECTIVE_LINE = /^#cloud-config\b|^#\s*yaml-language-server:/;
-
-/**
- * The start of a vi/Vim/ex modeline in a `#` comment: `vi:`, `vim:`, `vim<version>:` (with an
- * optional `<`, `=` or `>`), `Vim:` or `ex:`, after white space. The rest of the line is captured.
- * @type {RegExp}
- */
-const MODELINE_START = /^#\s+(vi|vim(?:[<=>]?\d+)?|Vim|ex):[ \t]*(.*)$/;
-
-/**
- * One option of a modeline: `opt`, `noopt`, `opt!`, `opt&`, or `opt=val` (also `+=`, `-=`,
- * `^=`), where a value runs to white space or an unescaped `:`.
- * @type {RegExp}
- */
-const MODELINE_OPTION = /^[a-z]+(?:[!&]|[+^-]?=(?:\\.|[^\s:\\])*)?$/;
-
-/**
- * Boolean options common enough in modelines to mark a line as one on their own (`vim: et`,
- * `vim: noexpandtab`). Any other bare word could be prose, so a line of bare words needs one of
- * these, or an `opt=val` option, to count.
- * @type {Set<string>}
- */
-const MODELINE_BOOLEANS = new Set([
-	"et",
-	"expandtab",
-	"ai",
-	"autoindent",
-	"si",
-	"smartindent",
-	"ro",
-	"readonly",
-	"bin",
-	"binary",
-	"noet",
-	"noexpandtab",
-	"noai",
-	"noautoindent",
-	"nosi",
-	"nosmartindent",
-	"noro",
-	"noreadonly",
-	"nobin",
-	"nobinary",
-	"nowrap",
-	"nolist",
-	"nospell",
-	"nofen",
-	"nofoldenable",
-	"noeol",
-	"nofixeol",
-	"nofixendofline"
-]);
-
-/**
- * Whether a `#` comment line is a vi/Vim/ex modeline, in either of Vim's forms:
- * `vim: set ts=4 sw=4:` (`se`/`set`, options, a closing `:`, then any text) or
- * `vim: ts=4 sw=4 et` (options to the end of the line, separated by white space or `:`).
- * Every option must be option syntax, and at least one must be `opt=val` or a common boolean
- * option, so prose such as `vi: is the editor we use` is not a modeline.
- * @param {string} line - The comment line, prefix included.
- * @returns {boolean} Whether the line is a modeline.
- */
-function isModeline(line) {
-	const start = line.match(MODELINE_START);
-	if (!start) {
-		return false;
-	}
-	const set = start[2].match(/^se(?:t)?[ \t]+((?:\\.|[^:\\])*):/);
-	if (!set && start[1] === "Vim") {
-		// `Vim:` only opens the `set` form.
-		return false;
-	}
-	const options = set ? set[1].match(/(?:\\.|[^\s\\])+/g) : start[2].match(/(?:\\.|[^\s:\\])+/g);
-	return (
-		options !== null &&
-		options.every((option) => MODELINE_OPTION.test(option)) &&
-		options.some((option) => option.includes("=") || MODELINE_BOOLEANS.has(option))
-	);
-}
-
-/**
- * A PEP 263 encoding declaration (`# -*- coding: utf-8 -*-`, `# coding=utf-8`), which only
- * counts on the first or second line of a file. `coding` must start a word, so prose such as
- * `Decoding: base64` is not one.
- * @type {RegExp}
- */
-const CODING_LINE = /^#.*?(?<![A-Za-z])coding[:=]\s*[-\w.]+/;
-
-/**
- * Lead line of a block moved out of the header that would otherwise read as a stacked header,
- * so that it never does (see {@link readsAsStackedHeader}).
+ * Lead line fix-headers 2.2.3 wrote above a block it moved out of the header when that block
+ * started with a `@Project:` line. It is no longer written; when such a block is merged into
+ * the header as a copy of it, the lead line is dropped with its fields.
  * @type {string}
  */
 const MOVED_BLOCK_LEAD = "Moved out of the file header by fix-headers:";
 
 /**
- * Fewest managed fields (`@Project` included) a comment that does not start with `@Project:`
- * must carry to be taken for a stacked header.
- * @type {number}
- */
-const STACKED_HEADER_MIN_FIELDS = 4;
-
-/**
- * Whether the lines of a comment that follows the file's header are a stacked copy of a
- * header, to be merged into it. That is the case when its first non-empty line is a
- * `@Project:` field, or when, after description text, it carries a run of at least
- * {@link STACKED_HEADER_MIN_FIELDS} managed fields that starts with `@Project:` and has no
- * text among the fields (separators and empty lines only). A comment whose first line is the
- * {@link MOVED_BLOCK_LEAD} lead line never is one.
+ * Whether the lines of a comment make it a file header: one of them is a `@Project:` or a
+ * `@Filename:` field line.
  * @param {Array<{raw: string, text: string}>} lines - The comment's lines.
- * @returns {boolean} Whether the comment reads as a stacked header.
+ * @returns {boolean} Whether the comment is a file header.
  */
-function readsAsStackedHeader(lines) {
-	const first = lines.find((line) => line.text !== "");
-	if (first === undefined || first.text === MOVED_BLOCK_LEAD) {
-		return false;
-	}
-	if (first.text.startsWith("@Project:")) {
-		return true;
-	}
-	const kinds = classifyLines(lines);
-	const firstField = kinds.indexOf("field");
-	const lastField = kinds.lastIndexOf("field");
-	return (
-		firstField !== -1 &&
-		lines[firstField].text.startsWith("@Project:") &&
-		kinds.filter((kind) => kind === "field").length >= STACKED_HEADER_MIN_FIELDS &&
-		kinds.slice(firstField, lastField + 1).every((kind) => kind !== "text")
-	);
-}
-
-/**
- * Whether a header comment that follows the file's header is a stacked copy of a header (see
- * {@link readsAsStackedHeader}).
- * @param {string} segment - The following comment.
- * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockLinePrefix?: string}} syntax - Header syntax descriptor.
- * @returns {boolean} Whether it reads as a stacked header.
- */
-function isStackedHeader(segment, syntax) {
-	return readsAsStackedHeader(segmentLines(segment, syntax));
+function isFileHeader(lines) {
+	return lines.some((line) => /^@(?:Project|Filename):/.test(line.text));
 }
 
 /**
@@ -286,23 +156,31 @@ function segmentLines(segment, syntax) {
 }
 
 /**
- * Classifies the lines of one header comment. A line is a `field` when it carries a managed
- * tag not seen earlier in the same comment, a `separator` when it is a dash line next to a
- * field, `blank` when empty, and `text` otherwise. Text is never deleted, so a line that
+ * Classifies the lines of one comment of a file header. A line is a `field` when it carries a
+ * managed tag (a repeated tag is a duplicate of the field), except a `@Copyright` line after the
+ * header's own first one, which is a `copyright`; a `separator` when it is a dash line next to
+ * a field; `blank` when empty; and `text` otherwise. Text is never deleted, so a line that
  * wraps a field's value is text too.
  * @param {Array<{raw: string, text: string}>} lines - The comment's lines.
- * @returns {Array<"field" | "separator" | "blank" | "text">} One kind per line.
+ * @param {{copyright: boolean}} state - Whether the header's own `@Copyright` line was seen, in
+ * this comment or an earlier one of the same header; updated in place.
+ * @returns {Array<"field" | "copyright" | "separator" | "blank" | "text">} One kind per line.
  */
-function classifyLines(lines) {
-	const seen = new Set();
-	/** @type {Array<"field" | "separator" | "blank" | "text" | "dash">} */
+function classifyLines(lines, state) {
+	/** @type {Array<"field" | "copyright" | "separator" | "blank" | "text" | "dash">} */
 	const kinds = lines.map((line) => {
 		const tag = line.text.match(MANAGED_TAG);
 		if (line.text === "") {
 			return "blank";
 		}
-		if (tag && !seen.has(tag[1])) {
-			seen.add(tag[1]);
+		if (tag && tag[1] === "Copyright") {
+			if (state.copyright) {
+				return "copyright";
+			}
+			state.copyright = true;
+			return "field";
+		}
+		if (tag) {
 			return "field";
 		}
 		return /^-{3,}$/.test(line.text) ? "dash" : "text";
@@ -317,7 +195,7 @@ function classifyLines(lines) {
 	const neighbour = (from, step) => {
 		for (let index = from + step; index >= 0 && index < kinds.length; index += step) {
 			if (kinds[index] !== "blank" && kinds[index] !== "dash") {
-				return kinds[index];
+				return kinds[index] === "copyright" ? "field" : kinds[index];
 			}
 		}
 		return undefined;
@@ -330,46 +208,42 @@ function classifyLines(lines) {
 /**
  * Splits the text of an existing header block that is not header fields from the fields.
  * `foreign` holds every line that is neither a field, a separator next to a field, nor an
- * empty line around them: description text, unknown `@Tag:` lines, a repeated managed tag,
- * a dash line among text, a line wrapping a field's value. `above` holds, for a line-comment
- * header only, the directive lines at the top of the comment (a `# -*- coding -*-` line,
- * `#cloud-config`, a `yaml-language-server` or `vim:` modeline); they are separate comments
- * the header's line match took in, and stay above the header. Lines come back as written
- * (comment prefix included), in their original order, with blank lines between them kept
- * and blank lines around them dropped.
+ * empty line around them: description text, unknown `@Tag:` lines, a dash line among text, a
+ * line wrapping a field's value. `copyrights` holds the values of the `@Copyright` lines after
+ * the header's own. A stacked copy's lead line (see {@link MOVED_BLOCK_LEAD}) is neither.
+ * Lines come back as written (comment prefix included), in their original order, with blank
+ * lines between them kept (unless a dropped line sat between the two pieces of text) and blank
+ * lines around them dropped.
  * @param {string} headerText - The existing header block (every stacked segment).
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
- * @param {number} [firstLine=0] - Zero-based line number of the header's first line in the file
- * (an encoding declaration only counts on the file's first two lines).
- * @returns {{above: string[], foreign: string[]}} The non-field lines, as written.
+ * @returns {{foreign: string[], copyrights: string[]}} The non-field lines, as written, and the additional copyright values.
  */
-export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}, firstLine = 0) {
+export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}) {
 	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
-	/** @type {string[]} */
-	const above = [];
 	/** @type {Array<{raw: string, kind: string}>} */
 	const lines = [];
+	/** @type {string[]} */
+	const copyrights = [];
+	const state = { copyright: false };
 	let rest = headerText;
 	let segment = matchHeaderSegment(rest, syntax);
 	let firstSegment = true;
 	while (segment && segment[0].length > 0) {
 		const segmentLineList = segmentLines(segment[0], syntax);
-		const kinds = classifyLines(segmentLineList);
-		let start = 0;
-		if (firstSegment && syntax.kind === "line") {
-			// Directive lines at the very top of the comment are separate comments the header's
-			// line match took in; they keep their place above the header.
-			const isDirective = (index) =>
-				DIRECTIVE_LINE.test(segmentLineList[index].raw) ||
-				isModeline(segmentLineList[index].raw) ||
-				(firstLine + index <= 1 && CODING_LINE.test(segmentLineList[index].raw));
-			while (start < segmentLineList.length && kinds[start] === "text" && isDirective(start)) {
-				above.push(segmentLineList[start].raw);
-				start += 1;
-			}
+		const kinds = classifyLines(segmentLineList, state);
+		const lead = segmentLineList.findIndex((line) => line.text !== "");
+		if (!firstSegment && lead !== -1 && segmentLineList[lead].text === MOVED_BLOCK_LEAD) {
+			// A copy of the header that fix-headers 2.2.3 moved out with a lead line: the lead
+			// line is fix-headers' own, and goes with the copy's fields.
+			kinds[lead] = "separator";
 		}
-		segmentLineList.slice(start).forEach((line, index) => lines.push({ raw: line.raw, kind: kinds[start + index] }));
+		segmentLineList.forEach((line, index) => {
+			if (kinds[index] === "copyright") {
+				copyrights.push(line.text.replace(MANAGED_TAG, "").trim());
+			}
+			lines.push({ raw: line.raw, kind: kinds[index] });
+		});
 		rest = rest.slice(segment[0].length);
 		segment = matchHeaderSegment(rest, syntax);
 		firstSegment = false;
@@ -377,14 +251,28 @@ export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}, f
 
 	const first = lines.findIndex((line) => line.kind === "text");
 	if (first === -1) {
-		return { above, foreign: [] };
+		return { foreign: [], copyrights };
 	}
 	const last = lines.map((line) => line.kind).lastIndexOf("text");
-	const foreign = lines
-		.slice(first, last + 1)
-		.filter((line) => line.kind === "text" || line.kind === "blank")
-		.map((line) => line.raw);
-	return { above, foreign };
+	/** @type {string[]} */
+	const foreign = [];
+	/** @type {string[]} */
+	let blanks = [];
+	let dropped = false;
+	for (const line of lines.slice(first, last + 1)) {
+		if (line.kind === "text") {
+			// Blank lines between two pieces of text are kept, unless a dropped line (a field,
+			// a separator) sat between them: then they were the spacing around that field.
+			foreign.push(...(dropped ? [] : blanks), line.raw);
+			blanks = [];
+			dropped = false;
+		} else if (line.kind === "blank") {
+			blanks.push(line.raw);
+		} else {
+			dropped = true;
+		}
+	}
+	return { foreign, copyrights };
 }
 
 /**
@@ -401,8 +289,9 @@ export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptio
 
 /**
  * Wraps non-field header lines in a comment block of their own, in the file's comment syntax.
- * A line-comment block is the lines themselves. When the lines would read as a stacked header
- * (see {@link readsAsStackedHeader}), a lead line comes first so the block never does.
+ * A line-comment block is the lines themselves. The lines hold no `@Project:` or `@Filename:`
+ * field line (every such line is a field), so the block is never a file header and the next
+ * run leaves it alone.
  * @param {string[]} lines - Lines as written, comment prefixes included.
  * @param {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Header syntax descriptor.
  * @param {string} eol - Line ending to join the block with.
@@ -410,19 +299,10 @@ export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptio
  */
 function renderForeignBlock(lines, syntax, eol) {
 	const html = syntax.kind === "html";
-	const linePrefix =
-		syntax.kind === "line"
-			? `${syntax.linePrefix || "#"}${typeof syntax.lineSeparator === "string" ? syntax.lineSeparator : "\t"}`
-			: syntax.blockLinePrefix || (html ? "\t" : " *\t");
-	// A block that reads as a stacked header would be merged back into the header on the next
-	// run and its lines taken for fields: a lead line keeps it a plain comment.
-	const strip = syntax.kind === "line" ? new RegExp(`^${escapeRegex(syntax.linePrefix || "#")}[ \\t]*`) : html ? /^\s*/ : /^\s*\*?[ \t]*/;
-	const stacked = readsAsStackedHeader(lines.map((line) => ({ raw: line, text: line.replace(strip, "").trim() })));
-	const body = stacked ? [`${linePrefix}${MOVED_BLOCK_LEAD}`, ...lines] : lines;
 	if (syntax.kind === "line") {
-		return body.join(eol);
+		return lines.join(eol);
 	}
-	return [syntax.blockStart || (html ? "<!--" : "/**"), ...body, syntax.blockEnd || (html ? "-->" : " */")].join(eol);
+	return [syntax.blockStart || (html ? "<!--" : "/**"), ...lines, syntax.blockEnd || (html ? "-->" : " */")].join(eol);
 }
 
 /**
@@ -440,6 +320,46 @@ function appendToHeader(header, lines, syntax) {
 	const tail = Math.min(headerLines.length - 1, (syntax.spacing ?? 1) + (syntax.kind === "line" ? 0 : 1));
 	const at = headerLines.length - tail;
 	return [...headerLines.slice(0, at), empty, ...lines, ...headerLines.slice(at)].join("\n");
+}
+
+/**
+ * The holder named by a `@Copyright` value, for comparing two notices: the value without a
+ * leading `Copyright`, `(c)` / `©`, the year or year range, and a trailing
+ * `All rights reserved.`, with white space collapsed, trailing punctuation dropped and
+ * lower-cased. `Copyright (c) 2013-2025 Example Inc. All rights reserved.` and
+ * `Copyright (c) 2013-2026 Example Inc. All rights reserved.` name the same holder.
+ * @param {string} value - A `@Copyright` value.
+ * @returns {string} The holder (empty when the notice names none).
+ */
+export function copyrightHolder(value) {
+	return value
+		.replace(/^\s*copyright\b/i, "")
+		.replace(/^(?:\s*(?:\(c\)|©))+/i, "")
+		.replace(/^\s*\d{4}(?:\s*[-–,]\s*\d{4})*/, "")
+		.replace(/\s*all rights reserved\.?\s*$/i, "")
+		.replace(/\s+/g, " ")
+		.replace(/[\s.,;]+$/, "")
+		.trim()
+		.toLowerCase();
+}
+
+/**
+ * Writes additional `@Copyright` lines into a rendered header, directly under its own
+ * `@Copyright` line (or under its last field line when it has none), in the same field format.
+ * @param {string} header - Rendered header block.
+ * @param {string[]} values - Additional copyright values, in order.
+ * @returns {string} The header carrying them.
+ */
+function insertCopyrights(header, values) {
+	const lines = header.split("\n");
+	const own = lines.findIndex((line) => line.includes("@Copyright:"));
+	const lastField = lines.map((line) => /@[A-Za-z][A-Za-z ]*:/.test(line)).lastIndexOf(true);
+	const at = own !== -1 ? own : lastField;
+	if (values.length === 0 || at === -1) {
+		return header;
+	}
+	const fieldPrefix = lines[at].slice(0, lines[at].indexOf("@"));
+	return [...lines.slice(0, at + 1), ...values.map((value) => `${fieldPrefix}@Copyright: ${value}`), ...lines.slice(at + 1)].join("\n");
 }
 
 /**
@@ -465,9 +385,9 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
 		const remaining = scanLines.slice(offset);
 		const segment = matchHeaderSegment(remaining, syntax);
 
-		// The header itself is the first comment carrying @Project:; a comment after it is a
-		// stacked copy only when it reads as one (see readsAsStackedHeader).
-		if (!segment || !(offset === 0 ? segment[0].includes("@Project:") : isStackedHeader(segment[0], syntax))) {
+		// The header is the file's first comment when it is a file header (a @Project: or a
+		// @Filename: field line); every file header stacked directly after it is a copy of it.
+		if (!segment || !isFileHeader(segmentLines(segment[0], syntax))) {
 			break;
 		}
 
@@ -486,19 +406,24 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
 }
 
 /**
- * Replaces or inserts a project header block. Text in the existing header that is not a
- * header field (see {@link splitHeaderText}) is never dropped: with
- * `strictHeaderBlock` (the default) it is written as its own comment block directly below
- * the header, separated from it and from the rest of the file by the margin; with
- * `strictHeaderBlock: false` it stays inside the header, after the fields. Directive lines a
- * line-comment header took in from directly above it stay above it.
+ * Replaces or inserts a project header block. The existing header is the file's first comment
+ * (after what stays above it, see {@link splitPreservedPrefix}) when it is a file header, plus
+ * every file header stacked directly after it, which are copies of it: their fields are
+ * replaced by the new header's. Text in them that is not a header field (see
+ * {@link splitHeaderText}) is never dropped: with `strictHeaderBlock` (the default) it is
+ * written as its own comment block directly below the header, separated from it and from the
+ * rest of the file by the margin; with `strictHeaderBlock: false` it stays inside the header,
+ * after the fields. A `@Copyright` line after the header's own that names the same holder as
+ * the new header's (see {@link copyrightHolder}) is a duplicate and dropped; one naming another
+ * holder is kept as an additional `@Copyright` field under the new header's, in order, and
+ * reported in `extraCopyrights`.
  * @param {string} content - Original file content.
  * @param {string} newHeader - Generated header text.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number, strictHeaderBlock?: boolean }} [syntaxOptions={}] - Syntax resolution options.
- * @returns {{nextContent: string, changed: boolean, header: string, written: string}} Updated content result: `header` is the
- * header block as written, and `written` everything that took the old header's place (comment lines kept above the
- * header, the header, and the block of text moved below it).
+ * @returns {{nextContent: string, changed: boolean, header: string, written: string, extraCopyrights: string[]}} Updated
+ * content result: `header` is the header block as written, `written` everything that took the old header's place (the
+ * header and the block of text moved below it), and `extraCopyrights` the additional copyright values the header keeps.
  */
 export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxOptions = {}) {
 	const existing = findProjectHeader(content, filePath, syntaxOptions);
@@ -519,27 +444,40 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 		const eol = lineEnding(content) ?? "\n";
 		const header = withEol(newHeader, eol);
 		const rest = body.replace(/^(?:\r?\n)+/, "");
+		// A kept top line that ends the file without a line break still needs one before the header.
+		const joiner = prefix.replace(/^\uFEFF/, "") !== "" && !prefix.endsWith("\n") ? eol : "";
 		// With nothing after the header there is no next content to separate from, so the file just ends with the header.
-		const nextContent = `${prefix}${rest.trim() === "" ? `${header}${eol}` : `${header}${eol.repeat(margin + 1)}${rest}`}`;
-		return { nextContent, changed: nextContent !== content, header, written: header };
+		const nextContent = `${prefix}${joiner}${rest.trim() === "" ? `${header}${eol}` : `${header}${eol.repeat(margin + 1)}${rest}`}`;
+		return { nextContent, changed: nextContent !== content, header, written: header, extraCopyrights: [] };
 	}
 
 	const region = content.slice(existing.start, existing.end);
-	const { above, foreign } = splitHeaderText(region, filePath, syntaxOptions, content.slice(0, existing.start).split("\n").length - 1);
+	const { foreign, copyrights } = splitHeaderText(region, filePath, syntaxOptions);
+	const ownCopyright = newHeader.match(/@Copyright:[ \t]*(.*?)[ \t]*$/m);
+	const holders = new Set(ownCopyright ? [copyrightHolder(ownCopyright[1])] : []);
+	/** @type {string[]} */
+	const extraCopyrights = [];
+	for (const value of copyrights) {
+		const holder = copyrightHolder(value);
+		if (!holders.has(holder)) {
+			holders.add(holder);
+			extraCopyrights.push(value);
+		}
+	}
 	// The header is written in the line ending of the content after it (the file's own), so a
 	// CRLF file stays CRLF, and a header an earlier run wrote with \n in a CRLF file is repaired.
 	const eol = lineEnding(content.slice(existing.end)) ?? lineEnding(region) ?? "\n";
 	const gap = eol.repeat(margin + 1);
 	const strict = syntaxOptions.strictHeaderBlock !== false;
-	const header = withEol(foreign.length > 0 && !strict ? appendToHeader(newHeader, foreign, syntax) : newHeader, eol);
-	const lead = above.length > 0 ? `${above.join(eol)}${eol}` : "";
+	const fields = insertCopyrights(newHeader, extraCopyrights);
+	const header = withEol(foreign.length > 0 && !strict ? appendToHeader(fields, foreign, syntax) : fields, eol);
 	const moved = foreign.length > 0 && strict ? renderForeignBlock(foreign, syntax, eol) : "";
 	const after = content.slice(existing.end).replace(/^(?:\r?\n)+/, "");
 	const below = moved === "" ? after : `${moved}${after.trim() === "" ? eol : `${gap}${after}`}`;
-	const nextContent = `${content.slice(0, existing.start)}${lead}${below.trim() === "" ? `${header}${eol}` : `${header}${gap}${below}`}`;
-	// What took the old header's place: lines kept above it, the header, and the block moved below it.
-	const written = `${lead}${header}${moved === "" ? "" : `${gap}${moved}`}`;
-	return { nextContent, changed: nextContent !== content, header, written };
+	const nextContent = `${content.slice(0, existing.start)}${below.trim() === "" ? `${header}${eol}` : `${header}${gap}${below}`}`;
+	// What took the old header's place: the header and the block moved below it.
+	const written = `${header}${moved === "" ? "" : `${gap}${moved}`}`;
+	return { nextContent, changed: nextContent !== content, header, written, extraCopyrights };
 }
 
 /**
