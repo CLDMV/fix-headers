@@ -38,11 +38,12 @@ export function copyrightHolder(value: string): string;
 /**
  * Repairs a file an earlier fix-headers version wrote its header above lines that must come
  * first (`<?php`, `@charset`, a shebang, Go build constraints, a modeline, ...; see
- * getPreservedPrefixForFile), or above a byte order mark. When the file starts with file
- * headers and, after them and blank lines only, with such lines (or a byte order mark), those
- * lines are moved back to the top and the headers placed after them, where the header is then
- * rewritten as usual. Any other content before those lines leaves the file as it is: nothing
- * is moved up past it.
+ * getPreservedPrefixForFile), or above a byte order mark. The top of the file is read as one
+ * run: lines already kept at the top (possibly none), then file headers with blank lines, then
+ * lines that would be kept at the top if they directly followed the first ones (or a byte
+ * order mark). Those last lines are moved up to join the first ones, in order, and the headers
+ * placed after them, where the header is then rewritten as usual. Any other content before
+ * those lines leaves the file as it is: nothing is moved up past it.
  * @param {string} content - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.

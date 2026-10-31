@@ -223,6 +223,43 @@ describe("lines kept above the header (#162)", () => {
 			expect(replaceOrInsertHeader(fixedMd.nextContent, md, "/r/a.md", options).changed).toBe(false);
 		});
 
+		describe("lines that belong with lines kept above the header, left below it", () => {
+			for (const [name, file, kept, moved, body, options] of [
+				["a coding line after a kept shebang", "/r/a.py", "#!/usr/bin/env python3", "# -*- coding: utf-8 -*-", "print(1)\n", {}],
+				["a modeline after a kept shebang", "/r/a.mjs", "#!/usr/bin/env node", "// vim: set ts=2 sw=2:", "code();\n", {}],
+				[
+					"a modeline after kept front matter",
+					"/r/a.md",
+					"---\ntitle: x\n---",
+					"<!-- vim: set tw=80: -->",
+					"# Title\n",
+					{ forcedDetectors: ["markdown"] }
+				]
+			]) {
+				it(`${name} joins them, in both modes, and a second run is a no-op`, () => {
+					const next = header(file, "x", options);
+					const damaged = `${kept}\n${old(file, "old", "Text.", options)}\n\n\n${moved}\n${body}`;
+					const already = `${kept}\n${moved}\n${old(file, "old", "Text.", options)}\n\n\n${body}`;
+					expect(restoreTopLines(damaged, file, options)).toBe(already);
+					for (const mode of [{}, { strictHeaderBlock: false }]) {
+						const opts = { ...options, ...mode };
+						const first = replaceOrInsertHeader(damaged, next, file, opts);
+						expect(first.nextContent).toBe(replaceOrInsertHeader(already, next, file, opts).nextContent);
+						expect(first.nextContent.startsWith(`${kept}\n${moved}\n${next.split("\n")[0]}`)).toBe(true);
+						expect(first.nextContent).toContain("Text.");
+						expect(replaceOrInsertHeader(first.nextContent, next, file, opts).changed).toBe(false);
+					}
+				});
+			}
+
+			it("stops at any other comment: nothing is moved past it", () => {
+				const content = `#!/usr/bin/env python3\n${old("/r/a.py", "old", "Text.")}\n\n# A note.\n# -*- coding: utf-8 -*-\nprint(1)\n`;
+				expect(restoreTopLines(content, "/r/a.py")).toBe(content);
+				const kept = `#!/usr/bin/env python3\n${old("/r/a.py", "old", "Text.")}\n\nprint(1)\n`;
+				expect(restoreTopLines(kept, "/r/a.py")).toBe(kept);
+			});
+		});
+
 		it("puts a byte order mark an earlier version wrote the header above back at byte 0, and merges the header after it", () => {
 			const next = header("/r/a.mjs", "x");
 			const damaged = `${next}\n\n\n\uFEFF${old("/r/a.mjs", "old", "Text.")}\n\ncode();\n`;

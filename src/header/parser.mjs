@@ -382,11 +382,12 @@ function leadingHeadersLength(text, syntax) {
 /**
  * Repairs a file an earlier fix-headers version wrote its header above lines that must come
  * first (`<?php`, `@charset`, a shebang, Go build constraints, a modeline, ...; see
- * getPreservedPrefixForFile), or above a byte order mark. When the file starts with file
- * headers and, after them and blank lines only, with such lines (or a byte order mark), those
- * lines are moved back to the top and the headers placed after them, where the header is then
- * rewritten as usual. Any other content before those lines leaves the file as it is: nothing
- * is moved up past it.
+ * getPreservedPrefixForFile), or above a byte order mark. The top of the file is read as one
+ * run: lines already kept at the top (possibly none), then file headers with blank lines, then
+ * lines that would be kept at the top if they directly followed the first ones (or a byte
+ * order mark). Those last lines are moved up to join the first ones, in order, and the headers
+ * placed after them, where the header is then rewritten as usual. Any other content before
+ * those lines leaves the file as it is: nothing is moved up past it.
  * @param {string} content - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
@@ -395,15 +396,16 @@ function leadingHeadersLength(text, syntax) {
 export function restoreTopLines(content, filePath = "", syntaxOptions = {}) {
 	let bom = content.startsWith("\uFEFF") ? "\uFEFF" : "";
 	let rest = content.slice(bom.length);
-	if (getPreservedPrefixForFile(filePath, rest, syntaxOptions) !== "") {
-		return content;
-	}
+	// The top of the file read as one run: lines already kept at the top, then file headers,
+	// then lines that would be kept at the top if they directly followed the first ones.
+	const kept = getPreservedPrefixForFile(filePath, rest, syntaxOptions);
 	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
-	let headersLength = leadingHeadersLength(rest, syntax);
+	const start = kept.length;
+	let headersLength = leadingHeadersLength(rest.slice(start), syntax);
 	if (headersLength === 0) {
 		return content;
 	}
-	const movedBom = bom === "" && rest.startsWith("\uFEFF", headersLength);
+	const movedBom = bom === "" && start === 0 && rest.startsWith("\uFEFF", headersLength);
 	if (movedBom) {
 		// An earlier version wrote the header above the byte order mark (and, not finding the
 		// header after it, left that one in place too): the mark goes back to byte 0, and the
@@ -412,13 +414,17 @@ export function restoreTopLines(content, filePath = "", syntaxOptions = {}) {
 		rest = `${rest.slice(0, headersLength)}${rest.slice(headersLength + 1)}`;
 		headersLength += leadingHeadersLength(rest.slice(headersLength), syntax);
 	}
-	const after = rest.slice(headersLength);
-	const top = getPreservedPrefixForFile(filePath, after, syntaxOptions);
+	const headers = rest.slice(start, start + headersLength);
+	const after = rest.slice(start + headersLength);
+	// Whether a line may stay at the top is judged on the joined run (a coding line counts on
+	// line 2 directly after a kept shebang).
+	const joined = getPreservedPrefixForFile(filePath, `${kept}${after}`, syntaxOptions);
+	const top = joined.length > kept.length ? joined.slice(kept.length) : "";
 	if (top === "" && !movedBom) {
 		return content;
 	}
 	const topLines = top === "" || top.endsWith("\n") ? top : `${top}${lineEnding(content) ?? "\n"}`;
-	return `${bom}${topLines}${rest.slice(0, headersLength)}${after.slice(top.length)}`;
+	return `${bom}${kept}${topLines}${headers}${after.slice(top.length)}`;
 }
 
 /**
