@@ -7,28 +7,27 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T15:14:45-07:00 (1793484885)
+ *	@Last modified time: 2026-10-31T15:37:23-07:00 (1793486243)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
-// Development environment check. devcheck.mjs exists only in a source checkout; it is
-// never published, so the import is allowed to fail. It runs inside an async function
-// rather than as a top-level await: index.cjs loads this file through Node's synchronous
-// require(esm), which rejects any module graph containing top-level await
-// (ERR_REQUIRE_ASYNC_MODULE). The promise is kept so fixHeaders() can await it: devcheck
-// exits the process when the checkout is misconfigured, and awaiting it first means no
-// header is read or written before that happens (the CLI goes through fixHeaders() too).
-// The build keeps the import external, so dist/index.mjs and bin/fix-headers.mjs import the
-// same root file instead of bundling it.
-const devcheckReady = (async () => {
-	try {
-		await import("../devcheck.mjs");
-	} catch {
-		// ignore - devcheck.mjs is not published
-	}
-})();
+import { createRequire } from "node:module";
+
+// Development environment check. devcheck.mjs exists only in a source checkout and exits the
+// process when the checkout runs without --conditions=fix-headers-dev. It is loaded
+// synchronously, through require(esm), so it finishes before this module's exports can be
+// called from ESM or CJS, sync or async: nothing runs against the wrong tree first. There is
+// no top-level await, which index.cjs's require(esm) would reject (ERR_REQUIRE_ASYNC_MODULE).
+// The file is never published, so MODULE_NOT_FOUND is expected outside a checkout; any other
+// error is a real failure. The build keeps the specifier external, so dist/index.mjs and
+// bin/fix-headers.mjs load the same root file instead of bundling it.
+try {
+	createRequire(import.meta.url)("../devcheck.mjs");
+} catch (error) {
+	if (error?.code !== "MODULE_NOT_FOUND") throw error;
+}
 
 import { fixHeaders as fixHeadersCore } from "./core/fix-headers.mjs";
 
@@ -40,11 +39,9 @@ import { fixHeaders as fixHeadersCore } from "./core/fix-headers.mjs";
 /**
  * Runs header fix-up using automatic metadata detection and optional overrides.
  * @param {Parameters<typeof fixHeadersCore>[0]} [options] - Runtime options.
- * @returns {Promise<Awaited<ReturnType<typeof fixHeadersCore>>>} Update report.
+ * @returns {ReturnType<typeof fixHeadersCore>} Update report.
  */
-export async function fixHeaders(options) {
-	// Wait for the development check before touching any file.
-	await devcheckReady;
+export function fixHeaders(options) {
 	return fixHeadersCore(options);
 }
 

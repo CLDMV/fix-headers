@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T14:46:54-07:00 (1793483214)
+ *	@Last modified time: 2026-10-31T15:37:24-07:00 (1793486244)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -71,7 +71,7 @@ test("the built API and CLI import ../devcheck.mjs instead of bundling it", () =
 	const fs = require("node:fs");
 	for (const built of ["dist/index.mjs", "bin/fix-headers.mjs"]) {
 		const source = fs.readFileSync(path.join(repoRoot, built), "utf8");
-		assert.match(source, /import\(\s*["']\.\.\/devcheck\.mjs["']\s*\)/, `${built} should import ../devcheck.mjs`);
+		assert.match(source, /["']\.\.\/devcheck\.mjs["']/, `${built} should load ../devcheck.mjs`);
 		assert.doesNotMatch(source, /Development environment not properly configured/, `${built} should not inline devcheck`);
 	}
 });

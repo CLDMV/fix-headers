@@ -5,8 +5,8 @@
 /**
  * Runs header fix-up using automatic metadata detection and optional overrides.
  * @param {Parameters<typeof fixHeadersCore>[0]} [options] - Runtime options.
- * @returns {Promise<Awaited<ReturnType<typeof fixHeadersCore>>>} Update report.
+ * @returns {ReturnType<typeof fixHeadersCore>} Update report.
  */
-export function fixHeaders(options?: Parameters<typeof fixHeadersCore>[0]): Promise<Awaited<ReturnType<typeof fixHeadersCore>>>;
+export function fixHeaders(options?: Parameters<typeof fixHeadersCore>[0]): ReturnType<typeof fixHeadersCore>;
 export default fixHeaders;
 import { fixHeaders as fixHeadersCore } from "./core/fix-headers.mjs";
