@@ -18,7 +18,13 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { parseCliArgs } from "../src/cli.mjs";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
-import { extractForeignHeaderLines, extractHeaderlessBody, replaceOrInsertHeader, splitHeaderText } from "../src/header/parser.mjs";
+import {
+	extractForeignHeaderLines,
+	extractHeaderlessBody,
+	findProjectHeader,
+	replaceOrInsertHeader,
+	splitHeaderText
+} from "../src/header/parser.mjs";
 import { getHeaderSyntaxForFile, renderHeaderLines } from "../src/header/syntax.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
@@ -404,5 +410,62 @@ describe("non-field text in an existing header (#160)", () => {
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
+	});
+
+	describe("a moved block is never taken back into the header", () => {
+		const jsHeader = header("/r/a.mjs", FIELDS);
+		const yamlHeader = header("/r/a.yaml", FIELDS);
+		const yamlTwice = `${headerWithText("/r/a.yaml", FIELDS)}\n\nkey: 1\n`;
+		const repros = [
+			[
+				"a JS header with a second @Project line",
+				"/r/a.mjs",
+				jsHeader,
+				"/**\n *\t@Project: demo\n *\t@Project: legacy-name (renamed 2024)\n */\n\ncode();\n",
+				["@Project: legacy-name (renamed 2024)"]
+			],
+			["a # header holding two copies of the header", "/r/a.yaml", yamlHeader, yamlTwice, FIELDS.filter((line) => line !== "-----")]
+		];
+		for (const [name, file, next, content, kept] of repros) {
+			for (const options of [{}, { margin: 0 }, { strictHeaderBlock: false }, { strictHeaderBlock: false, margin: 0 }]) {
+				it(`${name}: three runs with ${JSON.stringify(options)} keep every line and settle after the first`, () => {
+					const runs = [];
+					let current = content;
+					for (let run = 0; run < 3; run += 1) {
+						current = replaceOrInsertHeader(current, next, file, options).nextContent;
+						runs.push(current);
+					}
+					expect(runs[1]).toBe(runs[0]);
+					expect(runs[2]).toBe(runs[0]);
+					for (const line of kept) {
+						// Each kept line appears once in the regenerated header (when it is a field) plus once as kept text.
+						expect(runs[2].split(line).length - 1).toBeGreaterThanOrEqual(next.includes(line) ? 2 : 1);
+					}
+				});
+			}
+		}
+
+		it("only takes a following comment as a stacked header when it starts with @Project:", () => {
+			const content = "/**\n *\t@Project: demo\n */\n\n/**\n *\tNotes.\n *\t@Project: mentioned\n */\n\ncode();\n";
+			expect(findProjectHeader(content, "/r/a.mjs")).toEqual({ start: 0, end: content.indexOf("/**", 1) });
+			const stacked = "/**\n *\t@Project: demo\n */\n\n/**\n *\n *\t@Project: copy\n */\n\ncode();\n";
+			expect(findProjectHeader(stacked, "/r/a.mjs").end).toBe(stacked.indexOf("code();"));
+		});
+	});
+
+	describe("prose is not a directive", () => {
+		for (const prose of ["#\tDecoding: base64 helpers", "#\tUse it like vi: modal"]) {
+			it(`moves "${prose}" with the header text instead of keeping it above the header`, () => {
+				const content = `${prose}\n#\n#\t@Project: demo\n#\n\nprint(1)\n`;
+				expect(splitHeaderText(content, "/r/a.py")).toEqual({ above: [], foreign: [prose] });
+			});
+		}
+
+		it("counts an encoding declaration only on the file's first two lines", () => {
+			const content = "# -*- coding: utf-8 -*-\n#\n#\t@Project: demo\n#\n";
+			expect(splitHeaderText(content, "/r/a.py", {}, 1).above).toEqual(["# -*- coding: utf-8 -*-"]);
+			expect(splitHeaderText(content, "/r/a.py", {}, 2)).toEqual({ above: [], foreign: ["# -*- coding: utf-8 -*-"] });
+			expect(splitHeaderText("# coding=utf-8\n#\t@Project: demo\n", "/r/a.py").above).toEqual(["# coding=utf-8"]);
+		});
 	});
 });

@@ -11,9 +11,11 @@
  * @param {string} headerText - The existing header block (every stacked segment).
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
+ * @param {number} [firstLine=0] - Zero-based line number of the header's first line in the file
+ * (an encoding declaration only counts on the file's first two lines).
  * @returns {{above: string[], foreign: string[]}} The non-field lines, as written.
  */
-export function splitHeaderText(headerText: string, filePath?: string, syntaxOptions?: Parameters<typeof findProjectHeader>[2]): {
+export function splitHeaderText(headerText: string, filePath?: string, syntaxOptions?: Parameters<typeof findProjectHeader>[2], firstLine?: number): {
     above: string[];
     foreign: string[];
 };

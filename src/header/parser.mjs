@@ -92,12 +92,39 @@ function matchHeaderSegment(content, syntax) {
 const MANAGED_TAG = /^@(Project|Filename|Date|Author|Email|Last modified by|Last modified time|Copyright):/;
 
 /**
- * Comment lines that must keep their place at the top of a file (a Python encoding
- * declaration, `#cloud-config`, a `yaml-language-server` or editor modeline). Found directly
+ * Comment lines that must keep their place at the top of a file (`#cloud-config`, a
+ * `yaml-language-server` modeline, a `vim:` / `vi:` / `ex:` editor modeline). Found directly
  * above the first field of a line-comment header, they stay above it.
  * @type {RegExp}
  */
-const DIRECTIVE_LINE = /coding[:=]|^#cloud-config\b|^#\s*yaml-language-server:|^#.*\b(?:vim?|ex):/;
+const DIRECTIVE_LINE = /^#cloud-config\b|^#\s*yaml-language-server:|^#\s+(?:vim?|ex):/;
+
+/**
+ * A PEP 263 encoding declaration (`# -*- coding: utf-8 -*-`, `# coding=utf-8`), which only
+ * counts on the first or second line of a file. `coding` must start a word, so prose such as
+ * `Decoding: base64` is not one.
+ * @type {RegExp}
+ */
+const CODING_LINE = /^#.*?(?<![A-Za-z])coding[:=]\s*[-\w.]+/;
+
+/**
+ * Lead line of a block moved out of the header whose own first line is a `@Project:` line,
+ * so that the block never reads as a stacked header (see {@link findProjectHeader}).
+ * @type {string}
+ */
+const MOVED_BLOCK_LEAD = "Moved out of the file header by fix-headers:";
+
+/**
+ * Whether a header comment that follows the file's header is a stacked copy of a header:
+ * its first non-empty line is a `@Project:` field.
+ * @param {string} segment - The following comment.
+ * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockLinePrefix?: string}} syntax - Header syntax descriptor.
+ * @returns {boolean} Whether it starts with `@Project:`.
+ */
+function isStackedHeader(segment, syntax) {
+	const first = segmentLines(segment, syntax).find((line) => line.text !== "");
+	return first !== undefined && first.text.startsWith("@Project:");
+}
 
 /**
  * Splits one matched header segment into its lines, as written, with the comment's own
@@ -186,9 +213,11 @@ function classifyLines(lines) {
  * @param {string} headerText - The existing header block (every stacked segment).
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
+ * @param {number} [firstLine=0] - Zero-based line number of the header's first line in the file
+ * (an encoding declaration only counts on the file's first two lines).
  * @returns {{above: string[], foreign: string[]}} The non-field lines, as written.
  */
-export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}) {
+export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}, firstLine = 0) {
 	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
 	/** @type {string[]} */
 	const above = [];
@@ -204,7 +233,9 @@ export function splitHeaderText(headerText, filePath = "", syntaxOptions = {}) {
 		if (firstSegment && syntax.kind === "line") {
 			// Directive lines at the very top of the comment are separate comments the header's
 			// line match took in; they keep their place above the header.
-			while (start < segmentLineList.length && kinds[start] === "text" && DIRECTIVE_LINE.test(segmentLineList[start].raw)) {
+			const isDirective = (index) =>
+				DIRECTIVE_LINE.test(segmentLineList[index].raw) || (firstLine + index <= 1 && CODING_LINE.test(segmentLineList[index].raw));
+			while (start < segmentLineList.length && kinds[start] === "text" && isDirective(start)) {
 				above.push(segmentLineList[start].raw);
 				start += 1;
 			}
@@ -241,18 +272,29 @@ export function extractForeignHeaderLines(headerText, filePath = "", syntaxOptio
 
 /**
  * Wraps non-field header lines in a comment block of their own, in the file's comment syntax.
- * A line-comment block is the lines themselves.
+ * A line-comment block is the lines themselves. When the first line is a `@Project:` line, a
+ * lead line comes first so the block never reads as a stacked header.
  * @param {string[]} lines - Lines as written, comment prefixes included.
- * @param {{kind: "block" | "line" | "html", blockStart?: string, blockEnd?: string}} syntax - Header syntax descriptor.
+ * @param {{kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Header syntax descriptor.
  * @param {string} eol - Line ending to join the block with.
  * @returns {string} The comment block.
  */
 function renderForeignBlock(lines, syntax, eol) {
-	if (syntax.kind === "line") {
-		return lines.join(eol);
-	}
 	const html = syntax.kind === "html";
-	return [syntax.blockStart || (html ? "<!--" : "/**"), ...lines, syntax.blockEnd || (html ? "-->" : " */")].join(eol);
+	const linePrefix =
+		syntax.kind === "line"
+			? `${syntax.linePrefix || "#"}${typeof syntax.lineSeparator === "string" ? syntax.lineSeparator : "\t"}`
+			: syntax.blockLinePrefix || (html ? "\t" : " *\t");
+	// A block whose first line is a @Project: line would read as a stacked header on the next
+	// run and its lines would be taken for fields: a lead line keeps it a plain comment.
+	const strip = syntax.kind === "line" ? new RegExp(`^${escapeRegex(syntax.linePrefix || "#")}[ \\t]*`) : html ? /^\s*/ : /^\s*\*?[ \t]*/;
+	const firstText = lines.map((line) => line.replace(strip, "").trim()).find((text) => text !== "");
+	const leadsWithProject = firstText !== undefined && firstText.startsWith("@Project:");
+	const body = leadsWithProject ? [`${linePrefix}${MOVED_BLOCK_LEAD}`, ...lines] : lines;
+	if (syntax.kind === "line") {
+		return body.join(eol);
+	}
+	return [syntax.blockStart || (html ? "<!--" : "/**"), ...body, syntax.blockEnd || (html ? "-->" : " */")].join(eol);
 }
 
 /**
@@ -295,7 +337,9 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
 		const remaining = scanLines.slice(offset);
 		const segment = matchHeaderSegment(remaining, syntax);
 
-		if (!segment || !segment[0].includes("@Project:")) {
+		// The header itself is the first comment carrying @Project:; a comment after it is a
+		// stacked copy only when it starts with @Project:.
+		if (!segment || !(offset === 0 ? segment[0].includes("@Project:") : isStackedHeader(segment[0], syntax))) {
 			break;
 		}
 
@@ -344,7 +388,7 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 	}
 
 	const region = content.slice(existing.start, existing.end);
-	const { above, foreign } = splitHeaderText(region, filePath, syntaxOptions);
+	const { above, foreign } = splitHeaderText(region, filePath, syntaxOptions, content.slice(0, existing.start).split("\n").length - 1);
 	const eol = region.includes("\r\n") ? "\r\n" : "\n";
 	const strict = syntaxOptions.strictHeaderBlock !== false;
 	const header = foreign.length > 0 && !strict ? appendToHeader(newHeader, foreign, syntax) : newHeader;
