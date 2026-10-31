@@ -363,6 +363,65 @@ function insertCopyrights(header, values) {
 }
 
 /**
+ * Length of the run of file headers (see {@link isFileHeader}), with the blank lines after
+ * each, at the start of a text.
+ * @param {string} text - Text to read.
+ * @param {{kind: "block" | "line" | "html", linePrefix?: string, blockLinePrefix?: string, blockEnd?: string}} syntax - Header syntax descriptor.
+ * @returns {number} Length of the run (0 when the text does not start with a file header).
+ */
+function leadingHeadersLength(text, syntax) {
+	let length = 0;
+	let segment = matchHeaderSegment(text, syntax);
+	while (segment && segment[0].length > 0 && isFileHeader(segmentLines(segment[0], syntax))) {
+		length += segment[0].length;
+		segment = matchHeaderSegment(text.slice(length), syntax);
+	}
+	return length;
+}
+
+/**
+ * Repairs a file an earlier fix-headers version wrote its header above lines that must come
+ * first (`<?php`, `@charset`, a shebang, Go build constraints, a modeline, ...; see
+ * getPreservedPrefixForFile), or above a byte order mark. When the file starts with file
+ * headers and, after them and blank lines only, with such lines (or a byte order mark), those
+ * lines are moved back to the top and the headers placed after them, where the header is then
+ * rewritten as usual. Any other content before those lines leaves the file as it is: nothing
+ * is moved up past it.
+ * @param {string} content - File content.
+ * @param {string} [filePath=""] - File path used for syntax selection.
+ * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
+ * @returns {string} The content with the lines back at the top (unchanged when there is nothing to repair).
+ */
+export function restoreTopLines(content, filePath = "", syntaxOptions = {}) {
+	let bom = content.startsWith("\uFEFF") ? "\uFEFF" : "";
+	let rest = content.slice(bom.length);
+	if (getPreservedPrefixForFile(filePath, rest, syntaxOptions) !== "") {
+		return content;
+	}
+	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
+	let headersLength = leadingHeadersLength(rest, syntax);
+	if (headersLength === 0) {
+		return content;
+	}
+	const movedBom = bom === "" && rest.startsWith("\uFEFF", headersLength);
+	if (movedBom) {
+		// An earlier version wrote the header above the byte order mark (and, not finding the
+		// header after it, left that one in place too): the mark goes back to byte 0, and the
+		// header after it is a copy of the header.
+		bom = "\uFEFF";
+		rest = `${rest.slice(0, headersLength)}${rest.slice(headersLength + 1)}`;
+		headersLength += leadingHeadersLength(rest.slice(headersLength), syntax);
+	}
+	const after = rest.slice(headersLength);
+	const top = getPreservedPrefixForFile(filePath, after, syntaxOptions);
+	if (top === "" && !movedBom) {
+		return content;
+	}
+	const topLines = top === "" || top.endsWith("\n") ? top : `${top}${lineEnding(content) ?? "\n"}`;
+	return `${bom}${topLines}${rest.slice(0, headersLength)}${after.slice(top.length)}`;
+}
+
+/**
  * Finds the first top-level project header block in a file.
  * @param {string} content - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
@@ -417,7 +476,7 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
  * the new header's (see {@link copyrightHolder}) is a duplicate and dropped; one naming another
  * holder is kept as an additional `@Copyright` field under the new header's, in order, and
  * reported in `extraCopyrights`.
- * @param {string} content - Original file content.
+ * @param {string} original - Original file content.
  * @param {string} newHeader - Generated header text.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number, strictHeaderBlock?: boolean }} [syntaxOptions={}] - Syntax resolution options.
@@ -425,7 +484,9 @@ export function findProjectHeader(content, filePath = "", syntaxOptions = {}) {
  * content result: `header` is the header block as written, `written` everything that took the old header's place (the
  * header and the block of text moved below it), and `extraCopyrights` the additional copyright values the header keeps.
  */
-export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxOptions = {}) {
+export function replaceOrInsertHeader(original, newHeader, filePath = "", syntaxOptions = {}) {
+	// A header an earlier version wrote above lines that must come first goes back below them.
+	const content = restoreTopLines(original, filePath, syntaxOptions);
 	const existing = findProjectHeader(content, filePath, syntaxOptions);
 	const syntax = getHeaderSyntaxForFile(filePath, syntaxOptions);
 	// A line-comment header needs one blank line after it, or the comment that follows would read as part of it.
@@ -448,7 +509,7 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 		const joiner = prefix.replace(/^\uFEFF/, "") !== "" && !prefix.endsWith("\n") ? eol : "";
 		// With nothing after the header there is no next content to separate from, so the file just ends with the header.
 		const nextContent = `${prefix}${joiner}${rest.trim() === "" ? `${header}${eol}` : `${header}${eol.repeat(margin + 1)}${rest}`}`;
-		return { nextContent, changed: nextContent !== content, header, written: header, extraCopyrights: [] };
+		return { nextContent, changed: nextContent !== original, header, written: header, extraCopyrights: [] };
 	}
 
 	const region = content.slice(existing.start, existing.end);
@@ -477,7 +538,7 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
 	const nextContent = `${content.slice(0, existing.start)}${below.trim() === "" ? `${header}${eol}` : `${header}${gap}${below}`}`;
 	// What took the old header's place: the header and the block moved below it.
 	const written = `${header}${moved === "" ? "" : `${gap}${moved}`}`;
-	return { nextContent, changed: nextContent !== content, header, written, extraCopyrights };
+	return { nextContent, changed: nextContent !== original, header, written, extraCopyrights };
 }
 
 /**
@@ -485,12 +546,15 @@ export function replaceOrInsertHeader(content, newHeader, filePath = "", syntaxO
  * with no header at all. Blank lines between the header and the next content, and a body
  * that is only whitespace, are dropped, so two versions of a file that differ only in their
  * header (its fields, framing, spacing or margin, or whether it has one) give the same body.
- * @param {string} content - File content.
+ * @param {string} original - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
  * @returns {string} The content outside the header.
  */
-export function extractHeaderlessBody(content, filePath = "", syntaxOptions = {}) {
+export function extractHeaderlessBody(original, filePath = "", syntaxOptions = {}) {
+	// Read a file an earlier version left with its header above lines that must come first as
+	// it reads once repaired, so the repair is not a content edit.
+	const content = restoreTopLines(original, filePath, syntaxOptions);
 	const existing = findProjectHeader(content, filePath, syntaxOptions);
 	if (existing) {
 		// Non-field text in the header counts as content, read as if it sat in its own block

@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
 import { getContentSkipReason } from "../src/detectors/index.mjs";
 import { isModeline } from "../src/detectors/top-lines.mjs";
-import { findProjectHeader, replaceOrInsertHeader, splitHeaderText } from "../src/header/parser.mjs";
+import { findProjectHeader, replaceOrInsertHeader, restoreTopLines, splitHeaderText } from "../src/header/parser.mjs";
 import { getHeaderSyntaxForFile, renderHeaderLines } from "../src/header/syntax.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
@@ -163,6 +163,94 @@ describe("lines kept above the header (#162)", () => {
 		}
 	});
 
+	describe("a header an earlier version wrote above them is put back below them (#162)", () => {
+		/**
+		 * Renders an old header with description text, as an earlier version left it.
+		 * @param {string} file - File path used for syntax selection.
+		 * @param {string} project - The @Project value.
+		 * @param {string} text - Description text.
+		 * @param {object} [options={}] - Syntax options.
+		 * @returns {string} Header block.
+		 */
+		const old = (file, project, text, options = {}) =>
+			renderHeaderLines(getHeaderSyntaxForFile(file, options), [`@Project: ${project}`, "@Copyright: c", "", text]);
+
+		for (const [name, file, top, body] of CONSTRUCTS) {
+			const next = header(file, "x");
+			// The same file with the lines already first: the repair must give exactly its result.
+			const already = `${top}\n${old(file, "old", "Text.")}\n\n${body}`;
+			const damaged = `${old(file, "old", "Text.")}\n\n\n${top}\n${body}`;
+
+			it(`${name}: is repaired to the lines then the header, in both modes, and a second run is a no-op`, () => {
+				expect(restoreTopLines(damaged, file)).toBe(`${top}\n${old(file, "old", "Text.")}\n\n\n${body}`);
+				for (const options of [{}, { strictHeaderBlock: false }]) {
+					const first = replaceOrInsertHeader(damaged, next, file, options);
+					expect(first.nextContent).toBe(replaceOrInsertHeader(already, next, file, options).nextContent);
+					expect(first.nextContent.startsWith(`${top}\n${next.split("\n")[0]}`)).toBe(true);
+					expect(first.nextContent).toContain("Text.");
+					expect(first.nextContent).not.toContain("@Project: old");
+					expect(replaceOrInsertHeader(first.nextContent, next, file, options).changed).toBe(false);
+				}
+			});
+
+			it(`${name}: a stacked copy under the old header is still merged`, () => {
+				const stacked = `${old(file, "old", "Text.")}\n\n${old(file, "other", "More.")}\n\n${top}\n${body}`;
+				const first = replaceOrInsertHeader(stacked, next, file);
+				expect(first.nextContent).toBe(
+					replaceOrInsertHeader(`${top}\n${old(file, "old", "Text.")}\n\n${old(file, "other", "More.")}\n\n${body}`, next, file).nextContent
+				);
+				expect(first.nextContent).not.toContain("@Project: other");
+				expect(first.nextContent.indexOf("Text.")).toBeLessThan(first.nextContent.indexOf("More."));
+			});
+		}
+
+		it("repairs Go build constraints and Markdown front matter", () => {
+			const go = header("/r/a.go", "x");
+			const constraints = "//go:build linux\n// +build linux\n\n";
+			const damagedGo = `${old("/r/a.go", "old", "Text.")}\n\n${constraints}package main\n`;
+			const fixedGo = replaceOrInsertHeader(damagedGo, go, "/r/a.go");
+			expect(fixedGo.nextContent).toBe(`${constraints}${go}\n\n\n/**\n *\tText.\n */\n\n\npackage main\n`);
+			expect(replaceOrInsertHeader(fixedGo.nextContent, go, "/r/a.go").changed).toBe(false);
+			const options = { forcedDetectors: ["markdown"] };
+			const md = header("/r/a.md", "x", options);
+			const fixedMd = replaceOrInsertHeader(
+				`${old("/r/a.md", "old", "Text.", options)}\n\n---\ntitle: x\n---\n# Title\n`,
+				md,
+				"/r/a.md",
+				options
+			);
+			expect(fixedMd.nextContent).toBe(`---\ntitle: x\n---\n${md}\n\n\n<!--\n\tText.\n-->\n\n\n# Title\n`);
+			expect(replaceOrInsertHeader(fixedMd.nextContent, md, "/r/a.md", options).changed).toBe(false);
+		});
+
+		it("puts a byte order mark an earlier version wrote the header above back at byte 0, and merges the header after it", () => {
+			const next = header("/r/a.mjs", "x");
+			const damaged = `${next}\n\n\n\uFEFF${old("/r/a.mjs", "old", "Text.")}\n\ncode();\n`;
+			const first = replaceOrInsertHeader(damaged, next, "/r/a.mjs");
+			expect(first.nextContent).toBe(`\uFEFF${next}\n\n\n/**\n *\tText.\n */\n\n\ncode();\n`);
+			expect(replaceOrInsertHeader(first.nextContent, next, "/r/a.mjs").changed).toBe(false);
+		});
+
+		it("ends a repaired line that ended the file without a line break with one", () => {
+			expect(restoreTopLines(`${header("/r/a.php", "old")}\n\n<?php`, "/r/a.php")).toBe(`<?php\n${header("/r/a.php", "old")}\n\n`);
+		});
+
+		it("moves nothing past other content: a comment that is not a file header, or code", () => {
+			for (const [file, top, before] of [
+				["/r/a.mjs", "#!/usr/bin/env node", "// note\n"],
+				["/r/a.php", "<?php", "<p>hi</p>\n"],
+				["/r/a.css", '@charset "UTF-8";', "/* plain comment */\n"]
+			]) {
+				const content = `${before}${old(file, "old", "Text.")}\n\n${top}\nrest\n`;
+				expect(restoreTopLines(content, file)).toBe(content);
+				const notHeader = `${before}${top}\nrest\n`;
+				expect(restoreTopLines(notHeader, file)).toBe(notHeader);
+			}
+			const fine = `${header("/r/a.mjs", "x")}\n\ncode();\n`;
+			expect(restoreTopLines(fine, "/r/a.mjs")).toBe(fine);
+		});
+	});
+
 	describe("a PHP file that does not open with <?php", () => {
 		it("cannot carry a header, and is skipped with the reason", async () => {
 			expect(getContentSkipReason("/r/a.php", "<?php\necho 1;\n")).toBeNull();
@@ -174,13 +262,27 @@ describe("lines kept above the header (#162)", () => {
 				const template = "<html><?= $title ?></html>\n";
 				await writeWorkspaceFile(join(workspace, "src", "page.php"), template);
 				await writeWorkspaceFile(join(workspace, "src", "code.php"), "<?php\necho 1;\n");
-				const result = await fixHeaders({ cwd: workspace, input: "src", authorName: "A", authorEmail: "a@example.com" });
+				const templateWithHeader = "/**\n *\t@Project: old\n */\n\n<html><?= $title ?></html>\n";
+				await writeWorkspaceFile(join(workspace, "src", "page-with-header.php"), templateWithHeader);
+				await writeWorkspaceFile(
+					join(workspace, "src", "old-layout.php"),
+					"/**\n *\t@Project: old\n *\n *\tText.\n */\n\n\n<?php\necho 1;\n"
+				);
+				const options = { cwd: workspace, input: "src", authorName: "A", authorEmail: "a@example.com" };
+				const result = await fixHeaders(options);
+				const reason = "the file does not start with <?php, so a comment at the top would be output as text";
 				expect(result.skipped).toEqual([
-					{ file: join("src", "page.php"), reason: "the file does not start with <?php, so a comment at the top would be output as text" }
+					{ file: join("src", "page-with-header.php"), reason },
+					{ file: join("src", "page.php"), reason }
 				]);
-				expect(result.filesUpdated).toBe(1);
+				expect(result.filesUpdated).toBe(2);
 				expect(await readFile(join(workspace, "src", "page.php"), "utf8")).toBe(template);
+				expect(await readFile(join(workspace, "src", "page-with-header.php"), "utf8")).toBe(templateWithHeader);
 				expect((await readFile(join(workspace, "src", "code.php"), "utf8")).startsWith("<?php\n/**\n")).toBe(true);
+				const repaired = await readFile(join(workspace, "src", "old-layout.php"), "utf8");
+				expect(repaired.startsWith("<?php\n/**\n *\n *\t@Project: top-lines\n")).toBe(true);
+				expect(repaired).toMatch(/ \*\/\n\n\n\/\*\*\n \*\tText\.\n \*\/\n\n\necho 1;\n$/);
+				expect((await fixHeaders(options)).filesUpdated).toBe(0);
 			} finally {
 				await cleanupWorkspace(workspace);
 			}

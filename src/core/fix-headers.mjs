@@ -30,7 +30,7 @@ import {
 } from "../header/dates.mjs";
 import { buildHeader } from "../header/template.mjs";
 import { compareHeaderFields } from "../header/fields.mjs";
-import { extractHeaderlessBody, findProjectHeader, replaceOrInsertHeader } from "../header/parser.mjs";
+import { extractHeaderlessBody, findProjectHeader, replaceOrInsertHeader, restoreTopLines } from "../header/parser.mjs";
 import { createUnifiedDiff } from "../utils/diff.mjs";
 import { readFileDates } from "../utils/fs.mjs";
 import { getGitCreationDate, getGitLastModifiedDate, readGitHeadFile } from "../utils/git.mjs";
@@ -394,12 +394,15 @@ export async function fixHeaders(options = {}) {
 		const relativePath = relative(scanRoot, filePath);
 		const original = await readFile(filePath, "utf8");
 		// A file whose content cannot take a comment at the top (a PHP file that does not open
-		// with <?php) is skipped too.
-		const contentSkipReason = getContentSkipReason(filePath, original, {
+		// with <?php) is skipped too, read as it is once a header an earlier version wrote above
+		// <?php is moved back below it.
+		const detectorOptions = {
 			enabledDetectors: effectiveOptions.enabledDetectors,
 			disabledDetectors: effectiveOptions.disabledDetectors,
-			forcedDetectors
-		});
+			forcedDetectors,
+			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
+		};
+		const contentSkipReason = getContentSkipReason(filePath, restoreTopLines(original, filePath, detectorOptions), detectorOptions);
 		if (contentSkipReason !== null) {
 			skipped.push({ file: relativePath, reason: contentSkipReason });
 			continue;

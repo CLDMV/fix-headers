@@ -36,6 +36,20 @@ export function extractForeignHeaderLines(headerText: string, filePath?: string,
  */
 export function copyrightHolder(value: string): string;
 /**
+ * Repairs a file an earlier fix-headers version wrote its header above lines that must come
+ * first (`<?php`, `@charset`, a shebang, Go build constraints, a modeline, ...; see
+ * getPreservedPrefixForFile), or above a byte order mark. When the file starts with file
+ * headers and, after them and blank lines only, with such lines (or a byte order mark), those
+ * lines are moved back to the top and the headers placed after them, where the header is then
+ * rewritten as usual. Any other content before those lines leaves the file as it is: nothing
+ * is moved up past it.
+ * @param {string} content - File content.
+ * @param {string} [filePath=""] - File path used for syntax selection.
+ * @param {Parameters<typeof findProjectHeader>[2]} [syntaxOptions={}] - Syntax resolution options.
+ * @returns {string} The content with the lines back at the top (unchanged when there is nothing to repair).
+ */
+export function restoreTopLines(content: string, filePath?: string, syntaxOptions?: Parameters<typeof findProjectHeader>[2]): string;
+/**
  * Finds the first top-level project header block in a file.
  * @param {string} content - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
@@ -72,7 +86,7 @@ export function findProjectHeader(content: string, filePath?: string, syntaxOpti
  * the new header's (see {@link copyrightHolder}) is a duplicate and dropped; one naming another
  * holder is kept as an additional `@Copyright` field under the new header's, in order, and
  * reported in `extraCopyrights`.
- * @param {string} content - Original file content.
+ * @param {string} original - Original file content.
  * @param {string} newHeader - Generated header text.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number, strictHeaderBlock?: boolean }} [syntaxOptions={}] - Syntax resolution options.
@@ -80,7 +94,7 @@ export function findProjectHeader(content: string, filePath?: string, syntaxOpti
  * content result: `header` is the header block as written, `written` everything that took the old header's place (the
  * header and the block of text moved below it), and `extraCopyrights` the additional copyright values the header keeps.
  */
-export function replaceOrInsertHeader(content: string, newHeader: string, filePath?: string, syntaxOptions?: {
+export function replaceOrInsertHeader(original: string, newHeader: string, filePath?: string, syntaxOptions?: {
     language?: string;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
@@ -107,12 +121,12 @@ export function replaceOrInsertHeader(content: string, newHeader: string, filePa
  * with no header at all. Blank lines between the header and the next content, and a body
  * that is only whitespace, are dropped, so two versions of a file that differ only in their
  * header (its fields, framing, spacing or margin, or whether it has one) give the same body.
- * @param {string} content - File content.
+ * @param {string} original - File content.
  * @param {string} [filePath=""] - File path used for syntax selection.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[], detectorSyntaxOverrides?: Record<string, { linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string }>, spacing?: number, margin?: number }} [syntaxOptions={}] - Syntax resolution options.
  * @returns {string} The content outside the header.
  */
-export function extractHeaderlessBody(content: string, filePath?: string, syntaxOptions?: {
+export function extractHeaderlessBody(original: string, filePath?: string, syntaxOptions?: {
     language?: string;
     enabledDetectors?: string[];
     disabledDetectors?: string[];
