@@ -332,15 +332,25 @@ function appendToHeader(header, lines, syntax) {
  * @returns {string} The holder (empty when the notice names none).
  */
 export function copyrightHolder(value) {
-	return value
-		.replace(/^\s*copyright\b/i, "")
-		.replace(/^(?:\s*(?:\(c\)|©))+/i, "")
-		.replace(/^\s*\d{4}(?:\s*[-–,]\s*\d{4})*/, "")
-		.replace(/\s*all rights reserved\.?\s*$/i, "")
-		.replace(/\s+/g, " ")
-		.replace(/[\s.,;]+$/, "")
-		.trim()
-		.toLowerCase();
+	// String operations and anchored patterns whose pieces cannot match the same text, so the
+	// time stays linear however much white space the value holds.
+	let text = value.trim();
+	const word = text.match(/^copyright\b/i);
+	text = word ? text.slice(word[0].length).trimStart() : text;
+	for (let mark = text.match(/^(?:\(c\)|©)/i); mark; mark = text.match(/^(?:\(c\)|©)/i)) {
+		text = text.slice(mark[0].length).trimStart();
+	}
+	const years = text.match(/^\d{4}(?:\s*[-–,]\s*\d{4})*/);
+	text = years ? text.slice(years[0].length) : text;
+	text = text.trimEnd();
+	const lower = text.toLowerCase();
+	const suffix = lower.endsWith("all rights reserved.") ? 20 : lower.endsWith("all rights reserved") ? 19 : 0;
+	text = text.slice(0, text.length - suffix);
+	let end = text.length;
+	while (end > 0 && ".,; \t\r\n".includes(text[end - 1])) {
+		end -= 1;
+	}
+	return text.slice(0, end).split(/\s+/).filter(Boolean).join(" ").toLowerCase();
 }
 
 /**
@@ -520,8 +530,10 @@ export function replaceOrInsertHeader(original, newHeader, filePath = "", syntax
 
 	const region = content.slice(existing.start, existing.end);
 	const { foreign, copyrights } = splitHeaderText(region, filePath, syntaxOptions);
-	const ownCopyright = newHeader.match(/@Copyright:[ \t]*(.*?)[ \t]*$/m);
-	const holders = new Set(ownCopyright ? [copyrightHolder(ownCopyright[1])] : []);
+	const ownCopyright = newHeader.split("\n").find((line) => line.includes("@Copyright:"));
+	const holders = new Set(
+		ownCopyright === undefined ? [] : [copyrightHolder(ownCopyright.slice(ownCopyright.indexOf("@Copyright:") + 11))]
+	);
 	/** @type {string[]} */
 	const extraCopyrights = [];
 	for (const value of copyrights) {

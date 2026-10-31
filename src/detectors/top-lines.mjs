@@ -24,10 +24,12 @@
 /**
  * The start of a vi/Vim/ex modeline in a comment line: the comment opener (`#`, `//`, `/*` or
  * `<!--`), white space, then `vi:`, `vim:`, `vim<version>:` (with an optional `<`, `=` or `>`),
- * `Vim:` or `ex:`. The rest of the line, without a closing `*\/` or `-->`, is captured.
+ * `Vim:` or `ex:`. The rest of the line is captured; {@link isModeline} trims it and takes a
+ * closing `*\/` or `-->` off with string operations, so no two quantifiers compete for the same
+ * white space.
  * @type {RegExp}
  */
-const MODELINE_START = /^(?:#|\/\/|\/\*+|<!--)[ \t]+(vi|vim(?:[<=>]?\d+)?|Vim|ex):[ \t]*(.*?)[ \t]*(?:\*+\/|-->)?[ \t]*$/;
+const MODELINE_START = /^(?:#|\/\/|\/\*+|<!--)[ \t]+(vi|vim(?:[<=>]?\d+)?|Vim|ex):(.*)$/;
 
 /**
  * One option of a modeline: `opt`, `noopt`, `opt!`, `opt&`, or `opt=val` (also `+=`, `-=`,
@@ -89,12 +91,24 @@ export function isModeline(line) {
 	if (!start) {
 		return false;
 	}
-	const set = start[2].match(/^se(?:t)?[ \t]+((?:\\.|[^:\\])*):/);
+	let rest = start[2].trim();
+	if (rest.endsWith("-->")) {
+		rest = rest.slice(0, -3).trimEnd();
+	} else if (rest.endsWith("*/")) {
+		let end = rest.length - 2;
+		while (end > 0 && rest[end - 1] === "*") {
+			end -= 1;
+		}
+		rest = rest.slice(0, end).trimEnd();
+	}
+	// One white space character after `set`: the options may start with more, which the option
+	// split ignores, and a single character leaves no choice of where the options begin.
+	const set = rest.match(/^se(?:t)?[ \t]((?:\\.|[^:\\])*):/);
 	if (!set && start[1] === "Vim") {
 		// `Vim:` only opens the `set` form.
 		return false;
 	}
-	const options = set ? set[1].match(/(?:\\.|[^\s\\])+/g) : start[2].match(/(?:\\.|[^\s:\\])+/g);
+	const options = set ? set[1].match(/(?:\\.|[^\s\\])+/g) : rest.match(/(?:\\.|[^\s:\\])+/g);
 	return (
 		options !== null &&
 		options.every((option) => MODELINE_OPTION.test(option)) &&
