@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T14:46:48-07:00 (1793483208)
+ *	@Last modified time: 2026-11-01T09:27:53-08:00 (1793554073)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -37,8 +37,8 @@ export default defineConfig({
 	test: {
 		environment: "node",
 		include: ["tests/**/*.test.vitest.mjs"],
-		// Workers get the condition on their node CLI (execArgv), so Node's own resolver
-		// and devcheck.mjs see it too.
+		// Workers get the condition on their node CLI (execArgv), so the package's
+		// self-reference resolves to src/.
 		nodeOptions: ["--conditions=fix-headers-dev"],
 		// Isolate every git call the tests make (directly and through the code under test)
 		// from the developer's global and system git config, so settings such as

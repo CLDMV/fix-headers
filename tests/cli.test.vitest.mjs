@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
+ *	@Last modified time: 2026-11-01T09:28:02-08:00 (1793554082)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -448,8 +448,7 @@ describe("cli", () => {
 	});
 
 	it("executes CLI main entry path", async () => {
-		// From a source checkout the entry's devcheck exits unless the dev condition is set,
-		// the same as `npm run cli`.
+		// Run the source CLI under the dev condition, the same as `npm run cli`.
 		const { stdout, stderr } = await execFileAsync("node", ["--conditions=fix-headers-dev", "./src/cli.mjs", "--help"], {
 			cwd: process.cwd()
 		});
