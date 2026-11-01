@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T14:46:56-07:00 (1793483216)
+ *	@Last modified time: 2026-11-01T09:28:06-08:00 (1793554086)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -26,10 +26,7 @@
  *    stable published path (package.json "bin") but is a build artifact like dist/ — not
  *    tracked in git. esbuild keeps the entry's shebang, so the output stays executable.
  *
- * Runtime dependencies (package.json "dependencies") stay external, and so does
- * ../devcheck.mjs: the entry's development check imports that root file, which is never
- * published, so both bundles import it by path (and skip it when it is absent) instead of
- * inlining it. Output is minified;
+ * Runtime dependencies (package.json "dependencies") stay external. Output is minified;
  * sourcemaps are generated for local debugging and excluded from the tarball via
  * package.json "files". Each output is one self-contained file (no shared chunks).
  * Nothing here cleans the output folders; the `build` script clears dist/ and bin/
@@ -49,9 +46,7 @@ const shared = {
 	dts: false,
 	minify: true,
 	// Keep function and class names through minification (`fixHeaders.name`, stack traces).
-	keepNames: true,
-	// The source checkout's development check (see src/index.mjs); never bundled.
-	external: ["../devcheck.mjs"]
+	keepNames: true
 };
 
 export default defineConfig([

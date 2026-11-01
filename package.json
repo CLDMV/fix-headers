@@ -10,7 +10,6 @@
 		"dist/",
 		"!dist/**/*.map",
 		"types/",
-		"!types/devcheck.d.mts",
 		"bin/",
 		"!bin/**/*.map"
 	],

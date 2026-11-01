@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T15:37:24-07:00 (1793486244)
+ *	@Last modified time: 2026-11-01T09:28:02-08:00 (1793554082)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -65,13 +65,4 @@ test("the fix-headers-dev condition routes require() and import() of the package
 	assert.equal(require("@cldmv/fix-headers"), require("../../src/index.cjs"));
 	const esm = await import("@cldmv/fix-headers");
 	assert.equal(esm.default, (await import("../../src/index.mjs")).default);
-});
-
-test("the built API and CLI import ../devcheck.mjs instead of bundling it", () => {
-	const fs = require("node:fs");
-	for (const built of ["dist/index.mjs", "bin/fix-headers.mjs"]) {
-		const source = fs.readFileSync(path.join(repoRoot, built), "utf8");
-		assert.match(source, /["']\.\.\/devcheck\.mjs["']/, `${built} should load ../devcheck.mjs`);
-		assert.doesNotMatch(source, /Development environment not properly configured/, `${built} should not inline devcheck`);
-	}
 });
