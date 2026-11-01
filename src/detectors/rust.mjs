@@ -44,6 +44,9 @@ export const detector = {
 	id: "rust",
 	extensions,
 	enabledByDefault: true,
+	// Rust skips a first line starting with `#!` (a cargo script's shebang) unless it opens an
+	// inner attribute (`#![...]`); anywhere else `#!` is a syntax error.
+	keepsAboveHeader: (line, index) => index === 0 && line.startsWith("#!") && !/^#!\s*\[/.test(line),
 	resolveCommentSyntax(filePath) {
 		return resolveRustCommentSyntax(filePath);
 	}

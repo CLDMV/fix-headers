@@ -24,6 +24,7 @@ import { detector as phpDetector } from "./php.mjs";
 import { detector as pythonDetector } from "./python.mjs";
 import { detector as rustDetector } from "./rust.mjs";
 import { detector as yamlDetector } from "./yaml.mjs";
+import { isModeline, takeTopLines } from "./top-lines.mjs";
 
 /**
  * @fileoverview Detector registry and shared selector helpers.
@@ -37,10 +38,15 @@ import { detector as yamlDetector } from "./yaml.mjs";
  *  enabledByDefault: boolean,
  *  requiresForce?: boolean,
  *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
- *  resolvePreservedPrefix?: (filePath: string, content: string) => string
+ *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
+ *  keepsAboveHeader?: (line: string, index: number) => boolean,
+ *  resolveContentSkipReason?: (content: string) => string | null
  * }} DetectorProfile
- * A file-type detector: which extensions it handles and the comment syntax (and preserved
- * leading prefix) of those files. Which project a file belongs to is resolved separately,
+ * A file-type detector: which extensions it handles and the comment syntax of those files, and
+ * what stays above the header: `resolvePreservedPrefix` takes a leading block (front matter),
+ * and `keepsAboveHeader` accepts each line of the run at the very top of the file that keeps its
+ * place (a shebang, an encoding declaration; editor modelines are accepted for every detector).
+ * `resolveContentSkipReason` says why a file's content cannot carry a header at all. Which project a file belongs to is resolved separately,
  * from the manifest drivers in `src/drivers/`. A detector with `requiresForce: true` is used only
  * when its id is listed in the `forcedDetectors` option (see {@link getEnabledDetectors}).
  */
@@ -232,26 +238,49 @@ export function getCommentSyntaxForFile(filePath, options = {}) {
 }
 
 /**
- * Resolves detector-specific leading content that must be preserved above inserted headers.
+ * Finds the enabled detector handling a file's extension.
  * @param {string} filePath - File path.
- * @param {string} content - Full file content.
+ * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} options - Runtime options.
+ * @returns {DetectorProfile | undefined} The detector.
+ */
+function detectorForFile(filePath, options) {
+	const extension = extname(filePath).toLowerCase();
+	return getEnabledDetectors(options).find((detector) => detector.extensions.includes(extension));
+}
+
+/**
+ * Resolves the content at the top of a file that stays above the header: the detector's
+ * leading block (front matter), then the run of lines at the very top whose position matters
+ * (see {@link DetectorProfile}). A line further down is never part of it.
+ * @param {string} filePath - File path.
+ * @param {string} content - File content, without a byte order mark.
  * @param {{ language?: string, enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
  * @returns {string} Preserved prefix (possibly empty).
  */
 export function getPreservedPrefixForFile(filePath, content, options = {}) {
-	const extension = extname(filePath).toLowerCase();
-	const detectors = getEnabledDetectors(options);
-	for (const detector of detectors) {
-		if (!detector.extensions.includes(extension)) {
-			continue;
-		}
-
-		if (typeof detector.resolvePreservedPrefix === "function") {
-			return detector.resolvePreservedPrefix(filePath, content);
-		}
-
+	const detector = detectorForFile(filePath, options);
+	if (!detector) {
 		return "";
 	}
+	const block = typeof detector.resolvePreservedPrefix === "function" ? detector.resolvePreservedPrefix(filePath, content) : "";
+	const keeps = detector.keepsAboveHeader;
+	const lines = takeTopLines(
+		content.slice(block.length),
+		(line, index) => isModeline(line) || (typeof keeps === "function" && keeps(line, index)),
+		block.split("\n").length - 1
+	);
+	return `${block}${lines}`;
+}
 
-	return "";
+/**
+ * Says why a file's content cannot carry a header (a PHP file that does not open with `<?php`,
+ * where a comment at the top would be output as text), or null when it can.
+ * @param {string} filePath - File path.
+ * @param {string} content - File content.
+ * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
+ * @returns {string | null} Skip reason, or null.
+ */
+export function getContentSkipReason(filePath, content, options = {}) {
+	const detector = detectorForFile(filePath, options);
+	return detector && typeof detector.resolveContentSkipReason === "function" ? detector.resolveContentSkipReason(content) : null;
 }

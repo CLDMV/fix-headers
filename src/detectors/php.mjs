@@ -40,10 +40,24 @@ function resolvePhpCommentSyntax(filePath) {
 	return null;
 }
 
+/**
+ * The PHP opening tag at the start of a file, with the rest of its line.
+ * @type {RegExp}
+ */
+const OPENING_TAG = /^<\?php(?:\s|$)/i;
+
 export const detector = {
 	id: "php",
 	extensions,
 	enabledByDefault: true,
+	// Everything before `<?php` is output as text, so the opening tag's line stays first and the
+	// header goes inside the PHP code after it.
+	keepsAboveHeader: (line, index) => index === 0 && OPENING_TAG.test(line),
+	resolveContentSkipReason(content) {
+		return OPENING_TAG.test(content.replace(/^\uFEFF/, ""))
+			? null
+			: "the file does not start with <?php, so a comment at the top would be output as text";
+	},
 	resolveCommentSyntax(filePath) {
 		return resolvePhpCommentSyntax(filePath);
 	}

@@ -335,6 +335,20 @@ function printChangedFiles(stdout, result) {
 }
 
 /**
+ * Prints a warning for each additional `@Copyright` a header keeps (one naming another holder
+ * than the header's own). Warnings never change the exit code.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {{copyrightWarnings?: Array<{file?: string, copyright?: string}>}} report - Runner result object.
+ * @returns {void}
+ */
+function printCopyrightWarnings(stdout, report) {
+	const warnings = Array.isArray(report.copyrightWarnings) ? report.copyrightWarnings : [];
+	for (const warning of warnings) {
+		stdout(`warning: ${warning?.file || "<unknown-file>"} keeps an additional @Copyright: ${warning?.copyright ?? ""}`);
+	}
+}
+
+/**
  * Prints each file that was skipped because its format cannot carry the header comment.
  * @param {(message: string) => void} stdout - Standard output writer.
  * @param {{skipped?: Array<{file?: string, reason?: string}>}} report - Runner result object.
@@ -433,19 +447,25 @@ export async function runCli(argv, deps = {}) {
 				`fix-headers check: scanned=${checkReport.filesScanned ?? 0}, drift=${checkReport.filesWithDateDrift ?? 0}, advisories=${checkReport.dateAdvisories ?? 0}`
 			);
 			printDateIssues(stdout, checkReport, finalOptions.verbose === true);
+			printCopyrightWarnings(stdout, result);
 			return exitCode;
 		}
 
 		if (result && typeof result === "object") {
 			const report =
-				/** @type {{filesScanned?: number, filesUpdated?: number, filesSkipped?: number, skipped?: Array<{file?: string, reason?: string}>, dryRun?: boolean}} */ (
+				/** @type {{filesScanned?: number, filesUpdated?: number, filesSkipped?: number, skipped?: Array<{file?: string, reason?: string}>, copyrightWarnings?: Array<{file?: string, copyright?: string}>, dryRun?: boolean}} */ (
 					result
 				);
 			const skippedCount = Number(report.filesSkipped) > 0 ? `, skipped=${report.filesSkipped}` : "";
+			const warningCount =
+				Array.isArray(report.copyrightWarnings) && report.copyrightWarnings.length > 0
+					? `, warnings=${report.copyrightWarnings.length}`
+					: "";
 			stdout(
-				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}${skippedCount}, dryRun=${report.dryRun === true}`
+				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}${skippedCount}${warningCount}, dryRun=${report.dryRun === true}`
 			);
 			printSkipped(stdout, report);
+			printCopyrightWarnings(stdout, report);
 			printDetails(stdout, result, finalOptions, parsed.diff);
 		} else {
 			printDetails(stdout, result, finalOptions, parsed.diff);
