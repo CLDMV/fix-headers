@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
+ *	@Last modified time: 2026-10-31T14:46:55-07:00 (1793483215)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -18,7 +18,7 @@ import { chmod, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { fixHeaders } from "../src/fix-header.mjs";
+import { fixHeaders } from "../src/index.mjs";
 import { detectGitAuthor, parseSignerUid, readSigningKeyUid } from "../src/utils/git.mjs";
 import { SIGNING_KEY_UID_ENV } from "./helpers/signing-key.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";

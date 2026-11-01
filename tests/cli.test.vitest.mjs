@@ -448,7 +448,11 @@ describe("cli", () => {
 	});
 
 	it("executes CLI main entry path", async () => {
-		const { stdout, stderr } = await execFileAsync("node", ["./src/cli.mjs", "--help"], { cwd: process.cwd() });
+		// From a source checkout the entry's devcheck exits unless the dev condition is set,
+		// the same as `npm run cli`.
+		const { stdout, stderr } = await execFileAsync("node", ["--conditions=fix-headers-dev", "./src/cli.mjs", "--help"], {
+			cwd: process.cwd()
+		});
 		expect(stderr).toBe("");
 		expect(stdout).toContain("fix-headers CLI");
 	});

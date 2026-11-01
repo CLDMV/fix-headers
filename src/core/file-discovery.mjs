@@ -18,6 +18,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { getAllowedExtensions } from "../detectors/index.mjs";
 import { walkFiles } from "../utils/fs.mjs";
+import { trimTrailingSlashes } from "../utils/text.mjs";
 import { createIgnoreFilter } from "./ignore-rules.mjs";
 
 /**
@@ -85,7 +86,7 @@ function isNeverWalked(dirPath, dirName) {
  * @returns {string} Normalized path.
  */
 function normalizeFolderPath(folderPath) {
-	return folderPath.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "").replace(/\/+$/, "");
+	return trimTrailingSlashes(folderPath.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, ""));
 }
 
 /**

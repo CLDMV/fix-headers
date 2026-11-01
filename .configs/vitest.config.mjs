@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:05-07:00 (1790969285)
+ *	@Last modified time: 2026-10-31T14:46:48-07:00 (1793483208)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -23,9 +23,23 @@ import { defineConfig } from "vitest/config";
  */
 
 export default defineConfig({
+	resolve: {
+		// Replaces the defaults, so keep the usual ones alongside the package's own
+		// condition (which routes the "." export to src/).
+		conditions: ["fix-headers-dev", "module", "browser", "development|production"]
+	},
+	ssr: {
+		// Vitest often goes through the SSR resolve pipeline even in node tests.
+		resolve: {
+			conditions: ["fix-headers-dev", "node", "development|production"]
+		}
+	},
 	test: {
 		environment: "node",
 		include: ["tests/**/*.test.vitest.mjs"],
+		// Workers get the condition on their node CLI (execArgv), so Node's own resolver
+		// and devcheck.mjs see it too.
+		nodeOptions: ["--conditions=fix-headers-dev"],
 		// Isolate every git call the tests make (directly and through the code under test)
 		// from the developer's global and system git config, so settings such as
 		// user.signingkey, commit.gpgsign or user.name on the machine running the suite

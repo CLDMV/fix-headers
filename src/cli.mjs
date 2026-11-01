@@ -8,7 +8,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-03T22:50:30-07:00 (1791093030)
+ *	@Last modified time: 2026-10-31T14:46:51-07:00 (1793483211)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -17,7 +17,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { applyConfigOption } from "./config/load.mjs";
-import fixHeaders from "./fix-header.mjs";
+import fixHeaders from "./index.mjs";
 
 /**
  * @fileoverview CLI entry point for running fix-headers from terminal commands.

@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:19-07:00 (1790969299)
+ *	@Last modified time: 2026-10-31T14:46:56-07:00 (1793483216)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -15,7 +15,7 @@
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { fixHeaders } from "../src/fix-header.mjs";
+import { fixHeaders } from "../src/index.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 /**
