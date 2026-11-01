@@ -111,6 +111,8 @@
 		"ignore": "^7.0.5"
 	},
 	"overrides": {
-		"esbuild": "$esbuild"
+		"esbuild": "$esbuild",
+		"katex": "^0.19.1",
+		"minimatch": "^11.0.3"
 	}
 }
