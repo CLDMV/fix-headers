@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.2.3",
+	"version": "2.2.4",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -10,6 +10,7 @@
 		"dist/",
 		"!dist/**/*.map",
 		"types/",
+		"!types/devcheck.d.mts",
 		"bin/",
 		"!bin/**/*.map"
 	],
@@ -17,7 +18,8 @@
 		".": {
 			"fix-headers-dev": {
 				"types": "./types/index.d.mts",
-				"import": "./src/fix-header.mjs"
+				"import": "./src/index.mjs",
+				"require": "./src/index.cjs"
 			},
 			"types": "./types/index.d.mts",
 			"import": "./dist/index.mjs",
@@ -31,13 +33,13 @@
 	"scripts": {
 		"build:ci": "npm run lint --if-present && npm run format:check --if-present && npm run types:check && npm run types:build && npm run build",
 		"test": "node tests/run-vitest.mjs && npm run test:cjs",
-		"test:cjs": "npm run build && node --test tests/cjs/entry.test.cjs",
+		"test:cjs": "npm run build && node --conditions=fix-headers-dev --test tests/cjs/entry.test.cjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet && npm run test:cjs",
 		"ci:coverage": "npm run coverage",
 		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
-		"cli": "node ./src/cli.mjs",
+		"cli": "node --conditions=fix-headers-dev ./src/cli.mjs",
 		"build": "node -e \"for (const d of ['dist', 'bin']) require('node:fs').rmSync(d, { recursive: true, force: true })\" && tsup",
 		"prepack": "node -e \"const fs=require('node:fs');const hasTsup=fs.existsSync('node_modules/.bin/tsup')||fs.existsSync('node_modules/.bin/tsup.cmd');if(hasTsup){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and tsup is unavailable to build it (expected in a bare package-contents publish dir with a prebuilt dist/; unexpected anywhere else)')}\"",
 		"lint": "eslint --config .configs/eslint.config.mjs .",
@@ -45,7 +47,7 @@
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
 		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"",
-		"fix:headers": "node ./src/cli.mjs --config .configs/fix-headers.json"
+		"fix:headers": "node --conditions=fix-headers-dev ./src/cli.mjs --config .configs/fix-headers.json"
 	},
 	"keywords": [
 		"headers",
@@ -62,7 +64,7 @@
 	},
 	"homepage": "https://github.com/CLDMV/fix-headers#readme",
 	"engines": {
-		"node": ">=22.12.0"
+		"node": ">=22.13.0"
 	},
 	"author": {
 		"name": "Shinrai",
@@ -109,6 +111,8 @@
 		"ignore": "^7.0.5"
 	},
 	"overrides": {
-		"esbuild": "$esbuild"
+		"esbuild": "$esbuild",
+		"katex": ">=0.19.1 <1.0.0",
+		"minimatch": "^11.0.3"
 	}
 }

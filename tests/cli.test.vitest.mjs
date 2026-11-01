@@ -194,6 +194,24 @@ describe("cli", () => {
 		expect(stdout.join("\n")).toContain("scanned=5");
 	});
 
+	it("prints a copyright warning per entry without changing the exit code, even for incomplete entries (#162)", async () => {
+		const stdout = [];
+		const code = await runCli([], {
+			runner: async () => ({
+				filesScanned: 1,
+				filesUpdated: 0,
+				dryRun: false,
+				copyrightWarnings: [{ file: "a.mjs", copyright: "(c) X" }, {}]
+			}),
+			stdout: (message) => stdout.push(message)
+		});
+
+		expect(code).toBe(0);
+		expect(stdout[0]).toContain("updated=0, warnings=2");
+		expect(stdout).toContain("warning: a.mjs keeps an additional @Copyright: (c) X");
+		expect(stdout).toContain("warning: <unknown-file> keeps an additional @Copyright: ");
+	});
+
 	it("prints updated file paths in verbose mode", async () => {
 		const stdout = [];
 		const code = await runCli(["--verbose"], {
@@ -430,7 +448,11 @@ describe("cli", () => {
 	});
 
 	it("executes CLI main entry path", async () => {
-		const { stdout, stderr } = await execFileAsync("node", ["./src/cli.mjs", "--help"], { cwd: process.cwd() });
+		// From a source checkout the entry's devcheck exits unless the dev condition is set,
+		// the same as `npm run cli`.
+		const { stdout, stderr } = await execFileAsync("node", ["--conditions=fix-headers-dev", "./src/cli.mjs", "--help"], {
+			cwd: process.cwd()
+		});
 		expect(stderr).toBe("");
 		expect(stdout).toContain("fix-headers CLI");
 	});

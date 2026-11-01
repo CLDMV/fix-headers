@@ -42,6 +42,8 @@ export const detector = {
 	id: "yaml",
 	extensions,
 	enabledByDefault: true,
+	// cloud-init reads a user-data file as cloud-config only when its first line is `#cloud-config`.
+	keepsAboveHeader: (line, index) => index === 0 && /^#cloud-config\s*$/.test(line),
 	resolveCommentSyntax(filePath) {
 		return resolveYamlCommentSyntax(filePath);
 	}

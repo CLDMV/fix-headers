@@ -17,6 +17,7 @@ import { basename, dirname, extname, resolve } from "node:path";
 import { getEnabledDetectors } from "../detectors/index.mjs";
 import { resolveManifestProject } from "../drivers/index.mjs";
 import { detectGitAuthor } from "../utils/git.mjs";
+import { hasAngleTag } from "../utils/text.mjs";
 
 /**
  * @fileoverview Auto-detects project metadata from the project's manifests and git config.
@@ -61,7 +62,7 @@ function formatAuthorNameWithCompany(authorName, company) {
 		return authorName;
 	}
 
-	if (/<[^>]+>/.test(authorName)) {
+	if (hasAngleTag(authorName)) {
 		return authorName;
 	}
 

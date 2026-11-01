@@ -8,7 +8,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-03T22:50:30-07:00 (1791093030)
+ *	@Last modified time: 2026-10-31T14:46:51-07:00 (1793483211)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -17,7 +17,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { applyConfigOption } from "./config/load.mjs";
-import fixHeaders from "./fix-header.mjs";
+import fixHeaders from "./index.mjs";
 
 /**
  * @fileoverview CLI entry point for running fix-headers from terminal commands.
@@ -335,6 +335,20 @@ function printChangedFiles(stdout, result) {
 }
 
 /**
+ * Prints a warning for each additional `@Copyright` a header keeps (one naming another holder
+ * than the header's own). Warnings never change the exit code.
+ * @param {(message: string) => void} stdout - Standard output writer.
+ * @param {{copyrightWarnings?: Array<{file?: string, copyright?: string}>}} report - Runner result object.
+ * @returns {void}
+ */
+function printCopyrightWarnings(stdout, report) {
+	const warnings = Array.isArray(report.copyrightWarnings) ? report.copyrightWarnings : [];
+	for (const warning of warnings) {
+		stdout(`warning: ${warning?.file || "<unknown-file>"} keeps an additional @Copyright: ${warning?.copyright ?? ""}`);
+	}
+}
+
+/**
  * Prints each file that was skipped because its format cannot carry the header comment.
  * @param {(message: string) => void} stdout - Standard output writer.
  * @param {{skipped?: Array<{file?: string, reason?: string}>}} report - Runner result object.
@@ -433,19 +447,25 @@ export async function runCli(argv, deps = {}) {
 				`fix-headers check: scanned=${checkReport.filesScanned ?? 0}, drift=${checkReport.filesWithDateDrift ?? 0}, advisories=${checkReport.dateAdvisories ?? 0}`
 			);
 			printDateIssues(stdout, checkReport, finalOptions.verbose === true);
+			printCopyrightWarnings(stdout, result);
 			return exitCode;
 		}
 
 		if (result && typeof result === "object") {
 			const report =
-				/** @type {{filesScanned?: number, filesUpdated?: number, filesSkipped?: number, skipped?: Array<{file?: string, reason?: string}>, dryRun?: boolean}} */ (
+				/** @type {{filesScanned?: number, filesUpdated?: number, filesSkipped?: number, skipped?: Array<{file?: string, reason?: string}>, copyrightWarnings?: Array<{file?: string, copyright?: string}>, dryRun?: boolean}} */ (
 					result
 				);
 			const skippedCount = Number(report.filesSkipped) > 0 ? `, skipped=${report.filesSkipped}` : "";
+			const warningCount =
+				Array.isArray(report.copyrightWarnings) && report.copyrightWarnings.length > 0
+					? `, warnings=${report.copyrightWarnings.length}`
+					: "";
 			stdout(
-				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}${skippedCount}, dryRun=${report.dryRun === true}`
+				`fix-headers complete: scanned=${report.filesScanned ?? 0}, updated=${report.filesUpdated ?? 0}${skippedCount}${warningCount}, dryRun=${report.dryRun === true}`
 			);
 			printSkipped(stdout, report);
+			printCopyrightWarnings(stdout, report);
 			printDetails(stdout, result, finalOptions, parsed.diff);
 		} else {
 			printDetails(stdout, result, finalOptions, parsed.diff);

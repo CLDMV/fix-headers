@@ -1,2 +1,2 @@
-export * from "./src/fix-header.mjs";
-export { default } from "./src/fix-header.mjs";
+export * from "./src/index.mjs";
+export { default } from "./src/index.mjs";

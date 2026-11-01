@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:19-07:00 (1790969299)
+ *	@Last modified time: 2026-10-31T14:46:56-07:00 (1793483216)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -18,20 +18,25 @@
  *
  * Two builds plus one copied file:
  *  - ESM API  → dist/index.mjs — `fixHeaders` named export plus the default export.
- *  - CJS API  → dist/index.cjs — not built: src/cjs/index.cjs is a thin wrapper that
- *    `require()`s dist/index.mjs and returns its default export (`module.exports =
- *    fixHeaders`, the historical shape). tsup copies it into the ESM build's outDir via
- *    `publicDir`, so it follows any outDir override and never duplicates the library.
+ *  - CJS API  → dist/index.cjs — not built: src/index.cjs is a thin wrapper that
+ *    `require()`s the sibling index.mjs and returns its default export (`module.exports =
+ *    fixHeaders`, the historical shape). `onSuccess` copies it verbatim into the ESM
+ *    build's outDir, so it follows any outDir override and never duplicates the library.
  *  - CLI      → bin/fix-headers.mjs — ESM only, bundled from src/cli.mjs. bin/ is the
  *    stable published path (package.json "bin") but is a build artifact like dist/ — not
  *    tracked in git. esbuild keeps the entry's shebang, so the output stays executable.
  *
- * Runtime dependencies (package.json "dependencies") stay external. Output is minified;
+ * Runtime dependencies (package.json "dependencies") stay external, and so does
+ * ../devcheck.mjs: the entry's development check imports that root file, which is never
+ * published, so both bundles import it by path (and skip it when it is absent) instead of
+ * inlining it. Output is minified;
  * sourcemaps are generated for local debugging and excluded from the tarball via
  * package.json "files". Each output is one self-contained file (no shared chunks).
  * Nothing here cleans the output folders; the `build` script clears dist/ and bin/
  * before invoking tsup instead.
  */
+import { copyFileSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "tsup";
 
 const shared = {
@@ -44,19 +49,25 @@ const shared = {
 	dts: false,
 	minify: true,
 	// Keep function and class names through minification (`fixHeaders.name`, stack traces).
-	keepNames: true
+	keepNames: true,
+	// The source checkout's development check (see src/index.mjs); never bundled.
+	external: ["../devcheck.mjs"]
 };
 
 export default defineConfig([
 	{
 		...shared,
-		entry: { index: "src/fix-header.mjs" },
+		entry: { index: "src/index.mjs" },
 		format: ["esm"],
-		publicDir: "src/cjs",
 		outDir: "dist",
 		clean: false,
 		outExtension() {
 			return { js: ".mjs" };
+		},
+		// tsup calls this on the resolved options, so `this.outDir` is the directory the
+		// build actually wrote to (a caller may override outDir), not always dist/.
+		onSuccess() {
+			copyFileSync("src/index.cjs", join(this.outDir, "index.cjs"));
 		}
 	},
 	{

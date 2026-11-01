@@ -14,6 +14,7 @@
  */
 
 import { extname } from "node:path";
+import { isShebang } from "./top-lines.mjs";
 
 /**
  * @fileoverview Python detector implementation.
@@ -23,23 +24,28 @@ import { extname } from "node:path";
 const extensions = [".py"];
 
 /**
- * Resolves preserved leading prefix for Python files (for example: shebang line).
- * @param {string} _filePath - File path.
- * @param {string} content - File content.
- * @returns {string} Preserved prefix.
+ * A PEP 263 encoding declaration (`# -*- coding: utf-8 -*-`, `# coding=utf-8`). `coding` must
+ * start a word, so prose such as `Decoding: base64` is not one.
+ * @type {RegExp}
  */
-function resolvePythonPreservedPrefix(_filePath, content) {
-	const shebangMatch = content.match(/^#!.*\bpython(?:\d+(?:\.\d+)*)?\b.*(?:\r?\n|$)/);
-	return shebangMatch ? shebangMatch[0] : "";
+const CODING_LINE = /^#.*?(?<![A-Za-z])coding[:=]\s*[-\w.]+/;
+
+/**
+ * Whether a line at the top of a Python file keeps its place above the header: a shebang on
+ * line 1, or a PEP 263 encoding declaration on line 1 or 2 (Python reads it nowhere else).
+ * @param {string} line - The line.
+ * @param {number} index - Zero-based line number.
+ * @returns {boolean} Whether the line stays above the header.
+ */
+function keepsAboveHeader(line, index) {
+	return isShebang(line, index) || (index <= 1 && CODING_LINE.test(line));
 }
 
 export const detector = {
 	id: "python",
 	extensions,
 	enabledByDefault: true,
-	resolvePreservedPrefix(filePath, content) {
-		return resolvePythonPreservedPrefix(filePath, content);
-	},
+	keepsAboveHeader,
 	resolveCommentSyntax(filePath) {
 		const extension = extname(filePath).toLowerCase();
 		if (extensions.includes(extension)) {
