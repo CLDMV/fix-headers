@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { isModeline } from "../src/detectors/top-lines.mjs";
 import { copyrightHolder, replaceOrInsertHeader } from "../src/header/parser.mjs";
+import { hasAngleTag, trimTrailingSlashes } from "../src/utils/text.mjs";
 
 /**
  * @fileoverview Inputs shaped like the polynomial-backtracking cases CodeQL reported on #162
@@ -69,5 +70,29 @@ describe("regular expressions stay linear on long white space (#162)", () => {
 		expect(fast(() => isModeline(`/* vim: ts=2 ${"*".repeat(RUN)}*/`))).toBe(true);
 		expect(fast(() => isModeline(`<!-- vim: set ts=2:${SPACES}-->`))).toBe(true);
 		expect(fast(() => isModeline(`<!-- vim: ts=2${SPACES}is,${TABS}-->`))).toBe(false);
+	});
+});
+
+describe("text scans (CodeQL #1, #2)", () => {
+	it("hasAngleTag matches /<[^>]+>/ on short inputs", () => {
+		for (const text of ["", "Nate", "Nate <CLDMV>", "<>", "<><a>", "a<b", "<a<>", "<<a>", "x>y<", "<>>"]) {
+			expect(hasAngleTag(text)).toBe(/<[^>]+>/.test(text));
+		}
+	});
+
+	it("hasAngleTag reads a long run of < in linear time", () => {
+		expect(fast(() => hasAngleTag("<".repeat(RUN)))).toBe(false);
+		expect(fast(() => hasAngleTag("<>".repeat(RUN)))).toBe(false);
+	});
+
+	it("trimTrailingSlashes matches .replace(/\\/+$/, '') on short inputs", () => {
+		for (const text of ["", "/", "///", "a", "a/", "a//b//", "/a/"]) {
+			expect(trimTrailingSlashes(text)).toBe(text.replace(/\/+$/, ""));
+		}
+	});
+
+	it("trimTrailingSlashes reads a long run of / in linear time", () => {
+		expect(fast(() => trimTrailingSlashes(`${"/".repeat(RUN)}a`))).toBe(`${"/".repeat(RUN)}a`);
+		expect(fast(() => trimTrailingSlashes("/".repeat(RUN)))).toBe("");
 	});
 });
