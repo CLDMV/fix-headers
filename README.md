@@ -14,18 +14,18 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.3 (October 2026)
+### Latest: v2.2.4 (October 2026)
 
-- **Text inside an existing header is never deleted** — rewriting a header used to drop any line in it that was not a header field: a description under `@Copyright`, a co-author or licence line, a line wrapping a field's value. That text is now kept verbatim and in order. By default it moves to its own comment block directly below the header, so the header holds only fields; turning `strictHeaderBlock` off (`--no-strict-header-block`) keeps it inside the header instead. Files whose header carries extra text get a one-time diff on the first run; review it with `--dry-run --diff` ([#160](https://github.com/CLDMV/fix-headers/issues/160), [#161](https://github.com/CLDMV/fix-headers/pull/161)).
-- **Dependency refresh** — `ignore` 7.0.14 within its existing range, plus development tooling (`vitest` 5.0.5, `eslint` 10.14.0, `prettier` 3.9.10, `@cldmv/vitest-runner` 1.5.6) ([#144](https://github.com/CLDMV/fix-headers/pull/144), [#163](https://github.com/CLDMV/fix-headers/pull/163)).
-- [View full v2.2.3 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md)
+- **One header per file** — stacked copies of a header are merged into one whatever their first line is, repeated fields are dropped, and a stale `@Copyright` for the same holder goes away while one naming another holder is kept and reported in `copyrightWarnings` and as a CLI warning. Only lines that must stay at the top of a file (a shebang, a Python encoding line, `#cloud-config`, `@charset`, Go build constraints, `<?php`, front matter, a Vim modeline) stay above the header, and files where an earlier version wrote the header above one are repaired. `#` headers are found in CRLF and byte-order-mark files. Expect a one-time diff in affected files; review it with `--dry-run --diff` ([#162](https://github.com/CLDMV/fix-headers/issues/162), [#166](https://github.com/CLDMV/fix-headers/pull/166)).
+- **Packaging and hardening** — entry files are `src/index.mjs` and `src/index.cjs`, a source checkout run without the `fix-headers-dev` condition stops with a clear message, the Node.js floor is 22.13.0, and two ReDoS-prone regular expressions are now linear-time scans ([#157](https://github.com/CLDMV/fix-headers/issues/157), [#158](https://github.com/CLDMV/fix-headers/issues/158), [#165](https://github.com/CLDMV/fix-headers/pull/165)).
+- [View full v2.2.4 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.4.md)
 
 ### Recent Releases
 
+- **v2.2.3** (October 2026) — text inside an existing header that is not a header field is kept instead of deleted, moved to its own block below the header by default (`strictHeaderBlock`), plus a dependency refresh ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md))
 - **v2.2.2** (October 2026) — dependency refresh with nothing the package ships changed: `ignore` 7.0.12 within its range, plus `@cldmv/vitest-runner` 1.5.3, `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md))
 - **v2.2.1** (October 2026) — development-setup patch: the repository's own `fix:headers` run moves to `@cldmv/configs` 1.2.4, whose shared config no longer forces author updates; nothing the package ships changed ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.1.md))
 - **v2.2.0** (October 2026) — `@Last modified by` names whoever last edited the file's content: a run that only rewrites a header keeps the recorded editor instead of writing the run's identity ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.0.md))
-- **v2.1.4** (October 2026) — strict JSON, Markdown named with `--input` and files with no or an unhandled extension are skipped and reported instead of getting a JavaScript comment; `--input` is repeatable; dependency folders are never walked; `require()` fails clearly where Node.js cannot load ES modules ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.1.4.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
