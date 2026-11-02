@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-01T09:28:06-08:00 (1793554086)
+ *	@Last modified time: 2026-11-01T16:29:22-08:00 (1793579362)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -37,7 +37,7 @@ import { join } from "node:path";
 import { defineConfig } from "tsup";
 
 const shared = {
-	target: "node22",
+	target: "node18",
 	platform: "node",
 	splitting: false,
 	// Keep `node:` specifiers on built-in imports (tsup strips them by default).

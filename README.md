@@ -51,8 +51,9 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ### Requirements
 
-- **Node.js 22.22.0 or later** (`engines.node` is `>=22.22.0`).
-- The package is an ES module and loads with `import` on every supported version. `require("@cldmv/fix-headers")` loads the ES module build synchronously, which needs Node.js >=22.22.0; on older Node.js, use `import()` instead.
+- **Node.js 18.0.0 or later** (`engines.node` is `>=18.0.0`). The package is an ES module and loads with `import` on every supported version. Remote (`https://`) config `extends` uses the global `fetch`, which Node.js 18 has.
+- `require("@cldmv/fix-headers")` loads the ES module build synchronously, which needs Node.js ^20.19.0 or >=22.13.0; on older Node.js, use `import()` instead.
+- Developing this package needs Node.js 22.22.0 or later (`devEngines`).
 
 ### Install
 
