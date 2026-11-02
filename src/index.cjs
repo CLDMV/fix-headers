@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-01T13:32:08-08:00 (1793568728)
+ *	@Last modified time: 2026-11-01T16:29:20-08:00 (1793579360)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -21,9 +21,9 @@
  * returns the default export, keeping the historical `module.exports = fixHeaders`
  * shape, instead of tsup bundling a second full copy of the library for CJS.
  *
- * Node.js versions without require(esm) (before 22.22) would fail with a bare
- * ERR_REQUIRE_ESM, so the check below fails early with a message that says what to do
- * instead.
+ * Node.js versions without require(esm) (20.x before 20.19, 22.x before 22.12, and
+ * anything older) would fail with a bare ERR_REQUIRE_ESM, so the check below fails
+ * early with a message that says what to do instead.
  *
  * It sits next to the ESM entry under the same name, so `require("./index.mjs")` resolves
  * to src/index.mjs from source and to dist/index.mjs once built. tsup's `onSuccess` copies
@@ -35,7 +35,7 @@
 
 if (!process.features?.require_module) {
 	const error = new Error(
-		`@cldmv/fix-headers: require() needs Node.js >=22.22.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
+		`@cldmv/fix-headers: require() needs Node.js ^20.19.0 or >=22.13.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
 	);
 	error.code = "ERR_REQUIRE_ESM";
 	throw error;
