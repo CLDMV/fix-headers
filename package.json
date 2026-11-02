@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.2.4",
+	"version": "2.2.5",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -10,7 +10,6 @@
 		"dist/",
 		"!dist/**/*.map",
 		"types/",
-		"!types/devcheck.d.mts",
 		"bin/",
 		"!bin/**/*.map"
 	],
@@ -64,7 +63,7 @@
 	},
 	"homepage": "https://github.com/CLDMV/fix-headers#readme",
 	"engines": {
-		"node": ">=22.13.0"
+		"node": ">=22.22.0"
 	},
 	"author": {
 		"name": "Shinrai",
@@ -101,14 +100,14 @@
 		"@vitest/coverage-v8": "^5.0.0",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.11.0",
-		"globals": "^17.12.0",
+		"globals": "^17.14.0",
 		"prettier": "^3.9.9",
-		"tsup": "^8.5.1",
+		"tsup": "^9.0.0",
 		"typescript": "^6.0.3",
 		"vitest": "^5.0.0"
 	},
 	"dependencies": {
-		"ignore": "^7.0.5"
+		"ignore": "^7.0.14"
 	},
 	"overrides": {
 		"esbuild": "$esbuild",

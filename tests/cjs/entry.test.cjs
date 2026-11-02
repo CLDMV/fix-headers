@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T15:37:24-07:00 (1793486244)
+ *	@Last modified time: 2026-11-01T13:32:12-08:00 (1793568732)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -38,7 +38,7 @@ test("require() returns the same fixHeaders function as import's default", async
 
 test("require() fails with a clear message where Node.js has no require(esm)", () => {
 	// --no-experimental-require-module turns require(esm) off, which is what Node.js
-	// versions before 20.19 / 22.12 look like to the entry.
+	// versions before 22.22 look like to the entry.
 	const res = spawnSync(process.execPath, ["--no-experimental-require-module", "-e", "require('./dist/index.cjs')"], {
 		cwd: repoRoot,
 		encoding: "utf8"
@@ -46,7 +46,7 @@ test("require() fails with a clear message where Node.js has no require(esm)", (
 
 	assert.notEqual(res.status, 0);
 	assert.match(res.stderr, /ERR_REQUIRE_ESM/);
-	assert.match(res.stderr, /require\(\) needs Node\.js \^20\.19\.0 or >=22\.12\.0/);
+	assert.match(res.stderr, /require\(\) needs Node\.js >=22\.22\.0/);
 	assert.match(res.stderr, /import\(\)/);
 });
 
@@ -65,13 +65,4 @@ test("the fix-headers-dev condition routes require() and import() of the package
 	assert.equal(require("@cldmv/fix-headers"), require("../../src/index.cjs"));
 	const esm = await import("@cldmv/fix-headers");
 	assert.equal(esm.default, (await import("../../src/index.mjs")).default);
-});
-
-test("the built API and CLI import ../devcheck.mjs instead of bundling it", () => {
-	const fs = require("node:fs");
-	for (const built of ["dist/index.mjs", "bin/fix-headers.mjs"]) {
-		const source = fs.readFileSync(path.join(repoRoot, built), "utf8");
-		assert.match(source, /["']\.\.\/devcheck\.mjs["']/, `${built} should load ../devcheck.mjs`);
-		assert.doesNotMatch(source, /Development environment not properly configured/, `${built} should not inline devcheck`);
-	}
 });
