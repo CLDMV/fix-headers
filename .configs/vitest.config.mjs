@@ -15,56 +15,49 @@
 
 import { devNull } from "node:os";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
+import { devCondition } from "@cldmv/configs/vitest.config.mjs";
 
 /**
  * @fileoverview Vitest configuration for full module coverage.
  * @module fix-headers/vitest-config
  */
 
-export default defineConfig({
-	resolve: {
-		// Replaces the defaults, so keep the usual ones alongside the package's own
-		// condition (which routes the "." export to src/).
-		conditions: ["fix-headers-dev", "module", "browser", "development|production"]
-	},
-	ssr: {
-		// Vitest often goes through the SSR resolve pipeline even in node tests.
-		resolve: {
-			conditions: ["fix-headers-dev", "node", "development|production"]
+// Project root, so devCondition() reads this package's package.json.
+const root = fileURLToPath(new URL("..", import.meta.url));
+
+export default mergeConfig(
+	devCondition({ root }),
+	defineConfig({
+		test: {
+			environment: "node",
+			include: ["tests/**/*.test.vitest.mjs"],
+			// Isolate every git call the tests make (directly and through the code under test)
+			// from the developer's global and system git config, so settings such as
+			// user.signingkey, commit.gpgsign or user.name on the machine running the suite
+			// can't change results. Tests set the identity they need in each workspace's own
+			// repository config.
+			env: { GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" },
+			// Reap only STALE fixture directories (age-guarded) before/after the run so
+			// orphaned fixtures from a crashed/interrupted run self-heal, without touching
+			// a concurrent run's fresh fixtures (see tests/helpers/workspace.mjs).
+			// Absolute path so it resolves regardless of vitest's root.
+			globalSetup: [fileURLToPath(new URL("./vitest.globalSetup.mjs", import.meta.url))],
+			// "dot" keeps CI logs to one character per test file instead of a full
+			// "RUN vX.Y.Z" + per-file pass/fail block for every file — vitest's
+			// non-interactive fallback (no TTY to redraw) otherwise reprints that
+			// whole block per file on top of the final aggregate summary. The
+			// final "Test Files X passed" / "Tests Y passed" summary is
+			// unaffected — every built-in reporter prints it regardless of
+			// per-test verbosity.
+			reporters: ["dot"],
+			coverage: {
+				provider: "v8",
+				reporter: ["text", "json", "json-summary", "html"],
+				include: ["src/**/*.mjs"],
+				exclude: ["reference/**"],
+				all: true
+			}
 		}
-	},
-	test: {
-		environment: "node",
-		include: ["tests/**/*.test.vitest.mjs"],
-		// Workers get the condition on their node CLI (execArgv), so the package's
-		// self-reference resolves to src/.
-		nodeOptions: ["--conditions=fix-headers-dev"],
-		// Isolate every git call the tests make (directly and through the code under test)
-		// from the developer's global and system git config, so settings such as
-		// user.signingkey, commit.gpgsign or user.name on the machine running the suite
-		// can't change results. Tests set the identity they need in each workspace's own
-		// repository config.
-		env: { GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" },
-		// Reap only STALE fixture directories (age-guarded) before/after the run so
-		// orphaned fixtures from a crashed/interrupted run self-heal, without touching
-		// a concurrent run's fresh fixtures (see tests/helpers/workspace.mjs).
-		// Absolute path so it resolves regardless of vitest's root.
-		globalSetup: [fileURLToPath(new URL("./vitest.globalSetup.mjs", import.meta.url))],
-		// "dot" keeps CI logs to one character per test file instead of a full
-		// "RUN vX.Y.Z" + per-file pass/fail block for every file — vitest's
-		// non-interactive fallback (no TTY to redraw) otherwise reprints that
-		// whole block per file on top of the final aggregate summary. The
-		// final "Test Files X passed" / "Tests Y passed" summary is
-		// unaffected — every built-in reporter prints it regardless of
-		// per-test verbosity.
-		reporters: ["dot"],
-		coverage: {
-			provider: "v8",
-			reporter: ["text", "json", "json-summary", "html"],
-			include: ["src/**/*.mjs"],
-			exclude: ["reference/**"],
-			all: true
-		}
-	}
-});
+	})
+);
