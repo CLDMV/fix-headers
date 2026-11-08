@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-31T14:46:55-07:00 (1793483215)
+ *	@Last modified time: 2026-11-07T21:53:30-08:00 (1794117210)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -22,7 +22,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { build } from "tsup";
 import tsupConfigs from "../tsup.config.mjs";
-import fixHeadersDefault, { fixHeaders } from "../src/index.mjs";
+import fixHeadersDefault, { fixHeaders } from "@cldmv/fix-headers";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
 import { detectProjectFromMarkers, resolveProjectMetadata } from "../src/detect/project.mjs";
