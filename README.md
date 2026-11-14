@@ -14,17 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.6 (November 2026)
+### Latest: v2.2.7 (November 2026)
 
-- **`engines.node` is the runtime floor again** — `engines.node` is back to `>=18.0.0`, the version the package actually needs, instead of v2.2.5's `>=22.22.0`, so installs on Node.js 18 through 22.21 no longer get an engine warning. The 22.22.0 development toolchain floor moves to `devEngines`, which only applies to work on this repository. `require()` still needs Node.js ^20.19.0 or >=22.13.0, and its error message now says so ([#176](https://github.com/CLDMV/fix-headers/pull/176)).
-- [View full v2.2.6 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.6.md)
+- **Tests run against `src/` and `dist/`** — no library code changed. The test suite now gets the `fix-headers-dev` condition through `devCondition()` from `@cldmv/configs` (the old `test.nodeOptions` never reached the workers), the tests import the package by name, and `npm run test:dist` builds the package and runs the same suite against `dist/` ([#179](https://github.com/CLDMV/fix-headers/pull/179), [#181](https://github.com/CLDMV/fix-headers/pull/181)). Also a discovery-test fix for checkouts under a `dist` folder, `vitest` 5.1.0 and the `sync-release-notes` workflow ([#182](https://github.com/CLDMV/fix-headers/pull/182), [#183](https://github.com/CLDMV/fix-headers/pull/183), [#187](https://github.com/CLDMV/fix-headers/pull/187)).
+- [View full v2.2.7 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.7.md)
 
 ### Recent Releases
 
+- **v2.2.6** (November 2026) — `engines.node` is back to `>=18.0.0`, the runtime floor; the 22.22.0 development toolchain floor moves to `devEngines`, and the `require()` error names ^20.19.0 or >=22.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.6.md))
 - **v2.2.5** (November 2026) — the source-checkout development check is removed (the `fix-headers-dev` condition already picks `src/` or `dist/`), and `engines.node` went to `>=22.22.0` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.5.md))
 - **v2.2.4** (October 2026) — one header per file: stacked headers merge, repeated fields and stale `@Copyright` lines are dropped, only position-critical lines stay above the header, `#` headers are found in CRLF and byte-order-mark files ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.4.md))
 - **v2.2.3** (October 2026) — text inside an existing header that is not a header field is kept instead of deleted, moved to its own block below the header by default (`strictHeaderBlock`), plus a dependency refresh ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md))
-- **v2.2.2** (October 2026) — dependency refresh with nothing the package ships changed: `ignore` 7.0.12 within its range, plus `@cldmv/vitest-runner` 1.5.3, `vitest` 5.0.3, `eslint` 10.12.0 and `globals` 17.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.2.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
