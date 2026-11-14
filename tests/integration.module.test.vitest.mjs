@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-07T21:53:30-08:00 (1794117210)
+ *	@Last modified time: 2026-11-08T00:25:42-08:00 (1794126342)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -15,7 +15,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
@@ -172,9 +172,21 @@ describe("module integration and coverage", () => {
 			excludeFolders: ["src/generated", "dist"]
 		});
 
-		expect(byIncludeFolders.some((path) => path.includes("src/generated/"))).toBe(false);
-		expect(byIncludeFolders.some((path) => path.includes("dist/"))).toBe(false);
+		// Judge each path from the workspace root, so a checkout that itself sits under a folder named dist doesn't count.
+		const folders = (path) => relative(workspace, path).split(sep).slice(0, -1);
+		expect(byIncludeFolders.some((path) => [...folders(path), ""].join("/").startsWith("src/generated/"))).toBe(false);
+		expect(byIncludeFolders.some((path) => folders(path).includes("dist"))).toBe(false);
 		expect(byIncludeFolders.some((path) => path.endsWith("main.mjs"))).toBe(true);
+
+		// Without includeFolders the whole project is walked, so the dist exclusion has a dist/ folder to skip.
+		const byExclusionsOnly = await discoverFiles({
+			projectRoot: workspace,
+			language: "node",
+			excludeFolders: ["src/generated", "dist"]
+		});
+		expect(byExclusionsOnly.some((path) => folders(path).includes("dist"))).toBe(false);
+		expect(byExclusionsOnly.some((path) => [...folders(path), ""].join("/").startsWith("src/generated/"))).toBe(false);
+		expect(byExclusionsOnly.some((path) => path.endsWith("main.mjs"))).toBe(true);
 
 		const byScriptsFolder = await discoverFiles({
 			projectRoot: workspace,
