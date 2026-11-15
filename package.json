@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.2.6",
+	"version": "2.2.7",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -31,11 +31,12 @@
 	},
 	"scripts": {
 		"build:ci": "npm run lint --if-present && npm run format:check --if-present && npm run types:check && npm run types:build && npm run build",
-		"test": "node tests/run-vitest.mjs && npm run test:cjs",
+		"test": "node tests/run-vitest.mjs && npm run test:cjs && npm run test:dist",
 		"test:cjs": "npm run build && node --conditions=fix-headers-dev --test tests/cjs/entry.test.cjs",
+		"test:dist": "npm run build && node tests/run-vitest.mjs --mode=dist",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet && npm run test:cjs",
-		"ci:coverage": "npm run coverage",
+		"ci:coverage": "npm run coverage && npm run test:dist",
 		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"cli": "node --conditions=fix-headers-dev ./src/cli.mjs",
@@ -94,7 +95,7 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
-		"@cldmv/configs": "^1.2.4",
+		"@cldmv/configs": "^1.4.0",
 		"@cldmv/eslint-plugin-jsonv": "^1.0.10",
 		"@cldmv/jsonv": "^1.0.9",
 		"@cldmv/prettier-plugin-jsonv": "^1.0.6",
