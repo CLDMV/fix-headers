@@ -14,17 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.2.7 (November 2026)
+### Latest: v2.3.0 (November 2026)
 
-- **Tests run against `src/` and `dist/`** — no library code changed. The test suite now gets the `fix-headers-dev` condition through `devCondition()` from `@cldmv/configs` (the old `test.nodeOptions` never reached the workers), the tests import the package by name, and `npm run test:dist` builds the package and runs the same suite against `dist/` ([#179](https://github.com/CLDMV/fix-headers/pull/179), [#181](https://github.com/CLDMV/fix-headers/pull/181)). Also a discovery-test fix for checkouts under a `dist` folder, `vitest` 5.1.0 and the `sync-release-notes` workflow ([#182](https://github.com/CLDMV/fix-headers/pull/182), [#183](https://github.com/CLDMV/fix-headers/pull/183), [#187](https://github.com/CLDMV/fix-headers/pull/187)).
-- [View full v2.2.7 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.7.md)
+- **`.mts`/`.cts` and C/C++ support** — the `node` detector now stamps `.mts` and `.cts` like `.ts`, and a new `c` detector (on by default) stamps `.c .h .cc .cpp .cxx .hh .hpp .hxx` with a plain `/* … */` header placed above `#include`, `#pragma once` and include guards. C files that open with someone else's license or copyright notice, such as the SQLite amalgamation, are skipped and left byte-for-byte untouched ([#193](https://github.com/CLDMV/fix-headers/pull/193), fixes [#192](https://github.com/CLDMV/fix-headers/issues/192)).
+- [View full v2.3.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.3.0.md)
 
 ### Recent Releases
 
+- **v2.2.7** (November 2026) — no library code changed: the tests get the `fix-headers-dev` condition through `devCondition()`, and `npm run test:dist` runs the same suite against `dist/` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.7.md))
 - **v2.2.6** (November 2026) — `engines.node` is back to `>=18.0.0`, the runtime floor; the 22.22.0 development toolchain floor moves to `devEngines`, and the `require()` error names ^20.19.0 or >=22.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.6.md))
 - **v2.2.5** (November 2026) — the source-checkout development check is removed (the `fix-headers-dev` condition already picks `src/` or `dist/`), and `engines.node` went to `>=22.22.0` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.5.md))
 - **v2.2.4** (October 2026) — one header per file: stacked headers merge, repeated fields and stale `@Copyright` lines are dropped, only position-critical lines stay above the header, `#` headers are found in CRLF and byte-order-mark files ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.4.md))
-- **v2.2.3** (October 2026) — text inside an existing header that is not a header field is kept instead of deleted, moved to its own block below the header by default (`strictHeaderBlock`), plus a dependency refresh ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.3.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
