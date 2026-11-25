@@ -14,18 +14,17 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.4.0 (November 2026)
+### Latest: v2.5.0 (November 2026)
 
-- **`@Filename` without a leading slash** — `@Filename` is the path relative to the project root, now written `src/index.mjs` instead of `/src/index.mjs`. The next run rewrites existing headers (only `@Filename` and `@Last modified time` change), so land it as a header-only commit ([#199](https://github.com/CLDMV/fix-headers/pull/199), fixes [#198](https://github.com/CLDMV/fix-headers/issues/198)).
-- **Generated declarations left alone** — a `.d.ts` / `.d.mts` / `.d.cts` carrying the header `tsc` copied from its own source is skipped, so `tsc` and fix-headers stop flipping `@Filename` in committed `types/` ([#196](https://github.com/CLDMV/fix-headers/pull/196), fixes [#195](https://github.com/CLDMV/fix-headers/issues/195)).
-- [View full v2.4.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.4.0.md)
+- **Generated declarations get their own header** — a `.d.ts` / `.d.mts` / `.d.cts` carrying the header `tsc` copied from its source is restamped for where it ships (`@Filename: types/src/x.d.mts`, its package's `@Project`), keeping the source's dates and author. Repos that still commit `types/` opt out with `rewriteDeclarationCopies: false` ([#202](https://github.com/CLDMV/fix-headers/pull/202), fixes [#201](https://github.com/CLDMV/fix-headers/issues/201)).
+- [View full v2.5.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.5.0.md)
 
 ### Recent Releases
 
+- **v2.4.0** (November 2026) — `@Filename` is written without a leading slash (`src/index.mjs`), and declarations carrying `tsc`'s copy of their source's header are skipped ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.4.0.md))
 - **v2.3.0** (November 2026) — `.mts`/`.cts` in the `node` detector and a new `c` detector for C/C++; C files carrying another holder's license notice are skipped ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.3.0.md))
 - **v2.2.7** (November 2026) — no library code changed: the tests get the `fix-headers-dev` condition through `devCondition()`, and `npm run test:dist` runs the same suite against `dist/` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.7.md))
 - **v2.2.6** (November 2026) — `engines.node` is back to `>=18.0.0`, the runtime floor; the 22.22.0 development toolchain floor moves to `devEngines`, and the `require()` error names ^20.19.0 or >=22.13.0 ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.6.md))
-- **v2.2.5** (November 2026) — the source-checkout development check is removed (the `fix-headers-dev` condition already picks `src/` or `dist/`), and `engines.node` went to `>=22.22.0` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.5.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
