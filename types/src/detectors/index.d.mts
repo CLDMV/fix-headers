@@ -96,7 +96,7 @@ export function getPreservedPrefixForFile(filePath: string, content: string, opt
 }): string;
 /**
  * Says why a file's content cannot carry a header (a PHP file that does not open with `<?php`,
- * where a comment at the top would be output as text), or null when it can.
+ * where a comment at the top would be output as text; third-party C with its own license notice), or null when it can.
  * @param {string} filePath - File path.
  * @param {string} content - File content.
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
