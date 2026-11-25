@@ -3,6 +3,7 @@ export namespace detector {
     export { extensions };
     export let enabledByDefault: boolean;
     export { isShebang as keepsAboveHeader };
+    export function resolveContentSkipReason(content: any, filePath: any): string;
     export function resolveCommentSyntax(filePath: any): {
         kind: "block";
         blockStart: string;
