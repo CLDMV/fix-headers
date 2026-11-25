@@ -19,7 +19,7 @@ import { applyConfigOption } from "../config/load.mjs";
 import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { getContentSkipReason, getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
-import { declarationCopySkipReason } from "../detectors/node.mjs";
+import { declarationCopySkipReason, isDeclarationFile } from "../detectors/node.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
 	checkHeaderDates,
@@ -475,10 +475,19 @@ export async function fixHeaders(options = {}) {
 		// @Last modified by names whoever last edited the file's content. It becomes the run's
 		// identity only when the content outside the header was edited (see detectContentEdit);
 		// a run that only rewrites header values keeps the recorded editor.
-		// A restamped declaration copy keeps the dates and editor its source's header carries: it
-		// is generated (usually gitignored, created by the build), so neither git nor the
-		// filesystem knows when its content was written, and tsc regenerating it is not an edit.
-		const contentEdit = declarationCopy ? { edited: false, state: "no-git" } : await detectContentEdit(original, filePath, syntaxOptions);
+		// A generated declaration keeps the dates and editor its header carries: tsc's copy of the
+		// source's header, or the header an earlier run restamped it with. It is built (usually
+		// gitignored), so neither git nor the filesystem knows when its content was written, and
+		// tsc regenerating it is not an edit. A declaration git does not track that already has a
+		// header is taken to be generated.
+		const gitContentEdit = declarationCopy ? null : await detectContentEdit(original, filePath, syntaxOptions);
+		const generatedDeclaration =
+			declarationCopy ||
+			(rewriteDeclarationCopies && gitContentEdit?.state === "untracked" && existingHeaderText.length > 0 && isDeclarationFile(filePath));
+		// gitContentEdit is only null for a declaration copy, which is a generated declaration.
+		const contentEdit = generatedDeclaration
+			? { edited: false, state: "no-git" }
+			: /** @type {{edited: boolean, state: string}} */ (gitContentEdit);
 		const lastModifiedByRun = shouldForceLastModifiedAuthorUpdate || contentEdit.edited;
 
 		/**
@@ -521,7 +530,7 @@ export async function fixHeaders(options = {}) {
 			gitLastUpdated !== null &&
 			repairedLastModifiedAt.timestamp < gitLastUpdated.timestamp;
 		const needsUpdate = comparisonReplacement.changed || unstampedEdit;
-		const keepCopiedLastModified = declarationCopy && repairedLastModifiedAt !== null;
+		const keepCopiedLastModified = generatedDeclaration && repairedLastModifiedAt !== null;
 		const restamp = needsUpdate && !keepCopiedLastModified;
 		const finalLastModifiedAt = restamp ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
 		const lastModifiedAtSource = restamp ? "current-time-on-change" : comparisonLastModifiedAtSource;

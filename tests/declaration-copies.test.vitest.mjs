@@ -13,7 +13,9 @@
  *
  */
 
+import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
@@ -181,6 +183,41 @@ describe("rewriteDeclarationCopies, on by default (#201)", () => {
 			expect(tag(content, "Filename")).toBe("lib/x.d.mts");
 			expect(tag(content, "Project")).toBe("@scope/x-types");
 			expect(tag(content, "Date")).toBe("2026-01-01T00:00:00-08:00 (1767254400)");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("keeps a restamped declaration stable when types/ is gitignored in a git repo", async () => {
+		const workspace = await createWorkspace("declaration-copies-gitignored");
+		const git = (args) => promisify(execFile)("git", args, { cwd: workspace });
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), PACKAGE_JSON);
+			await writeWorkspaceFile(join(workspace, ".gitignore"), "types/\n");
+			await git(["init", "-q"]);
+			await git(["add", "."]);
+			await git([
+				"-c",
+				"user.name=Decl Tester",
+				"-c",
+				"user.email=decl@example.com",
+				"-c",
+				"commit.gpgsign=false",
+				"commit",
+				"-q",
+				"-m",
+				"initial"
+			]);
+			await writeWorkspaceFile(join(workspace, "types", "src", "x.d.mts"), `${sourceHeader("src/x.mts")}export {};\n`);
+
+			await fixHeaders({ cwd: workspace, input: "types", ...IDENTITY });
+			const first = await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8");
+			expect(tag(first, "Filename")).toBe("types/src/x.d.mts");
+			expect(tag(first, "Last modified by")).toBe("Source Editor (editor@example.com)");
+
+			const again = await fixHeaders({ cwd: workspace, input: "types", ...IDENTITY });
+			expect(again.changes.filter((change) => change.changed)).toEqual([]);
+			expect(await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8")).toBe(first);
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
