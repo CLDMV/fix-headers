@@ -45,7 +45,7 @@ import { getHeaderSyntaxForFile, renderHeaderLines } from "./syntax.mjs";
  * @returns {string} Header block text.
  */
 export function buildHeader(data) {
-	const relativePath = `/${relative(data.projectRoot, data.absoluteFilePath).replace(/\\/g, "/")}`;
+	const relativePath = relative(data.projectRoot, data.absoluteFilePath).replace(/\\/g, "/");
 	const syntax = getHeaderSyntaxForFile(data.absoluteFilePath, data.syntaxOptions || { language: data.language });
 	const createdByName = data.createdByName || data.authorName;
 	const createdByEmail = data.createdByEmail || data.authorEmail;

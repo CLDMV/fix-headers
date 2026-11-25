@@ -52,7 +52,7 @@ const BODY = "export const one = true;\n";
 function fileWithHeader(parts = {}) {
 	const { body = BODY, author = ORIGINAL, editor = ORIGINAL, created = CREATED, modified = MODIFIED } = parts;
 	const year = new Date().getFullYear();
-	return `/**\n *\n *\t@Project: ${PROJECT}\n *\t@Filename: /src/one.mjs\n *\t@Date: ${created}\n *\t@Author: ${author.name}\n *\t@Email: <${author.email}>\n *\t-----\n *\t@Last modified by: ${editor.name} (${editor.email})\n *\t@Last modified time: ${modified}\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${year} ${COMPANY} All rights reserved.\n *\n */\n\n\n${body}`;
+	return `/**\n *\n *\t@Project: ${PROJECT}\n *\t@Filename: src/one.mjs\n *\t@Date: ${created}\n *\t@Author: ${author.name}\n *\t@Email: <${author.email}>\n *\t-----\n *\t@Last modified by: ${editor.name} (${editor.email})\n *\t@Last modified time: ${modified}\n *\t-----\n *\t@Copyright: Copyright (c) 2026-${year} ${COMPANY} All rights reserved.\n *\n */\n\n\n${body}`;
 }
 
 /**
@@ -170,17 +170,32 @@ describe("@Last modified by follows content edits (#127)", () => {
 	it("keeps @Last modified by for other header-only rewrites (stale fields, spacing, margin)", async () => {
 		const stale = fileWithHeader()
 			.replace(`@Project: ${PROJECT}`, "@Project: old-name")
-			.replace("@Filename: /src/one.mjs", "@Filename: /src/old.mjs")
+			.replace("@Filename: src/one.mjs", "@Filename: src/old.mjs")
 			.replace(" */\n\n\n", " */\n");
 		const workspace = await createRepo("lm-header-fields", stale);
 		try {
 			const { result, content } = await runAsJane(workspace, { spacing: 2 });
 			expect(result.filesUpdated).toBe(1);
 			expect(tag(content, "Project")).toBe(PROJECT);
-			expect(tag(content, "Filename")).toBe("/src/one.mjs");
+			expect(tag(content, "Filename")).toBe("src/one.mjs");
 			expect(tag(content, "Last modified time")).not.toBe(MODIFIED);
 			expect(tag(content, "Last modified by")).toBe(`${ORIGINAL.name} (${ORIGINAL.email})`);
 			expect(tag(content, "Author")).toBe(ORIGINAL.name);
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("rewrites an @Filename written with a leading slash by earlier versions, keeping @Last modified by", async () => {
+		const slashed = fileWithHeader().replace("@Filename: src/one.mjs", "@Filename: /src/one.mjs");
+		const workspace = await createRepo("lm-filename-slash", slashed);
+		try {
+			const { result, content } = await runAsJane(workspace);
+			expect(result.filesUpdated).toBe(1);
+			expect(tag(content, "Filename")).toBe("src/one.mjs");
+			expect(tag(content, "Last modified by")).toBe(`${ORIGINAL.name} (${ORIGINAL.email})`);
+			expect(content.endsWith(`\n\n\n${BODY}`)).toBe(true);
+			expect((await runAsJane(workspace)).result.filesUpdated).toBe(0);
 		} finally {
 			await cleanupWorkspace(workspace);
 		}

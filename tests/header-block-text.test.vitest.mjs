@@ -37,7 +37,7 @@ import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers
 
 const FIELDS = [
 	"@Project: demo",
-	"@Filename: /src/file",
+	"@Filename: src/file",
 	"@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
 	"@Author: Tester",
 	"@Email: <t@example.com>",
@@ -179,7 +179,7 @@ describe("non-field text in an existing header (#160)", () => {
 			"/**",
 			" *",
 			" *\t@Project: block-text",
-			" *\t@Filename: /src/one.mjs",
+			" *\t@Filename: src/one.mjs",
 			" *\t@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
 			" *\t@Author: Original <CLDMV>",
 			" *\t@Email: <original@example.com>",
@@ -464,7 +464,7 @@ describe("non-field text in an existing header (#160)", () => {
 
 		it("takes every following comment with a @Project: or @Filename: line for a copy of the header, and no other (#162)", () => {
 			const lead = "/**\n *\t@Project: demo\n */\n\n";
-			for (const comment of ["/**\n *\tNotes.\n *\t@Project: mentioned\n */", "/**\n *\tNotes.\n *\t@Filename: /x\n */"]) {
+			for (const comment of ["/**\n *\tNotes.\n *\t@Project: mentioned\n */", "/**\n *\tNotes.\n *\t@Filename: x\n */"]) {
 				const content = `${lead}${comment}\n\ncode();\n`;
 				expect(findProjectHeader(content, "/r/a.mjs")?.end).toBe(content.indexOf("code();"));
 			}
@@ -478,7 +478,7 @@ describe("non-field text in an existing header (#160)", () => {
 	describe("one header per file (#162)", () => {
 		const OTHER = [
 			"@Project: other-project",
-			"@Filename: /other/file",
+			"@Filename: other/file",
 			"@Author: Someone Else",
 			"-----",
 			"@Copyright: Copyright (c) 2015 Example Inc. All rights reserved."
@@ -497,7 +497,7 @@ describe("non-field text in an existing header (#160)", () => {
 				["/r/a.mjs", "code();\n"],
 				["/r/a.yaml", "key: 1\n"]
 			]) {
-				const content = `${header(file, ["@Filename: /src/a", "@Author: Tester"])}\n\n${body}`;
+				const content = `${header(file, ["@Filename: src/a", "@Author: Tester"])}\n\n${body}`;
 				const next = header(file, NEW_FIELDS);
 				expect(findProjectHeader(content, file)).toEqual({ start: 0, end: content.indexOf(body) });
 				const first = replaceOrInsertHeader(content, next, file);

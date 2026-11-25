@@ -19,7 +19,7 @@ import { compareHeaderFields, HEADER_FIELDS, parseHeaderFields } from "../src/he
 const FULL_HEADER = [
 	"/**",
 	" *\t@Project: @scope/pkg",
-	" *\t@Filename: /src/main.mjs",
+	" *\t@Filename: src/main.mjs",
 	" *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)",
 	" *\t@Author: Jane Doe <ACME>",
 	" *\t@Email: <jane@example.com>",
@@ -35,7 +35,7 @@ describe("parseHeaderFields", () => {
 	it("parses every field of a rendered header", () => {
 		expect(parseHeaderFields(FULL_HEADER)).toEqual({
 			projectName: "@scope/pkg",
-			filename: "/src/main.mjs",
+			filename: "src/main.mjs",
 			createdAt: "2026-01-01 00:00:00 +00:00 (1767225600)",
 			authorName: "Jane Doe <ACME>",
 			authorEmail: "jane@example.com",

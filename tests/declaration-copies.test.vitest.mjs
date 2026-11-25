@@ -49,6 +49,8 @@ describe("node detector: declaration files copied by tsc", () => {
 	it("skips a declaration whose header names its own source file", () => {
 		expect(skip("/repo/types/src/x.d.mts", `${headerNaming("/src/x.mts")}export declare const x: 1;\n`)).toMatch(/generated from x\.mts/);
 		expect(skip("/repo/types/src/x.d.mts", `${headerNaming("/src/x.mjs")}export {};\n`)).not.toBeNull();
+		// The slashless form written since #198, and the slashed form earlier versions wrote.
+		expect(skip("/repo/types/src/x.d.mts", `${headerNaming("src/x.mts")}export {};\n`)).not.toBeNull();
 		expect(skip("/repo/types/x.d.ts", `${headerNaming("/src/x.ts")}export {};\n`)).not.toBeNull();
 		expect(skip("/repo/types/x.d.ts", `${headerNaming("/src/x.tsx")}export {};\n`)).not.toBeNull();
 		expect(skip("/repo/types/x.d.ts", `${headerNaming("/lib/x.js")}export {};\n`)).not.toBeNull();
@@ -88,7 +90,7 @@ describe("node detector: declaration files copied by tsc", () => {
 			expect(result.changes.map((change) => change.file).sort()).toEqual([join("src", "x.mts"), join("types", "hand.d.ts")]);
 			expect(result.skipped).toEqual([{ file: join("types", "src", "x.d.mts"), reason: expect.stringMatching(/tsc copies it/) }]);
 			expect(await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8")).toBe(copied);
-			expect(await readFile(join(workspace, "types", "hand.d.ts"), "utf8")).toContain("@Filename: /types/hand.d.ts");
+			expect(await readFile(join(workspace, "types", "hand.d.ts"), "utf8")).toContain("@Filename: types/hand.d.ts");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}

@@ -89,7 +89,7 @@ describe("node detector: .mts and .cts", () => {
 			expect(result.changes.map((change) => change.file).sort()).toEqual([join("src", "db.mts"), join("src", "legacy.cts")]);
 			const mts = await readFile(join(workspace, "src", "db.mts"), "utf8");
 			expect(mts).toMatch(/^\/\*\*\n/);
-			expect(mts).toContain("@Filename: /src/db.mts");
+			expect(mts).toContain("@Filename: src/db.mts");
 			expect(mts.endsWith("export const db = 1;\n")).toBe(true);
 		} finally {
 			await cleanupWorkspace(workspace);
@@ -157,7 +157,7 @@ describe("c detector", () => {
 
 			const glue = await readFile(join(workspace, "src", "c", "glue.c"), "utf8");
 			expect(glue).toMatch(/^\/\*\n \*\n \*\t@Project: c-and-mts\n/);
-			expect(glue).toContain("@Filename: /src/c/glue.c");
+			expect(glue).toContain("@Filename: src/c/glue.c");
 			expect(glue.endsWith(GLUE_C)).toBe(true);
 			const header = await readFile(join(workspace, "src", "c", "glue.h"), "utf8");
 			expect(header.endsWith(GUARDED_H)).toBe(true);

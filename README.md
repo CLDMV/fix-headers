@@ -277,13 +277,13 @@ A manifest claims its folder as soon as it exists and can be read, even when it 
 
 For each file:
 
-1. **Project root.** Walk up from the file's folder. The nearest folder that at least one driver claims is the project root. `@Filename` is the file's path relative to it, and git history (`@Date`, `@Last modified time`) is looked up from it.
+1. **Project root.** Walk up from the file's folder. The nearest folder that at least one driver claims is the project root. `@Filename` is the file's path relative to it, with no leading slash (`src/index.mjs`; a leading `/` written by fix-headers 2.3 and earlier is removed on the next run), and git history (`@Date`, `@Last modified time`) is looked up from it.
 2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSONC, C, …) use the fixed order.
 3. **Per-field fallback.** Each value is taken from the first driver in that order whose manifest provides it. In a folder with a nameless `package.json` and a named `pyproject.toml`, every file gets the `pyproject.toml` name.
 4. **Climbing.** A value no driver at the project root provides is looked up the same way in each ancestor folder a driver claims, up to and including the scan root (`projectRoot`, else `cwd`), never above it. A nameless sub-package therefore takes the name of the repository around it. Only values climb: the project root, and with it `@Filename` and the git lookups, stays the nearest claimed folder.
 5. **Folder name.** When nothing up to the scan root provides a name, `@Project` is the project root's folder name.
 
-A folder holding `.git` is a repository boundary: neither the root search nor the climb goes past it, so a nested repository without a manifest is a project of its own. With no manifest up to the repository root, that repository root is the project root and its folder name is the name. With neither a manifest nor a repository anywhere above the file, the file's own folder is the project root: `@Project` is that folder's name and `@Filename` is `/<file name>`.
+A folder holding `.git` is a repository boundary: neither the root search nor the climb goes past it, so a nested repository without a manifest is a project of its own. With no manifest up to the repository root, that repository root is the project root and its folder name is the name. With neither a manifest nor a repository anywhere above the file, the file's own folder is the project root: `@Project` is that folder's name and `@Filename` is the file name.
 
 `projectName`, `projectRoot`, `language` and `marker` override the detected values for every file. The copyright holder is resolved from the same manifests by the same rules, see [Copyright holder](#-copyright-holder).
 
@@ -293,15 +293,15 @@ For example, scanning `repo/`:
 repo/
 ├── package.json            { "name": "@scope/repo" }
 ├── pyproject.toml          [project] name = "repo-py"
-├── scripts/build.py        → @Project: repo-py        @Filename: /scripts/build.py
-├── site/main.css           → @Project: @scope/repo    @Filename: /site/main.css
+├── scripts/build.py        → @Project: repo-py        @Filename: scripts/build.py
+├── site/main.css           → @Project: @scope/repo    @Filename: site/main.css
 └── packages/
     ├── a/
     │   ├── package.json    { "private": true }
-    │   └── src/x.mjs       → @Project: @scope/repo    @Filename: /src/x.mjs
+    │   └── src/x.mjs       → @Project: @scope/repo    @Filename: src/x.mjs
     └── b/
         ├── Cargo.toml      [package] name = "b-crate"
-        └── src/lib.rs      → @Project: b-crate        @Filename: /src/lib.rs
+        └── src/lib.rs      → @Project: b-crate        @Filename: src/lib.rs
 ```
 
 To support another ecosystem, add a module to `src/drivers/` that exports a `driver` with `id`, `languages` (the file-type detector ids native to it), `manifests` (filenames that claim a folder, in reading order), `detect(dirPath)` (returns `detectManifests(dirPath, manifests)` from `src/drivers/shared.mjs`) and `read(detection)` (returns `{ name, company }`, each `undefined` when the manifest has none), then add it to `MANIFEST_DRIVERS` in `src/drivers/index.mjs` at its place in the fixed order.
@@ -400,7 +400,7 @@ With the defaults a JavaScript file and a YAML file look like this:
 /**
  *
  *	@Project: @cldmv/example
- *	@Filename: /src/index.mjs
+ *	@Filename: src/index.mjs
  *	...
  *	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
  *
@@ -413,7 +413,7 @@ export const value = 1;
 ```text
 #
 #	@Project: @cldmv/example
-#	@Filename: /.github/workflows/ci.yml
+#	@Filename: .github/workflows/ci.yml
 #	...
 #	@Copyright: Copyright (c) 2026-2026 Example Inc. All rights reserved.
 #
@@ -578,7 +578,7 @@ Every other file is skipped and left byte-for-byte unchanged, including when you
 - **Files with no extension, or an extension no enabled detector handles** (`.txt`, `.toml`, a disabled detector's extensions, …) are skipped instead of being given a guessed comment.
 - **A PHP file that does not open with `<?php`** (a template starting with HTML) is skipped: a comment at the top would be output as text. A file where only a fix-headers header (and blank lines) comes before `<?php` is not skipped: an earlier version wrote that header there, and it is moved back below `<?php` (see [What stays above the header](#what-stays-above-the-header)).
 - **Third-party C and C++** is skipped: a `c` file whose prologue (the comments, blank lines and preprocessor directives before its first line of code) holds a comment with license or copyright wording (`Copyright`, `License`, `SPDX-License-Identifier`, `public domain`) that is not a fix-headers header is left untouched, so a vendored library such as the SQLite amalgamation (`sqlite3.c`, `sqlite3.h`) keeps its own notice. A file whose first comment is already a fix-headers header is never skipped this way. To keep a whole folder of vendored code out of the run regardless of its comments, use `excludeFolders` / `--exclude-folder`.
-- **A declaration file `tsc` generated from a source with a header** is skipped: `tsc` copies the source's header into the `.d.ts` / `.d.mts` / `.d.cts` it emits, `@Filename` included, and that header is maintained on the source. A declaration whose header names its own source (`types/src/x.d.mts` with `@Filename: /src/x.mts`, or `.mjs`; `.d.ts` pairs with `.ts .tsx .js .jsx`, `.d.cts` with `.cts .cjs`) is left as `tsc` wrote it, so the two tools no longer rewrite each other's output. A declaration with no header, or one whose header names any other file, is fixed as usual.
+- **A declaration file `tsc` generated from a source with a header** is skipped: `tsc` copies the source's header into the `.d.ts` / `.d.mts` / `.d.cts` it emits, `@Filename` included, and that header is maintained on the source. A declaration whose header names its own source (`types/src/x.d.mts` with `@Filename: src/x.mts`, or `.mjs`; `.d.ts` pairs with `.ts .tsx .js .jsx`, `.d.cts` with `.cts .cjs`) is left as `tsc` wrote it, so the two tools no longer rewrite each other's output. A declaration with no header, or one whose header names any other file, is fixed as usual.
 - **Markdown** is skipped unless the `markdown` detector is forced with `--force-detector markdown` (`forcedDetectors: ["markdown"]` in the API or a config file). Naming a `.md` file with `--input` does not force it. A forced header is an HTML comment, which Markdown renderers do not display; it goes below any YAML front matter (`---` … `---`), and later runs update it in place. Forcing applies to discovery too, so a repo-wide run with the option also stamps `README.md` and changelogs; to stamp one file, pass the option together with `--input <file>`. `.mdx` is not covered, because MDX does not accept HTML comments.
 
 A skipped file is listed in the result's `skipped` array as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or `changes`. The CLI adds `skipped=<n>` to its summary and prints one `skipped: <file> (<reason>)` line per file:
