@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/c-and-mts.test.vitest.mjs
+ *	@Filename: tests/c-and-mts.test.vitest.mjs
  *	@Date: 2026-11-25T08:41:48-08:00 (1795624908)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T08:42:42-08:00 (1795624962)
+ *	@Last modified time: 2026-11-25T13:07:26-08:00 (1795640846)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -89,7 +89,7 @@ describe("node detector: .mts and .cts", () => {
 			expect(result.changes.map((change) => change.file).sort()).toEqual([join("src", "db.mts"), join("src", "legacy.cts")]);
 			const mts = await readFile(join(workspace, "src", "db.mts"), "utf8");
 			expect(mts).toMatch(/^\/\*\*\n/);
-			expect(mts).toContain("@Filename: /src/db.mts");
+			expect(mts).toContain("@Filename: src/db.mts");
 			expect(mts.endsWith("export const db = 1;\n")).toBe(true);
 		} finally {
 			await cleanupWorkspace(workspace);
@@ -157,7 +157,7 @@ describe("c detector", () => {
 
 			const glue = await readFile(join(workspace, "src", "c", "glue.c"), "utf8");
 			expect(glue).toMatch(/^\/\*\n \*\n \*\t@Project: c-and-mts\n/);
-			expect(glue).toContain("@Filename: /src/c/glue.c");
+			expect(glue).toContain("@Filename: src/c/glue.c");
 			expect(glue.endsWith(GLUE_C)).toBe(true);
 			const header = await readFile(join(workspace, "src", "c", "glue.h"), "utf8");
 			expect(header.endsWith(GUARDED_H)).toBe(true);

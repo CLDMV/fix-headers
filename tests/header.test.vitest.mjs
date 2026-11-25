@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/header.test.vitest.mjs
+ *	@Filename: tests/header.test.vitest.mjs
  *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
+ *	@Last modified time: 2026-11-25T13:07:28-08:00 (1795640848)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -33,7 +33,7 @@ describe("header/template + parser", () => {
 		});
 
 		expect(header).toContain("@Project: my-project");
-		expect(header).toContain("@Filename: /src/a.mjs");
+		expect(header).toContain("@Filename: src/a.mjs");
 		expect(header).toContain("Copyright (c) 2013-2026");
 		expect(header).toContain("Catalyzed Motivation Inc. All rights reserved.");
 		expect(header).not.toContain("Inc.. All rights reserved.");
@@ -192,7 +192,7 @@ describe("header/template + parser", () => {
 		});
 
 		expect(header.startsWith("<!--")).toBe(true);
-		expect(header).toContain("@Filename: /src/page.html");
+		expect(header).toContain("@Filename: src/page.html");
 		const replacement = replaceOrInsertHeader("<html></html>\n", header, "/repo/src/page.html");
 		expect(replacement.nextContent.startsWith("<!--")).toBe(true);
 	});
