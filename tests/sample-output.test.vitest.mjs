@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/sample-output.test.vitest.mjs
+ *	@Filename: tests/sample-output.test.vitest.mjs
  *	@Date: 2026-09-28T09:14:18-07:00 (1790612058)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-03T22:50:31-07:00 (1791093031)
+ *	@Last modified time: 2026-11-25T13:07:29-08:00 (1795640849)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
