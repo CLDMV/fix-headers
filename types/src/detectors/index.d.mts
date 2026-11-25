@@ -96,7 +96,8 @@ export function getPreservedPrefixForFile(filePath: string, content: string, opt
 }): string;
 /**
  * Says why a file's content cannot carry a header (a PHP file that does not open with `<?php`,
- * where a comment at the top would be output as text; third-party C with its own license notice), or null when it can.
+ * where a comment at the top would be output as text; third-party C with its own license notice; a
+ * declaration file carrying the header `tsc` copied from its source), or null when it can.
  * @param {string} filePath - File path.
  * @param {string} content - File content.
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
@@ -120,7 +121,7 @@ export function getContentSkipReason(filePath: string, content: string, options?
  *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
  *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
  *  keepsAboveHeader?: (line: string, index: number) => boolean,
- *  resolveContentSkipReason?: (content: string) => string | null
+ *  resolveContentSkipReason?: (content: string, filePath: string) => string | null
  * }} DetectorProfile
  * A file-type detector: which extensions it handles and the comment syntax of those files, and
  * what stays above the header: `resolvePreservedPrefix` takes a leading block (front matter),
@@ -162,5 +163,5 @@ export type DetectorProfile = {
     } | null);
     resolvePreservedPrefix?: (filePath: string, content: string) => string;
     keepsAboveHeader?: (line: string, index: number) => boolean;
-    resolveContentSkipReason?: (content: string) => string | null;
+    resolveContentSkipReason?: (content: string, filePath: string) => string | null;
 };

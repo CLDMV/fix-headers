@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T08:42:47-08:00 (1795624967)
+ *	@Last modified time: 2026-11-25T11:25:45-08:00 (1795634745)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -41,7 +41,7 @@ import { isModeline, takeTopLines } from "./top-lines.mjs";
  *  resolveCommentSyntax: (filePath: string) => ({kind: "block" | "line" | "html", linePrefix?: string, lineSeparator?: string, blockStart?: string, blockLinePrefix?: string, blockEnd?: string} | null),
  *  resolvePreservedPrefix?: (filePath: string, content: string) => string,
  *  keepsAboveHeader?: (line: string, index: number) => boolean,
- *  resolveContentSkipReason?: (content: string) => string | null
+ *  resolveContentSkipReason?: (content: string, filePath: string) => string | null
  * }} DetectorProfile
  * A file-type detector: which extensions it handles and the comment syntax of those files, and
  * what stays above the header: `resolvePreservedPrefix` takes a leading block (front matter),
@@ -276,7 +276,8 @@ export function getPreservedPrefixForFile(filePath, content, options = {}) {
 
 /**
  * Says why a file's content cannot carry a header (a PHP file that does not open with `<?php`,
- * where a comment at the top would be output as text; third-party C with its own license notice), or null when it can.
+ * where a comment at the top would be output as text; third-party C with its own license notice; a
+ * declaration file carrying the header `tsc` copied from its source), or null when it can.
  * @param {string} filePath - File path.
  * @param {string} content - File content.
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.
@@ -284,5 +285,5 @@ export function getPreservedPrefixForFile(filePath, content, options = {}) {
  */
 export function getContentSkipReason(filePath, content, options = {}) {
 	const detector = detectorForFile(filePath, options);
-	return detector && typeof detector.resolveContentSkipReason === "function" ? detector.resolveContentSkipReason(content) : null;
+	return detector && typeof detector.resolveContentSkipReason === "function" ? detector.resolveContentSkipReason(content, filePath) : null;
 }
