@@ -7,13 +7,14 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:13-07:00 (1790969293)
+ *	@Last modified time: 2026-11-25T08:42:47-08:00 (1795624967)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
 import { extname } from "node:path";
+import { detector as cDetector } from "./c.mjs";
 import { detector as cssDetector } from "./css.mjs";
 import { detector as goDetector } from "./go.mjs";
 import { detector as htmlDetector } from "./html.mjs";
@@ -59,6 +60,7 @@ import { isModeline, takeTopLines } from "./top-lines.mjs";
  * `kind` strings, which the typedef narrows to its literal union.
  */
 export const DETECTOR_PROFILES = /** @type {DetectorProfile[]} */ ([
+	cDetector,
 	cssDetector,
 	goDetector,
 	htmlDetector,
@@ -274,7 +276,7 @@ export function getPreservedPrefixForFile(filePath, content, options = {}) {
 
 /**
  * Says why a file's content cannot carry a header (a PHP file that does not open with `<?php`,
- * where a comment at the top would be output as text), or null when it can.
+ * where a comment at the top would be output as text; third-party C with its own license notice), or null when it can.
  * @param {string} filePath - File path.
  * @param {string} content - File content.
  * @param {{ enabledDetectors?: string[], disabledDetectors?: string[], forcedDetectors?: string[] }} [options={}] - Runtime options.

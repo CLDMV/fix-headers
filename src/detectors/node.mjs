@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:14-07:00 (1790969294)
+ *	@Last modified time: 2026-11-25T08:42:47-08:00 (1795624967)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -21,7 +21,7 @@ import { isShebang } from "./top-lines.mjs";
  * @module fix-headers/detectors/node
  */
 
-const extensions = [".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"];
+const extensions = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx", ".jsx"];
 
 /**
  * Resolves comment syntax for Node-handled file extensions.
