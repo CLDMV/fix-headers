@@ -77,7 +77,7 @@ describe("node detector: declaration files copied by tsc", () => {
 		expect(skip("/repo/src/x.ts", `${headerNaming("/src/x.mts")}export {};\n`)).toBeNull();
 	});
 
-	it("leaves tsc's copies untouched in a repo-wide run and still stamps the sources", async () => {
+	it("with rewriteDeclarationCopies: false, leaves tsc's copies untouched in a repo-wide run and still stamps the sources", async () => {
 		const workspace = await createWorkspace("declaration-copies-run");
 		try {
 			const copied = `${headerNaming("/src/x.mts")}export declare const x: 1;\n`;
@@ -86,7 +86,7 @@ describe("node detector: declaration files copied by tsc", () => {
 			await writeWorkspaceFile(join(workspace, "types", "src", "x.d.mts"), copied);
 			await writeWorkspaceFile(join(workspace, "types", "hand.d.ts"), "export declare const hand: 1;\n");
 
-			const result = await fixHeaders({ cwd: workspace, ...IDENTITY });
+			const result = await fixHeaders({ cwd: workspace, rewriteDeclarationCopies: false, ...IDENTITY });
 
 			expect(result.changes.map((change) => change.file).sort()).toEqual([join("src", "x.mts"), join("types", "hand.d.ts")]);
 			expect(result.skipped).toEqual([{ file: join("types", "src", "x.d.mts"), reason: expect.stringMatching(/tsc copies it/) }]);
@@ -98,7 +98,7 @@ describe("node detector: declaration files copied by tsc", () => {
 	});
 });
 
-describe("rewriteDeclarationCopies (#201)", () => {
+describe("rewriteDeclarationCopies, on by default (#201)", () => {
 	/**
 	 * A full header as fix-headers writes it on a source file, as tsc copies it into the declaration.
 	 * @param {string} filename - The `@Filename` value.
@@ -126,11 +126,14 @@ describe("rewriteDeclarationCopies (#201)", () => {
 
 	const tag = (content, name) => new RegExp(`@${name}: (.*)`).exec(content)?.[1];
 
-	it("parses --rewrite-declaration-copies", () => {
+	it("parses --rewrite-declaration-copies [true|false] and --no-rewrite-declaration-copies", () => {
 		expect(parseCliArgs(["--rewrite-declaration-copies"]).options).toEqual({ rewriteDeclarationCopies: true });
+		expect(parseCliArgs(["--rewrite-declaration-copies", "false"]).options).toEqual({ rewriteDeclarationCopies: false });
+		expect(parseCliArgs(["--rewrite-declaration-copies", "true"]).options).toEqual({ rewriteDeclarationCopies: true });
+		expect(parseCliArgs(["--no-rewrite-declaration-copies"]).options).toEqual({ rewriteDeclarationCopies: false });
 	});
 
-	it("restamps a tsc copy for the path it ships at, keeping the source's dates and editor, and is then stable", async () => {
+	it("by default restamps a tsc copy for the path it ships at, keeping the source's dates and editor, and is then stable", async () => {
 		const workspace = await createWorkspace("declaration-copies-rewrite");
 		try {
 			const copied = `${sourceHeader("src/x.mts")}export declare const x: 1;\n`;
@@ -138,7 +141,7 @@ describe("rewriteDeclarationCopies (#201)", () => {
 			await writeWorkspaceFile(join(workspace, "types", "src", "x.d.mts"), copied);
 			await writeWorkspaceFile(join(workspace, "types", "src", "old.d.mts"), `${sourceHeader("/src/old.mts")}export {};\n`);
 
-			const result = await fixHeaders({ cwd: workspace, input: "types", rewriteDeclarationCopies: true, ...IDENTITY });
+			const result = await fixHeaders({ cwd: workspace, input: "types", ...IDENTITY });
 
 			expect(result.skipped).toEqual([]);
 			expect(result.changes.map((change) => change.file).sort()).toEqual([

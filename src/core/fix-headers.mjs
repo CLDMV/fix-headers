@@ -318,7 +318,7 @@ export async function fixHeaders(options = {}) {
 	const check = effectiveOptions.check === true;
 	const dryRun = check || effectiveOptions.dryRun === true;
 	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
-	const rewriteDeclarationCopies = effectiveOptions.rewriteDeclarationCopies === true;
+	const rewriteDeclarationCopies = effectiveOptions.rewriteDeclarationCopies !== false;
 	/** @type {DateRewrite} */
 	const keepDate = (payload) => payload;
 	/** @type {DateRewrite} */
@@ -406,8 +406,8 @@ export async function fixHeaders(options = {}) {
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		};
 		const restoredContent = restoreTopLines(original, filePath, detectorOptions);
-		// With rewriteDeclarationCopies, a declaration carrying tsc's copy of its source's header
-		// is restamped for the path it ships at instead of skipped (see declarationCopySkipReason).
+		// A declaration carrying tsc's copy of its source's header is restamped for the path it
+		// ships at (see declarationCopySkipReason); rewriteDeclarationCopies: false skips it instead.
 		const declarationCopy = rewriteDeclarationCopies && declarationCopySkipReason(restoredContent, filePath) !== null;
 		const contentSkipReason = declarationCopy ? null : getContentSkipReason(filePath, restoredContent, detectorOptions);
 		if (contentSkipReason !== null) {
