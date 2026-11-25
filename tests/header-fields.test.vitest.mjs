@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/header-fields.test.vitest.mjs
+ *	@Filename: tests/header-fields.test.vitest.mjs
  *	@Date: 2026-09-28T09:14:18-07:00 (1790612058)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:18-07:00 (1790969298)
+ *	@Last modified time: 2026-11-25T13:07:28-08:00 (1795640848)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -19,7 +19,7 @@ import { compareHeaderFields, HEADER_FIELDS, parseHeaderFields } from "../src/he
 const FULL_HEADER = [
 	"/**",
 	" *\t@Project: @scope/pkg",
-	" *\t@Filename: /src/main.mjs",
+	" *\t@Filename: src/main.mjs",
 	" *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)",
 	" *\t@Author: Jane Doe <ACME>",
 	" *\t@Email: <jane@example.com>",
@@ -35,7 +35,7 @@ describe("parseHeaderFields", () => {
 	it("parses every field of a rendered header", () => {
 		expect(parseHeaderFields(FULL_HEADER)).toEqual({
 			projectName: "@scope/pkg",
-			filename: "/src/main.mjs",
+			filename: "src/main.mjs",
 			createdAt: "2026-01-01 00:00:00 +00:00 (1767225600)",
 			authorName: "Jane Doe <ACME>",
 			authorEmail: "jane@example.com",

@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/sample-output.test.vitest.mjs
+ *	@Filename: tests/sample-output.test.vitest.mjs
  *	@Date: 2026-09-28T09:14:18-07:00 (1790612058)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-03T22:50:31-07:00 (1791093031)
+ *	@Last modified time: 2026-11-25T13:07:29-08:00 (1795640849)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -30,7 +30,7 @@ const execFileAsync = promisify(execFile);
  * @returns {string} File content with the stale header.
  */
 function staleFile(prefix = "") {
-	return `${prefix}/**\n *\n *\t@Project: old-project-name\n *\t@Filename: /src/old-name.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Old Company All rights reserved.\n *\n */\n\n\nexport const one = true;\n`;
+	return `${prefix}/**\n *\n *\t@Project: old-project-name\n *\t@Filename: src/old-name.mjs\n *\t@Date: 2026-01-01 00:00:00 +00:00 (1767225600)\n *\t@Author: Existing Author\n *\t@Email: <existing@example.com>\n *\t-----\n *\t@Last modified by: Existing Author (existing@example.com)\n *\t@Last modified time: 2026-01-02 00:00:00 +00:00 (1767312000)\n *\t-----\n *\t@Copyright: Copyright (c) 2013-2026 Old Company All rights reserved.\n *\n */\n\n\nexport const one = true;\n`;
 }
 
 /**
@@ -86,7 +86,7 @@ describe("sample output field issues and diff", () => {
 			)
 		);
 		expect(byField.projectName).toEqual({ field: "projectName", previous: "old-project-name", detected: "sample-issues-stale" });
-		expect(byField.filename).toEqual({ field: "filename", previous: "/src/old-name.mjs", detected: "/src/one.mjs" });
+		expect(byField.filename).toEqual({ field: "filename", previous: "src/old-name.mjs", detected: "src/one.mjs" });
 		expect(byField.lastModifiedAt.previous).toBe("2026-01-02 00:00:00 +00:00 (1767312000)");
 		expect(byField.copyrightStartYear).toEqual({ field: "copyrightStartYear", previous: "2013", detected: "2020" });
 		expect(byField.companyName).toEqual({ field: "companyName", previous: "Old Company", detected: "New Company Inc." });

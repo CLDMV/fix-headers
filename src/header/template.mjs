@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /src/header/template.mjs
+ *	@Filename: src/header/template.mjs
  *	@Date: 2026-03-01T17:59:32-08:00 (1772416772)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:28:16-07:00 (1790969296)
+ *	@Last modified time: 2026-11-25T13:07:26-08:00 (1795640846)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -45,7 +45,7 @@ import { getHeaderSyntaxForFile, renderHeaderLines } from "./syntax.mjs";
  * @returns {string} Header block text.
  */
 export function buildHeader(data) {
-	const relativePath = `/${relative(data.projectRoot, data.absoluteFilePath).replace(/\\/g, "/")}`;
+	const relativePath = relative(data.projectRoot, data.absoluteFilePath).replace(/\\/g, "/");
 	const syntax = getHeaderSyntaxForFile(data.absoluteFilePath, data.syntaxOptions || { language: data.language });
 	const createdByName = data.createdByName || data.authorName;
 	const createdByEmail = data.createdByEmail || data.authorEmail;

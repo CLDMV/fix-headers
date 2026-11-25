@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tsup.config.mjs
+ *	@Filename: tsup.config.mjs
  *	@Date: 2026-09-27T11:47:59-07:00 (1790534879)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-01T16:29:22-08:00 (1793579362)
+ *	@Last modified time: 2026-11-25T13:07:29-08:00 (1795640849)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *

@@ -1,13 +1,13 @@
 /**
  *
  *	@Project: @cldmv/fix-headers
- *	@Filename: /tests/project-manifest-resolution.test.vitest.mjs
+ *	@Filename: tests/project-manifest-resolution.test.vitest.mjs
  *	@Date: 2026-09-28T19:05:00-07:00 (1790647500)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-07T21:53:31-08:00 (1794117211)
+ *	@Last modified time: 2026-11-25T13:07:29-08:00 (1795640849)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -329,7 +329,7 @@ describe("no manifest anywhere", () => {
 			expect(resolved["vendor/lib/src/m.mjs"].header).toBe("lib");
 			expect(resolved["vendor/lib/src/s.css"].projectRoot).toBe(repo);
 			expect(resolved["vendor/lib/src/s.css"].marker).toBe(".git");
-			expect(resolved["vendor/lib/src/s.css"].filename).toBe("/src/s.css");
+			expect(resolved["vendor/lib/src/s.css"].filename).toBe("src/s.css");
 			expect(resolved["vendor/lib/src/s.css"].projectNameSource).toEqual({ from: "folder", dir: repo });
 		} finally {
 			await cleanupWorkspace(workspace);
@@ -344,7 +344,7 @@ describe("no manifest anywhere", () => {
 			expect(resolved["src/s.css"].header).toBe("src");
 			expect(resolved["src/p.py"].header).toBe("src");
 			expect(resolved["src/s.css"].projectRoot).toBe(join(workspace, "src"));
-			expect(resolved["src/s.css"].filename).toBe("/s.css");
+			expect(resolved["src/s.css"].filename).toBe("s.css");
 			expect(resolved["src/s.css"].marker).toBeNull();
 			expect(resolved["src/s.css"].language).toBe("css");
 		} finally {
@@ -433,8 +433,8 @@ describe("values missing from the nearest manifests climb to the scan root", () 
 				expect(resolved[file].createdAtSource).toBe("git-created");
 				expect(resolved[file].createdAt.timestamp).toBe(Date.parse("2001-02-03T04:05:06Z") / 1000);
 			}
-			expect(resolved["packages/a/src/x.mjs"].filename).toBe("/src/x.mjs");
-			expect(resolved["packages/a/src/y.css"].filename).toBe("/src/y.css");
+			expect(resolved["packages/a/src/x.mjs"].filename).toBe("src/x.mjs");
+			expect(resolved["packages/a/src/y.css"].filename).toBe("src/y.css");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -461,7 +461,7 @@ describe("values missing from the nearest manifests climb to the scan root", () 
 				expect(resolved[file].projectRoot).toBe(join(workspace, "web"));
 				expect(resolved[file].marker).toBe("package.json");
 			}
-			expect(resolved["web/src/x.mjs"].filename).toBe("/src/x.mjs");
+			expect(resolved["web/src/x.mjs"].filename).toBe("src/x.mjs");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -480,7 +480,7 @@ describe("values missing from the nearest manifests climb to the scan root", () 
 			});
 			const scanned = await resolveAll(join(workspace, "scan"), { includeFolders: ["mid"] });
 			expect(scanned["mid/deeper/src/g.go"].header).toBe("scan-root-name");
-			expect(scanned["mid/deeper/src/g.go"].filename).toBe("/src/g.go");
+			expect(scanned["mid/deeper/src/g.go"].filename).toBe("src/g.go");
 			expect(scanned["mid/deeper/src/g.go"].projectNameSource.dir).toBe(join(workspace, "scan"));
 
 			// Scanned from `other`: the named manifest above the scan root is not used.
@@ -503,7 +503,7 @@ describe("values missing from the nearest manifests climb to the scan root", () 
 			await execFileAsync("git", ["init", "-q"], { cwd: join(workspace, "vendor", "lib") });
 			const resolved = await resolveAll(workspace, { includeFolders: ["vendor"] });
 			expect(resolved["vendor/lib/src/x.mjs"].header).toBe("lib");
-			expect(resolved["vendor/lib/src/x.mjs"].filename).toBe("/src/x.mjs");
+			expect(resolved["vendor/lib/src/x.mjs"].filename).toBe("src/x.mjs");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -522,8 +522,8 @@ describe("@Filename is relative to the nearest claimed folder", () => {
 			});
 			const resolved = await resolveAll(workspace, { includeFolders: ["packages"] });
 			expect(resolved["packages/b/src/x.mjs"].header).toBe("vendor/b");
-			expect(resolved["packages/b/src/x.mjs"].filename).toBe("/src/x.mjs");
-			expect(resolved["packages/b/src/deep/y.php"].filename).toBe("/src/deep/y.php");
+			expect(resolved["packages/b/src/x.mjs"].filename).toBe("src/x.mjs");
+			expect(resolved["packages/b/src/deep/y.php"].filename).toBe("src/deep/y.php");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
@@ -540,9 +540,9 @@ describe("@Filename is relative to the nearest claimed folder", () => {
 				"two/pkg/c.yml": "k: v\n"
 			});
 			const resolved = await resolveAll(workspace, { includeFolders: ["one", "two"] });
-			expect(resolved["one/src/a.mjs"]).toMatchObject({ header: "repo-one", filename: "/src/a.mjs", projectRoot: join(workspace, "one") });
-			expect(resolved["two/pkg/b.py"]).toMatchObject({ header: "repo-two", filename: "/pkg/b.py", projectRoot: join(workspace, "two") });
-			expect(resolved["two/pkg/c.yml"]).toMatchObject({ header: "repo-two", filename: "/pkg/c.yml" });
+			expect(resolved["one/src/a.mjs"]).toMatchObject({ header: "repo-one", filename: "src/a.mjs", projectRoot: join(workspace, "one") });
+			expect(resolved["two/pkg/b.py"]).toMatchObject({ header: "repo-two", filename: "pkg/b.py", projectRoot: join(workspace, "two") });
+			expect(resolved["two/pkg/c.yml"]).toMatchObject({ header: "repo-two", filename: "pkg/c.yml" });
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
