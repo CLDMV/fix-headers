@@ -265,20 +265,20 @@ Which project a file belongs to depends on the manifests around it, not on the f
 
 Each ecosystem has a manifest driver in `src/drivers/`:
 
-| Driver   | Claims a folder holding                     | Name                                                                                                                      | Copyright holder                                                                                                                                                | Native files                  |
-| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `node`   | `package.json`                              | `name`                                                                                                                    | `author.company`, else `author.name`, else the name part of a string `author` (`"Name <email> (url)"`)                                                          | `.js .mjs .cjs .ts .tsx .jsx` |
-| `python` | `pyproject.toml`, `setup.cfg` or `setup.py` | `pyproject.toml` `[project].name`, then `[tool.poetry].name`; `setup.cfg` `[metadata] name`; `setup.py` `setup(name=...)` | `pyproject.toml` `[project].authors[0].name`, then the name part of `[tool.poetry].authors[0]`; `setup.cfg` `[metadata] author`; `setup.py` `setup(author=...)` | `.py`                         |
-| `php`    | `composer.json`                             | `name`                                                                                                                    | `authors[0].name`                                                                                                                                               | `.php`                        |
-| `rust`   | `Cargo.toml`                                | `[package].name`                                                                                                          | the name part of `[package].authors[0]`                                                                                                                         | `.rs`                         |
-| `go`     | `go.mod`                                    | the `module` path                                                                                                         | none (`go.mod` has no author)                                                                                                                                   | `.go`                         |
+| Driver   | Claims a folder holding                     | Name                                                                                                                      | Copyright holder                                                                                                                                                | Native files                            |
+| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `node`   | `package.json`                              | `name`                                                                                                                    | `author.company`, else `author.name`, else the name part of a string `author` (`"Name <email> (url)"`)                                                          | `.js .mjs .cjs .ts .mts .cts .tsx .jsx` |
+| `python` | `pyproject.toml`, `setup.cfg` or `setup.py` | `pyproject.toml` `[project].name`, then `[tool.poetry].name`; `setup.cfg` `[metadata] name`; `setup.py` `setup(name=...)` | `pyproject.toml` `[project].authors[0].name`, then the name part of `[tool.poetry].authors[0]`; `setup.cfg` `[metadata] author`; `setup.py` `setup(author=...)` | `.py`                                   |
+| `php`    | `composer.json`                             | `name`                                                                                                                    | `authors[0].name`                                                                                                                                               | `.php`                                  |
+| `rust`   | `Cargo.toml`                                | `[package].name`                                                                                                          | the name part of `[package].authors[0]`                                                                                                                         | `.rs`                                   |
+| `go`     | `go.mod`                                    | the `module` path                                                                                                         | none (`go.mod` has no author)                                                                                                                                   | `.go`                                   |
 
 A manifest claims its folder as soon as it exists and can be read, even when it is malformed or has no name. `requirements.txt` does not claim a folder: it carries no name and often sits in folders that are not projects of their own (`docs/requirements.txt`).
 
 For each file:
 
 1. **Project root.** Walk up from the file's folder. The nearest folder that at least one driver claims is the project root. `@Filename` is the file's path relative to it, and git history (`@Date`, `@Last modified time`) is looked up from it.
-2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSONC, …) use the fixed order.
+2. **Order.** When several drivers claim that folder, the file's native driver is read first (a `.py` file reads `python` first), then the fixed order `node`, `python`, `php`, `rust`, `go`. Language-neutral files (CSS, HTML, YAML, JSONC, C, …) use the fixed order.
 3. **Per-field fallback.** Each value is taken from the first driver in that order whose manifest provides it. In a folder with a nameless `package.json` and a named `pyproject.toml`, every file gets the `pyproject.toml` name.
 4. **Climbing.** A value no driver at the project root provides is looked up the same way in each ancestor folder a driver claims, up to and including the scan root (`projectRoot`, else `cwd`), never above it. A nameless sub-package therefore takes the name of the repository around it. Only values climb: the project root, and with it `@Filename` and the git lookups, stays the nearest claimed folder.
 5. **Folder name.** When nothing up to the scan root provides a name, `@Project` is the project root's folder name.
@@ -558,24 +558,26 @@ The `@Date` instant is unchanged; `@Last modified time` is restamped with the ti
 
 Each file type is handled by a detector, which decides the header's comment syntax. A file is given a header only when an enabled detector handles its extension:
 
-| Detector   | Extensions                    | Header comment | Default                                    |
-| ---------- | ----------------------------- | -------------- | ------------------------------------------ |
-| `node`     | `.js .mjs .cjs .ts .tsx .jsx` | `/** … */`     | on                                         |
-| `json`     | `.jsonc .json5 .jsonv`        | `/** … */`     | on                                         |
-| `css`      | `.css`                        | `/* … */`      | on                                         |
-| `html`     | `.html .htm`                  | `<!-- … -->`   | on                                         |
-| `yaml`     | `.yaml .yml`                  | `# …`          | on                                         |
-| `python`   | `.py`                         | `# …`          | on                                         |
-| `php`      | `.php`                        | `/** … */`     | on                                         |
-| `rust`     | `.rs`                         | `/** … */`     | on                                         |
-| `go`       | `.go`                         | `/** … */`     | on                                         |
-| `markdown` | `.md .markdown`               | `<!-- … -->`   | off; only with `--force-detector markdown` |
+| Detector   | Extensions                              | Header comment | Default                                    |
+| ---------- | --------------------------------------- | -------------- | ------------------------------------------ |
+| `node`     | `.js .mjs .cjs .ts .mts .cts .tsx .jsx` | `/** … */`     | on                                         |
+| `json`     | `.jsonc .json5 .jsonv`                  | `/** … */`     | on                                         |
+| `css`      | `.css`                                  | `/* … */`      | on                                         |
+| `html`     | `.html .htm`                            | `<!-- … -->`   | on                                         |
+| `yaml`     | `.yaml .yml`                            | `# …`          | on                                         |
+| `python`   | `.py`                                   | `# …`          | on                                         |
+| `php`      | `.php`                                  | `/** … */`     | on                                         |
+| `rust`     | `.rs`                                   | `/** … */`     | on                                         |
+| `go`       | `.go`                                   | `/** … */`     | on                                         |
+| `c`        | `.c .h .cc .cpp .cxx .hh .hpp .hxx`     | `/* … */`      | on                                         |
+| `markdown` | `.md .markdown`                         | `<!-- … -->`   | off; only with `--force-detector markdown` |
 
 Every other file is skipped and left byte-for-byte unchanged, including when you name it with `--input` or add its extension with `includeExtensions`:
 
 - **Strict JSON (`.json`)** has no comment syntax, so it never gets a header. A comment would make `package.json` and every other JSON file invalid.
 - **Files with no extension, or an extension no enabled detector handles** (`.txt`, `.toml`, a disabled detector's extensions, …) are skipped instead of being given a guessed comment.
 - **A PHP file that does not open with `<?php`** (a template starting with HTML) is skipped: a comment at the top would be output as text. A file where only a fix-headers header (and blank lines) comes before `<?php` is not skipped: an earlier version wrote that header there, and it is moved back below `<?php` (see [What stays above the header](#what-stays-above-the-header)).
+- **Third-party C and C++** is skipped: a `c` file whose prologue (the comments, blank lines and preprocessor directives before its first line of code) holds a comment with license or copyright wording (`Copyright`, `License`, `SPDX-License-Identifier`, `public domain`) that is not a fix-headers header is left untouched, so a vendored library such as the SQLite amalgamation (`sqlite3.c`, `sqlite3.h`) keeps its own notice. A file whose first comment is already a fix-headers header is never skipped this way. To keep a whole folder of vendored code out of the run regardless of its comments, use `excludeFolders` / `--exclude-folder`.
 - **Markdown** is skipped unless the `markdown` detector is forced with `--force-detector markdown` (`forcedDetectors: ["markdown"]` in the API or a config file). Naming a `.md` file with `--input` does not force it. A forced header is an HTML comment, which Markdown renderers do not display; it goes below any YAML front matter (`---` … `---`), and later runs update it in place. Forcing applies to discovery too, so a repo-wide run with the option also stamps `README.md` and changelogs; to stamp one file, pass the option together with `--input <file>`. `.mdx` is not covered, because MDX does not accept HTML comments.
 
 A skipped file is listed in the result's `skipped` array as `{ file, reason }` and counted in `filesSkipped`, not in `filesScanned` or `changes`. The CLI adds `skipped=<n>` to its summary and prints one `skipped: <file> (<reason>)` line per file:
