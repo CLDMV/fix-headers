@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:07:23-08:00 (1795640843)
+ *	@Last modified time: 2026-11-25T13:49:52-08:00 (1795643392)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -19,6 +19,7 @@ import { applyConfigOption } from "../config/load.mjs";
 import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } from "../constants.mjs";
 import { discoverFiles } from "./file-discovery.mjs";
 import { getContentSkipReason, getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
+import { declarationCopySkipReason } from "../detectors/node.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
 	checkHeaderDates,
@@ -44,6 +45,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  check?: boolean,
  *  fixCreatedDate?: boolean,
  *  strictCreatedDate?: boolean,
+ *  rewriteDeclarationCopies?: boolean,
  *  strictHeaderBlock?: boolean,
  *  normalizeDateFormat?: boolean,
  *  timezone?: string,
@@ -316,6 +318,7 @@ export async function fixHeaders(options = {}) {
 	const check = effectiveOptions.check === true;
 	const dryRun = check || effectiveOptions.dryRun === true;
 	const fixCreatedDate = effectiveOptions.fixCreatedDate === true;
+	const rewriteDeclarationCopies = effectiveOptions.rewriteDeclarationCopies === true;
 	/** @type {DateRewrite} */
 	const keepDate = (payload) => payload;
 	/** @type {DateRewrite} */
@@ -402,7 +405,11 @@ export async function fixHeaders(options = {}) {
 			forcedDetectors,
 			detectorSyntaxOverrides: effectiveOptions.detectorSyntaxOverrides
 		};
-		const contentSkipReason = getContentSkipReason(filePath, restoreTopLines(original, filePath, detectorOptions), detectorOptions);
+		const restoredContent = restoreTopLines(original, filePath, detectorOptions);
+		// With rewriteDeclarationCopies, a declaration carrying tsc's copy of its source's header
+		// is restamped for the path it ships at instead of skipped (see declarationCopySkipReason).
+		const declarationCopy = rewriteDeclarationCopies && declarationCopySkipReason(restoredContent, filePath) !== null;
+		const contentSkipReason = declarationCopy ? null : getContentSkipReason(filePath, restoredContent, detectorOptions);
 		if (contentSkipReason !== null) {
 			skipped.push({ file: relativePath, reason: contentSkipReason });
 			continue;
@@ -468,7 +475,10 @@ export async function fixHeaders(options = {}) {
 		// @Last modified by names whoever last edited the file's content. It becomes the run's
 		// identity only when the content outside the header was edited (see detectContentEdit);
 		// a run that only rewrites header values keeps the recorded editor.
-		const contentEdit = await detectContentEdit(original, filePath, syntaxOptions);
+		// A restamped declaration copy keeps the dates and editor its source's header carries: it
+		// is generated (usually gitignored, created by the build), so neither git nor the
+		// filesystem knows when its content was written, and tsc regenerating it is not an edit.
+		const contentEdit = declarationCopy ? { edited: false, state: "no-git" } : await detectContentEdit(original, filePath, syntaxOptions);
 		const lastModifiedByRun = shouldForceLastModifiedAuthorUpdate || contentEdit.edited;
 
 		/**
@@ -511,10 +521,12 @@ export async function fixHeaders(options = {}) {
 			gitLastUpdated !== null &&
 			repairedLastModifiedAt.timestamp < gitLastUpdated.timestamp;
 		const needsUpdate = comparisonReplacement.changed || unstampedEdit;
-		const finalLastModifiedAt = needsUpdate ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
-		const lastModifiedAtSource = needsUpdate ? "current-time-on-change" : comparisonLastModifiedAtSource;
+		const keepCopiedLastModified = declarationCopy && repairedLastModifiedAt !== null;
+		const restamp = needsUpdate && !keepCopiedLastModified;
+		const finalLastModifiedAt = restamp ? formatDate(toZone(toDatePayload(new Date()))) : comparisonLastModifiedAt;
+		const lastModifiedAtSource = restamp ? "current-time-on-change" : comparisonLastModifiedAtSource;
 
-		const header = needsUpdate ? renderHeader(finalLastModifiedAt) : comparisonHeader;
+		const header = restamp ? renderHeader(finalLastModifiedAt) : comparisonHeader;
 
 		const replacement = needsUpdate ? replaceOrInsertHeader(original, header, filePath, syntaxOptions) : comparisonReplacement;
 		/** @type {FixHeadersResult["changes"][number]} */

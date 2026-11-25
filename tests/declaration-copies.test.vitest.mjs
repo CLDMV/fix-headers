@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:07:27-08:00 (1795640847)
+ *	@Last modified time: 2026-11-25T13:49:52-08:00 (1795643392)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import { fixHeaders } from "../src/core/fix-headers.mjs";
 import { detector as nodeDetector } from "../src/detectors/node.mjs";
 import { getContentSkipReason } from "../src/detectors/index.mjs";
+import { parseCliArgs } from "../src/cli.mjs";
 import { cleanupWorkspace, createWorkspace, writeWorkspaceFile } from "./helpers/workspace.mjs";
 
 /**
@@ -91,6 +92,109 @@ describe("node detector: declaration files copied by tsc", () => {
 			expect(result.skipped).toEqual([{ file: join("types", "src", "x.d.mts"), reason: expect.stringMatching(/tsc copies it/) }]);
 			expect(await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8")).toBe(copied);
 			expect(await readFile(join(workspace, "types", "hand.d.ts"), "utf8")).toContain("@Filename: types/hand.d.ts");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+});
+
+describe("rewriteDeclarationCopies (#201)", () => {
+	/**
+	 * A full header as fix-headers writes it on a source file, as tsc copies it into the declaration.
+	 * @param {string} filename - The `@Filename` value.
+	 * @returns {string} Header comment.
+	 */
+	function sourceHeader(filename) {
+		return [
+			"/**",
+			" *",
+			" *\t@Project: declaration-copies",
+			` *\t@Filename: ${filename}`,
+			" *\t@Date: 2026-01-01T00:00:00-08:00 (1767254400)",
+			" *\t@Author: Source Author",
+			" *\t@Email: <source@example.com>",
+			" *\t-----",
+			" *\t@Last modified by: Source Editor (editor@example.com)",
+			" *\t@Last modified time: 2026-02-01T00:00:00-08:00 (1769932800)",
+			" *\t-----",
+			" *\t@Copyright: Copyright (c) 2026 Catalyzed Motivation Inc. All rights reserved.",
+			" *",
+			" */",
+			""
+		].join("\n");
+	}
+
+	const tag = (content, name) => new RegExp(`@${name}: (.*)`).exec(content)?.[1];
+
+	it("parses --rewrite-declaration-copies", () => {
+		expect(parseCliArgs(["--rewrite-declaration-copies"]).options).toEqual({ rewriteDeclarationCopies: true });
+	});
+
+	it("restamps a tsc copy for the path it ships at, keeping the source's dates and editor, and is then stable", async () => {
+		const workspace = await createWorkspace("declaration-copies-rewrite");
+		try {
+			const copied = `${sourceHeader("src/x.mts")}export declare const x: 1;\n`;
+			await writeWorkspaceFile(join(workspace, "package.json"), PACKAGE_JSON);
+			await writeWorkspaceFile(join(workspace, "types", "src", "x.d.mts"), copied);
+			await writeWorkspaceFile(join(workspace, "types", "src", "old.d.mts"), `${sourceHeader("/src/old.mts")}export {};\n`);
+
+			const result = await fixHeaders({ cwd: workspace, input: "types", rewriteDeclarationCopies: true, ...IDENTITY });
+
+			expect(result.skipped).toEqual([]);
+			expect(result.changes.map((change) => change.file).sort()).toEqual([
+				join("types", "src", "old.d.mts"),
+				join("types", "src", "x.d.mts")
+			]);
+			const content = await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8");
+			expect(tag(content, "Filename")).toBe("types/src/x.d.mts");
+			expect(tag(content, "Project")).toBe("declaration-copies");
+			expect(tag(content, "Date")).toBe("2026-01-01T00:00:00-08:00 (1767254400)");
+			expect(tag(content, "Author")).toBe("Source Author");
+			expect(tag(content, "Last modified by")).toBe("Source Editor (editor@example.com)");
+			expect(tag(content, "Last modified time")).toBe("2026-02-01T00:00:00-08:00 (1769932800)");
+			expect(content.endsWith("export declare const x: 1;\n")).toBe(true);
+			// The slashed form earlier versions wrote is recognised as a copy too.
+			expect(tag(await readFile(join(workspace, "types", "src", "old.d.mts"), "utf8"), "Filename")).toBe("types/src/old.d.mts");
+
+			const again = await fixHeaders({ cwd: workspace, input: "types", rewriteDeclarationCopies: true, ...IDENTITY });
+			expect(again.changes.filter((change) => change.changed)).toEqual([]);
+			expect(await readFile(join(workspace, "types", "src", "x.d.mts"), "utf8")).toBe(content);
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("names a staged package's declarations from that package's own root and manifest", async () => {
+		const workspace = await createWorkspace("declaration-copies-staged");
+		try {
+			const staged = join(workspace, "dist-packages", "x-types");
+			await writeWorkspaceFile(join(workspace, "package.json"), PACKAGE_JSON);
+			await writeWorkspaceFile(join(staged, "package.json"), `${JSON.stringify({ name: "@scope/x-types", version: "1.0.0" }, null, 2)}\n`);
+			await writeWorkspaceFile(join(staged, "lib", "x.d.mts"), `${sourceHeader("src/x.mts")}export {};\n`);
+
+			await fixHeaders({ cwd: workspace, input: "dist-packages/x-types", rewriteDeclarationCopies: true, ...IDENTITY });
+
+			const content = await readFile(join(staged, "lib", "x.d.mts"), "utf8");
+			expect(tag(content, "Filename")).toBe("lib/x.d.mts");
+			expect(tag(content, "Project")).toBe("@scope/x-types");
+			expect(tag(content, "Date")).toBe("2026-01-01T00:00:00-08:00 (1767254400)");
+		} finally {
+			await cleanupWorkspace(workspace);
+		}
+	});
+
+	it("still stamps a declaration that is not a copy the usual way", async () => {
+		const workspace = await createWorkspace("declaration-copies-rewrite-plain");
+		try {
+			await writeWorkspaceFile(join(workspace, "package.json"), PACKAGE_JSON);
+			await writeWorkspaceFile(join(workspace, "types", "hand.d.ts"), "export declare const hand: 1;\n");
+
+			const result = await fixHeaders({ cwd: workspace, input: "types", rewriteDeclarationCopies: true, ...IDENTITY });
+
+			expect(result.changes.map((change) => change.file)).toEqual([join("types", "hand.d.ts")]);
+			const content = await readFile(join(workspace, "types", "hand.d.ts"), "utf8");
+			expect(tag(content, "Filename")).toBe("types/hand.d.ts");
+			expect(tag(content, "Author")).toBe("Decl Tester");
 		} finally {
 			await cleanupWorkspace(workspace);
 		}
