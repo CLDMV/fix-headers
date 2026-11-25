@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:07:24-08:00 (1795640844)
+ *	@Last modified time: 2026-11-25T13:49:52-08:00 (1795643392)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -73,6 +73,15 @@ function leadingHeaderFilename(content) {
 }
 
 /**
+ * Whether a path names a TypeScript declaration file (`.d.ts`, `.d.mts` or `.d.cts`).
+ * @param {string} filePath - File path.
+ * @returns {boolean} True for a declaration file.
+ */
+export function isDeclarationFile(filePath) {
+	return DECLARATION_FILE.test(basename(filePath));
+}
+
+/**
  * Says why a generated declaration file is skipped. `tsc` copies the source file's header into
  * the `.d.ts` / `.d.mts` / `.d.cts` it emits, `@Filename` included, and the source run already
  * maintains that header. Rewriting the copy only makes fix-headers and `tsc` undo each other on
@@ -82,7 +91,7 @@ function leadingHeaderFilename(content) {
  * @param {string} filePath - File path.
  * @returns {string | null} Skip reason, or null.
  */
-function declarationCopySkipReason(content, filePath) {
+export function declarationCopySkipReason(content, filePath) {
 	const declaration = DECLARATION_FILE.exec(basename(filePath));
 	if (!declaration) {
 		return null;
