@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:07:28-08:00 (1795640848)
+ *	@Last modified time: 2026-11-25T19:44:18-08:00 (1795664658)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -16,12 +16,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join, relative, sep } from "node:path";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { build } from "tsup";
-import tsupConfigs from "../tsup.config.mjs";
+import { build } from "../scripts/build.mjs";
 import fixHeadersDefault, { fixHeaders } from "@cldmv/fix-headers";
 import { discoverFiles } from "../src/core/file-discovery.mjs";
 import { fixHeaders as coreFixHeaders } from "../src/core/fix-headers.mjs";
@@ -91,22 +90,29 @@ describe("module integration and coverage", () => {
 		expect(result.changes.some((change) => change.file.startsWith("src/generated/"))).toBe(false);
 	});
 
-	// Three tsup builds, a git init and a CLI spawn: several seconds on its own, well past
+	// A full build, a git init and a CLI spawn: several seconds on its own, well past
 	// vitest's 5s default once coverage instrumentation and parallel workers are involved.
-	it("builds dist/ and bin/ with tsup and exposes the same API from the built output", { timeout: 30_000 }, async () => {
+	it("builds dist/ one file per module and exposes the same API from the built output", { timeout: 30_000 }, async () => {
 		const workspace = await createWorkspace("built-api");
 		workspaces.push(workspace);
 		await createNodeFixture(workspace);
 		await initializeGitWorkspace(workspace);
 
-		// Build with the repo's own tsup config, redirected into this test's workspace so
-		// the run never touches the repo's dist/ or bin/ (the API calls below only scan src/).
+		// Build with the repo's own build script, redirected into this test's workspace so
+		// the run never touches the repo's dist/ (the API calls below only scan src/).
 		const outRoot = join(workspace, "build-output");
-		for (const config of tsupConfigs) {
-			await build({ ...config, outDir: join(outRoot, config.outDir), silent: true, config: false });
-		}
+		const written = await build({ outDir: join(outRoot, "dist") });
 
-		// Every entry point package.json names must exist: dist/ and bin/ in the build output,
+		// dist/ mirrors src/ file for file: every source module has its own output, and no
+		// output carries another module's code (#205).
+		const sources = (await readdir(new URL("../src", import.meta.url), { recursive: true })).filter((file) => /\.(mjs|cjs)$/.test(file));
+		expect(written.sort()).toEqual(sources.sort());
+		const cli = await readFile(join(outRoot, "dist", "cli.mjs"), "utf8");
+		expect(cli.startsWith("#!/usr/bin/env node\n")).toBe(true);
+		expect(cli).toMatch(/from"\.\/index\.mjs"/);
+		expect(cli).not.toContain("function fixHeaders");
+
+		// Every entry point package.json names must exist: dist/ in the build output,
 		// types/ in the repository (a stale field such as "module" pointing at a deleted file
 		// would otherwise ship unnoticed).
 		const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -122,7 +128,7 @@ describe("module integration and coverage", () => {
 		];
 		for (const entry of entryPoints) {
 			const relativePath = entry.replace(/^\.\//, "");
-			const onDisk = /^(dist|bin)\//.test(relativePath) ? join(outRoot, relativePath) : new URL(`../${relativePath}`, import.meta.url);
+			const onDisk = relativePath.startsWith("dist/") ? join(outRoot, relativePath) : new URL(`../${relativePath}`, import.meta.url);
 			await expect(readFile(onDisk), `${entry} should exist`).resolves.toBeDefined();
 		}
 
@@ -152,7 +158,7 @@ describe("module integration and coverage", () => {
 
 		const { stdout } = await execFileAsync(
 			process.execPath,
-			[join(outRoot, "bin", "fix-headers.mjs"), "--dry-run", "--json", "--include-folder", "src"],
+			[join(outRoot, manifest.bin["fix-headers"]), "--dry-run", "--json", "--include-folder", "src"],
 			{ cwd: workspace }
 		);
 		const cliResult = JSON.parse(stdout);

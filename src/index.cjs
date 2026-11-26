@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:07:26-08:00 (1795640846)
+ *	@Last modified time: 2026-11-25T19:44:18-08:00 (1795664658)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -19,15 +19,15 @@
  * Node's `require()` loads an ES module synchronously and returns its namespace, as
  * long as that module has no top-level await (dist/index.mjs has none). The wrapper
  * returns the default export, keeping the historical `module.exports = fixHeaders`
- * shape, instead of tsup bundling a second full copy of the library for CJS.
+ * shape, instead of a second full copy of the library built for CJS.
  *
  * Node.js versions without require(esm) (20.x before 20.19, 22.x before 22.12, and
  * anything older) would fail with a bare ERR_REQUIRE_ESM, so the check below fails
  * early with a message that says what to do instead.
  *
  * It sits next to the ESM entry under the same name, so `require("./index.mjs")` resolves
- * to src/index.mjs from source and to dist/index.mjs once built. tsup's `onSuccess` copies
- * it verbatim into dist/ (tsup.config.mjs); it never passes through esbuild, so it stays
+ * to src/index.mjs from source and to dist/index.mjs once built. scripts/build.mjs copies
+ * it verbatim into dist/; it never passes through esbuild, so it stays
  * this small however much the library grows.
  * @module fix-headers/cjs-entry
  */

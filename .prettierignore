@@ -1,7 +1,6 @@
 # Dependencies + generated/build output (not hand-authored)
 node_modules/
 dist/
-bin/
 build/
 coverage/
 tmp/
