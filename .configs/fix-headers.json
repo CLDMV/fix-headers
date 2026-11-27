@@ -1,4 +1,3 @@
 {
-	"extends": "@cldmv/configs/fix-headers.json",
-	"rewriteDeclarationCopies": false
+	"extends": "@cldmv/configs/fix-headers.json"
 }
