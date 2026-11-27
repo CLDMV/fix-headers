@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T13:49:52-08:00 (1795643392)
+ *	@Last modified time: 2026-11-27T12:50:52-08:00 (1795812652)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -20,6 +20,7 @@ import { DEFAULT_HEADER_MARGIN, DEFAULT_HEADER_SPACING, resolveLayoutCount } fro
 import { discoverFiles } from "./file-discovery.mjs";
 import { getContentSkipReason, getHeaderSkipReason, resolveForcedDetectors } from "../detectors/index.mjs";
 import { declarationCopySkipReason, isDeclarationFile } from "../detectors/node.mjs";
+import { createDeclarationSourceResolver } from "./declaration-sources.mjs";
 import { resolveProjectMetadata } from "../detect/project.mjs";
 import {
 	checkHeaderDates,
@@ -46,6 +47,7 @@ import { assertTimeZone, toDatePayload } from "../utils/time.mjs";
  *  fixCreatedDate?: boolean,
  *  strictCreatedDate?: boolean,
  *  rewriteDeclarationCopies?: boolean,
+ *  tsconfig?: string,
  *  strictHeaderBlock?: boolean,
  *  normalizeDateFormat?: boolean,
  *  timezone?: string,
@@ -265,6 +267,21 @@ function extractHeaderLastModifiedAt(headerText) {
 }
 
 /**
+ * Reads the project header of a declaration's source file.
+ * @param {string | null} sourcePath - Absolute source path, or null when none was found.
+ * @param {Parameters<typeof findProjectHeader>[2]} syntaxOptions - Header syntax options.
+ * @returns {Promise<string>} The header text, or an empty string when there is no source or it has no header.
+ */
+async function readSourceHeader(sourcePath, syntaxOptions) {
+	if (sourcePath === null) {
+		return "";
+	}
+	const content = await readFile(sourcePath, "utf8");
+	const header = findProjectHeader(content, sourcePath, syntaxOptions);
+	return header ? content.slice(header.start, header.end) : "";
+}
+
+/**
  * Decides whether a file's content (everything outside its header) was edited, by comparing
  * it with the file at git `HEAD`. The header is taken out of both sides first, so a run that
  * only rewrites the header (dates, framing, spacing, margin, other fields, or adding one) does
@@ -340,6 +357,7 @@ export async function fixHeaders(options = {}) {
 		gitignore: effectiveOptions.gitignore
 	};
 	const inputs = resolveInputs(effectiveOptions.input);
+	const findDeclarationSource = createDeclarationSourceResolver({ scanRoot, tsconfig: effectiveOptions.tsconfig });
 
 	/** @type {string[]} */
 	let files;
@@ -434,10 +452,19 @@ export async function fixHeaders(options = {}) {
 		};
 		const existingHeader = findProjectHeader(original, filePath, syntaxOptions);
 		const existingHeaderText = existingHeader ? original.slice(existingHeader.start, existingHeader.end) : "";
-		const existingIdentity = existingHeaderText.length > 0 ? extractHeaderAuthorIdentity(existingHeaderText) : {};
-		const existingLastModifiedIdentity = existingHeaderText.length > 0 ? extractHeaderLastModifiedIdentity(existingHeaderText) : {};
-		const existingCreatedAt = existingHeaderText.length > 0 ? extractHeaderCreatedAt(existingHeaderText) : null;
-		const existingLastModifiedAt = existingHeaderText.length > 0 ? extractHeaderLastModifiedAt(existingHeaderText) : null;
+		// tsc drops a source's header from the declaration when imports follow it. A declaration
+		// with no header then takes the header of the source it was emitted from (found through
+		// the tsconfig, see declaration-sources.mjs) for its dates and author, so it is not stamped
+		// as new with the build time. @Filename and @Project still name the declaration.
+		const sourceHeaderText =
+			rewriteDeclarationCopies && existingHeaderText.length === 0 && isDeclarationFile(filePath)
+				? await readSourceHeader(await findDeclarationSource(filePath), syntaxOptions)
+				: "";
+		const basisHeaderText = existingHeaderText || sourceHeaderText;
+		const existingIdentity = basisHeaderText.length > 0 ? extractHeaderAuthorIdentity(basisHeaderText) : {};
+		const existingLastModifiedIdentity = basisHeaderText.length > 0 ? extractHeaderLastModifiedIdentity(basisHeaderText) : {};
+		const existingCreatedAt = basisHeaderText.length > 0 ? extractHeaderCreatedAt(basisHeaderText) : null;
+		const existingLastModifiedAt = basisHeaderText.length > 0 ? extractHeaderLastModifiedAt(basisHeaderText) : null;
 		const filesystemDates = await readFileDates(filePath);
 
 		const metadataRelativePath = relative(fileMetadata.projectRoot, filePath);
@@ -480,11 +507,13 @@ export async function fixHeaders(options = {}) {
 		// gitignored), so neither git nor the filesystem knows when its content was written, and
 		// tsc regenerating it is not an edit. A declaration git does not track that already has a
 		// header is taken to be generated.
-		const gitContentEdit = declarationCopy ? null : await detectContentEdit(original, filePath, syntaxOptions);
+		const sourceRecovered = sourceHeaderText.length > 0;
+		const gitContentEdit = declarationCopy || sourceRecovered ? null : await detectContentEdit(original, filePath, syntaxOptions);
 		const generatedDeclaration =
 			declarationCopy ||
+			sourceRecovered ||
 			(rewriteDeclarationCopies && gitContentEdit?.state === "untracked" && existingHeaderText.length > 0 && isDeclarationFile(filePath));
-		// gitContentEdit is only null for a declaration copy, which is a generated declaration.
+		// gitContentEdit is only null for a generated declaration (a copy or a recovered source header).
 		const contentEdit = generatedDeclaration
 			? { edited: false, state: "no-git" }
 			: /** @type {{edited: boolean, state: string}} */ (gitContentEdit);
