@@ -16,6 +16,7 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ### Latest: v2.6.0 (November 2026)
 
+- **Headerless declarations take their source's header** — a `.d.ts` / `.d.mts` / `.d.cts` that `tsc` emitted without a header gets its source's `@Date`, `@Author` and `@Last modified` values, found through the tsconfig the declarations were built with (new `tsconfig` option, `--tsconfig`), so rebuilding them no longer stamps the build time; `@Filename` still names the declaration (fixes [#214](https://github.com/CLDMV/fix-headers/issues/214)).
 - **Generic CommonJS shim** — `src/index.cjs` is the standard CLDMV drop-in shim; `require("@cldmv/fix-headers")` still returns the `fixHeaders` function ([#212](https://github.com/CLDMV/fix-headers/pull/212), fixes [#209](https://github.com/CLDMV/fix-headers/issues/209)).
 - **Generated declarations** — `types/` is built and header-stamped at build and pack time instead of being committed; the package's `types` entry is now `types/src/index.d.mts` ([#215](https://github.com/CLDMV/fix-headers/pull/215), fixes [#211](https://github.com/CLDMV/fix-headers/issues/211)).
 - [View full v2.6.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.6.0.md)
