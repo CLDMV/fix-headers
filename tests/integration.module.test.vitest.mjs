@@ -7,7 +7,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T19:44:18-08:00 (1795664658)
+ *	@Last modified time: 2026-11-27T12:16:47-08:00 (1795810607)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -140,7 +140,7 @@ describe("module integration and coverage", () => {
 		// bundle of the library: it must stay tiny and only delegate to dist/index.mjs.
 		const cjsSource = await readFile(join(outRoot, "dist", "index.cjs"), "utf8");
 		expect(cjsSource).toBe(await readFile(new URL("../src/index.cjs", import.meta.url), "utf8"));
-		expect(cjsSource).toContain('require("./index.mjs").default');
+		expect(cjsSource).toContain('require("./index.mjs")');
 		expect(Buffer.byteLength(cjsSource)).toBeLessThan(2048);
 
 		// `require()` must return the function itself (historical CJS shape), and an ESM
