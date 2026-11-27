@@ -7,28 +7,20 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-25T19:44:18-08:00 (1795664658)
+ *	@Last modified time: 2026-11-27T12:16:43-08:00 (1795810603)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
 /**
- * @fileoverview CommonJS entry point — a thin, synchronous wrapper around the ESM build.
+ * @fileoverview CommonJS entry point: the generic CLDMV drop-in shim
+ * (CLDMV/.github docs/conventions/package-layout.md).
  *
- * Node's `require()` loads an ES module synchronously and returns its namespace, as
- * long as that module has no top-level await (dist/index.mjs has none). The wrapper
- * returns the default export, keeping the historical `module.exports = fixHeaders`
- * shape, instead of a second full copy of the library built for CJS.
- *
- * Node.js versions without require(esm) (20.x before 20.19, 22.x before 22.12, and
- * anything older) would fail with a bare ERR_REQUIRE_ESM, so the check below fails
- * early with a message that says what to do instead.
- *
- * It sits next to the ESM entry under the same name, so `require("./index.mjs")` resolves
- * to src/index.mjs from source and to dist/index.mjs once built. scripts/build.mjs copies
- * it verbatim into dist/; it never passes through esbuild, so it stays
- * this small however much the library grows.
+ * It returns what `import` gives: the single distinct exported value when there is one
+ * (here `fixHeaders`, which is also the default export), so `require("@cldmv/fix-headers")`
+ * is the function itself; otherwise the module object. scripts/build.mjs copies it
+ * verbatim into dist/, where `./index.mjs` resolves to the built entry.
  * @module fix-headers/cjs-entry
  */
 "use strict";
@@ -41,4 +33,12 @@ if (!process.features?.require_module) {
 	throw error;
 }
 
-module.exports = require("./index.mjs").default;
+// Same exports as `import`. One distinct exported value (aliases of it count once) comes back as that value,
+// so require(x)(...) works; anything else comes back as the module object ({ default, ...named }).
+const esm = require("./index.mjs");
+const values = new Set(
+	Object.keys(esm)
+		.filter((key) => key !== "__esModule")
+		.map((key) => esm[key])
+);
+module.exports = values.size === 1 ? values.values().next().value : esm;
