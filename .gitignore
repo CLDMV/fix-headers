@@ -5,8 +5,7 @@ trash/
 other_drivers/
 dist
 dist/
-types/dist
-types/dist/
+types/
 build/
 build.zip
 build/zips/
