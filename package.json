@@ -1,11 +1,11 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.5.1",
+	"version": "2.6.0",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.mjs",
-	"types": "./types/index.d.mts",
+	"types": "./types/src/index.d.mts",
 	"files": [
 		"dist/",
 		"!dist/**/*.map",
@@ -14,11 +14,11 @@
 	"exports": {
 		".": {
 			"fix-headers-dev": {
-				"types": "./types/index.d.mts",
+				"types": "./types/src/index.d.mts",
 				"import": "./src/index.mjs",
 				"require": "./src/index.cjs"
 			},
-			"types": "./types/index.d.mts",
+			"types": "./types/src/index.d.mts",
 			"import": "./dist/index.mjs",
 			"require": "./dist/index.cjs"
 		},
@@ -35,11 +35,11 @@
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet && npm run test:cjs",
 		"ci:coverage": "npm run coverage && npm run test:dist",
-		"types:build": "tsc -p .configs/tsconfig.json --noCheck",
+		"types:build": "tsc -p .configs/tsconfig.json --noCheck && node --conditions=fix-headers-dev ./src/cli.mjs --config .configs/fix-headers.json --input types",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"cli": "node --conditions=fix-headers-dev ./src/cli.mjs",
 		"build": "node scripts/build.mjs",
-		"prepack": "node -e \"const fs=require('node:fs');if(fs.existsSync('node_modules/esbuild')){require('node:child_process').execSync('npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and esbuild is unavailable to build it')}\"",
+		"prepack": "node -e \"const fs=require('node:fs');if(fs.existsSync('node_modules/esbuild')){require('node:child_process').execSync('npm run types:build && npm run build',{stdio:'inherit'})}else if(!fs.existsSync('dist/index.mjs')){throw new Error('dist/ is missing and esbuild is unavailable to build it')}\"",
 		"lint": "eslint --config .configs/eslint.config.mjs .",
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
