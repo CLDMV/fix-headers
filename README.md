@@ -14,17 +14,19 @@ Headers stay correct without hand-editing: `@Date` follows the file's real creat
 
 ## ✨ What's New
 
-### Latest: v2.5.1 (November 2026)
+### Latest: v2.6.0 (November 2026)
 
-- **Unbundled build** — `dist/` now mirrors `src/` one file per module instead of a bundle, and the CLI (`dist/cli.mjs`) imports the library rather than shipping its own copy. The `fix-headers` command is unchanged; the `bin/` folder is no longer published ([#206](https://github.com/CLDMV/fix-headers/pull/206), fixes [#205](https://github.com/CLDMV/fix-headers/issues/205)).
-- [View full v2.5.1 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.5.1.md)
+- **Headerless declarations take their source's header** — a `.d.ts` / `.d.mts` / `.d.cts` that `tsc` emitted without a header gets its source's `@Date`, `@Author` and `@Last modified` values, found through the tsconfig the declarations were built with (new `tsconfig` option, `--tsconfig`), so rebuilding them no longer stamps the build time; `@Filename` still names the declaration (fixes [#214](https://github.com/CLDMV/fix-headers/issues/214)).
+- **Generic CommonJS shim** — `src/index.cjs` is the standard CLDMV drop-in shim; `require("@cldmv/fix-headers")` still returns the `fixHeaders` function ([#212](https://github.com/CLDMV/fix-headers/pull/212), fixes [#209](https://github.com/CLDMV/fix-headers/issues/209)).
+- **Generated declarations** — `types/` is built and header-stamped at build and pack time instead of being committed; the package's `types` entry is now `types/src/index.d.mts` ([#215](https://github.com/CLDMV/fix-headers/pull/215), fixes [#211](https://github.com/CLDMV/fix-headers/issues/211)).
+- [View full v2.6.0 Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.6.0.md)
 
 ### Recent Releases
 
+- **v2.5.1** (November 2026) — `dist/` is built one file per module instead of a bundle, and the CLI (`dist/cli.mjs`) imports the library; `bin/` is no longer published ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.5.1.md))
 - **v2.5.0** (November 2026) — generated declarations carrying `tsc`'s copy of their source's header are restamped for where they ship; `rewriteDeclarationCopies: false` opts out ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.5.0.md))
 - **v2.4.0** (November 2026) — `@Filename` is written without a leading slash (`src/index.mjs`), and declarations carrying `tsc`'s copy of their source's header are skipped ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.4.0.md))
 - **v2.3.0** (November 2026) — `.mts`/`.cts` in the `node` detector and a new `c` detector for C/C++; C files carrying another holder's license notice are skipped ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.3.0.md))
-- **v2.2.7** (November 2026) — no library code changed: the tests get the `fix-headers-dev` condition through `devCondition()`, and `npm run test:dist` runs the same suite against `dist/` ([Changelog](https://github.com/CLDMV/fix-headers/blob/master/docs/changelog/v2/v2.2.7.md))
 
 📚 For complete release notes, see the [docs/changelog/](https://github.com/CLDMV/fix-headers/tree/master/docs/changelog/) folder.
 
