@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/fix-headers",
-	"version": "2.6.0",
+	"version": "2.6.1",
 	"description": "Multi-language project header normalizer with auto-detection and override support.",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -93,11 +93,11 @@
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"devDependencies": {
-		"@cldmv/configs": "^1.4.0",
+		"@cldmv/configs": "^1.5.0",
 		"@cldmv/eslint-plugin-jsonv": "^1.0.10",
 		"@cldmv/jsonv": "^1.0.9",
 		"@cldmv/prettier-plugin-jsonv": "^1.0.6",
-		"@cldmv/vitest-runner": "^1.4.2",
+		"@cldmv/vitest-runner": "^1.11.3",
 		"@eslint/css": "^2.0.0",
 		"@eslint/js": "^10.0.1",
 		"@eslint/json": "^2.1.0",
